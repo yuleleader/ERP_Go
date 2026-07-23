@@ -340,7 +340,7 @@
 import { formatDate, formatDateTime, toBeijingDate } from '@/utils/format'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
-import { getOrders, createOrder, updateOrder, deleteOrder } from '@/api/order'
+import { getOrders, createOrder, updateOrder, deleteOrder, getOrder } from '@/api/order'
 import { getShops } from '@/api/shop'
 import { migrateImage } from '@/api/image'
 import { getLogisticsCompanies } from '@/api/logistics'
@@ -582,7 +582,14 @@ async function viewOrder(row) {
   viewDialogVisible.value = true
 }
 
-function editOrder(row) {
+async function editOrder(row) {
+  // 重新从后端拉取最新订单数据，避免沿用列表缓存的旧值（如手机端已修改）
+  try {
+    const res = await getOrder(row.order_id)
+    row = res?.data || res || row
+  } catch (e) {
+    console.error('获取订单最新数据失败，使用列表缓存:', e)
+  }
   currentOrder.value = row
   dialogMode.value = 'edit'
   orderForm.shop_id = row.shop_id

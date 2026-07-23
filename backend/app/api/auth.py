@@ -53,6 +53,15 @@ async def login(
             detail="登录服务暂时不可用，请稍后重试或联系管理员"
         )
 
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_active_user)):
+    return {
+        "username": current_user.username,
+        "real_name": current_user.real_name,
+        "role": current_user.role,
+    }
+
+
 @router.post("/register", response_model=UserResponse)
 async def register(
     user_data: UserCreate,

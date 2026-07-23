@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>订单作业端</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root { --primary:#2563eb; --ok:#16a34a; --bg:#f3f4f6; --card:#fff; --line:#e5e7eb; --text:#111827; --muted:#6b7280; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .view { min-height:100vh; display:flex; flex-direction:column; }
+  .hidden { display:none !important; }
+  header { background:var(--primary); color:#fff; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+  header .title { font-size:17px; font-weight:600; }
+  header .user { font-size:13px; opacity:.95; }
+  header button { background:rgba(255,255,255,.18); color:#fff; border:0; border-radius:8px; padding:6px 12px; font-size:13px; }
+  .body { flex:1; padding:16px; overflow:auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .row { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:15px; }
+  .row:last-child { border-bottom:0; }
+  .row .k { color:var(--muted); flex:0 0 auto; }
+  .row .v { text-align:right; word-break:break-all; }
+  label { display:block; font-size:14px; color:var(--muted); margin:12px 0 6px; }
+  input, select, textarea { width:100%; font-size:16px; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--text); }
+  textarea { resize:vertical; }
+  .btn { display:block; width:100%; border:0; border-radius:12px; padding:14px; font-size:16px; font-weight:600; color:#fff; background:var(--primary); margin-top:8px; }
+  .btn.secondary { background:#fff; color:var(--primary); border:1px solid var(--primary); }
+  .btn.ok { background:var(--ok); }
+  .muted { color:var(--muted); font-size:14px; text-align:center; padding:18px 0; }
+  .center { text-align:center; }
+  .scan-box { background:#000; border-radius:14px; overflow:hidden; position:relative; }
+  video { width:100%; display:block; }
+  .scan-close { position:absolute; top:10px; right:10px; background:rgba(0,0,0,.5); color:#fff; border:0; border-radius:8px; padding:6px 12px; }
+  .img-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .img-card { position:relative; aspect-ratio:1/1; background:#f8fafc; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .img-card img { width:100%; height:100%; object-fit:cover; }
+  .img-card .tag { position:absolute; left:0; bottom:0; background:rgba(0,0,0,.55); color:#fff; font-size:11px; padding:2px 6px; border-top-right-radius:8px; }
+  .toast { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,.82); color:#fff; padding:12px 20px; border-radius:10px; font-size:15px; z-index:99; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .field-hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  .logo { font-size:26px; font-weight:700; color:var(--primary); text-align:center; margin:8px 0 2px; }
+  .sub { text-align:center; color:var(--muted); font-size:13px; margin-bottom:22px; }
+  input[type=file] { padding:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 登录 -->
+  <section id="view-login" class="view">
+    <div class="body">
+      <div class="logo">订单作业端</div>
+      <div class="sub">工厂 / 发货 一线作业 · 扫码查单改单</div>
+      <div class="card">
+        <label>账号</label>
+        <input id="username" placeholder="用户名 / 工号" autocomplete="username">
+        <label>密码</label>
+        <input id="password" type="password" placeholder="密码" autocomplete="current-password">
+        <button id="loginBtn" class="btn">登 录</button>
+      </div>
+      <div class="muted">提示：请使用本系统分配的工厂 / 发货 / 销售 / 管理员账号登录。</div>
+    </div>
+  </section>
+
+  <!-- 首页：扫码 / 输单号 -->
+  <section id="view-home" class="view hidden">
+    <header>
+      <div class="title">订单作业端</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="user" id="homeUser"></span>
+        <button id="logoutBtn">退出</button>
+      </div>
+    </header>
+    <div class="body">
+      <div class="card center">
+        <button id="scanBtn" class="btn ok">📷 扫一扫二维码</button>
+        <button id="scanFileBtn" class="btn secondary">🖼️ 从相册选二维码</button>
+        <div class="field-hint" id="scanHint">对准订单二维码，自动识别订单号</div>
+        <label>或手动输入订单号</label>
+        <input id="manualInput" placeholder="粘贴 / 输入订单号">
+        <button id="manualBtn" class="btn secondary">查 询</button>
+      </div>
+    </div>
+    <!-- 摄像头遮罩 -->
+    <div id="scanOverlay" class="view hidden" style="position:fixed;inset:0;background:#000;z-index:50">
+      <div class="scan-box" style="height:100%">
+        <video id="video" playsinline></video>
+        <button id="scanClose" class="scan-close">关闭</button>
+        <div class="muted" style="color:#fff;position:absolute;bottom:72px;width:100%">将二维码放入取景框…</div>
+        <button id="scanFileBtn2" class="btn secondary" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%)">🖼️ 从相册选二维码</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 订单详情 -->
+  <section id="view-order" class="view hidden">
+    <header>
+      <button id="backBtn" style="background:transparent;color:#fff;border:0;border-radius:8px;padding:6px 14px;font-size:24px;line-height:1;font-weight:700">&lt;</button>
+      <div class="title" id="orderTitle">订单详情</div>
+      <div style="width:48px"></div>
+    </header>
+    <div class="body">
+      <div class="card">
+        <div id="info"></div>
+      </div>
+
+      <div class="card" id="editBox">
+        <div style="font-weight:600;margin-bottom:4px">修改信息</div>
+        <div class="field-hint">仅可修改你权限范围内的字段</div>
+        <form id="editForm"></form>
+        <button id="saveBtn" class="btn">保存修改</button>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:4px">图片</div>
+        <div id="images" class="img-grid"></div>
+        <label>上传图片（可拍照或从相册选择，≤5MB，支持 jpg/png）</label>
+        <input id="uploadInput" type="file" accept="image/*">
+        <div id="moduleWrap" class="hidden">
+          <label>图片类型</label>
+          <select id="moduleSelect">
+            <option value="production">生产实拍</option>
+            <option value="shipping">发货凭证</option>
+            <option value="sales">商品图</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+  <input id="qrFileInput" type="file" accept="image/*" style="display:none">
+</div>
+
+<script src="jsQR.js"></script>
+<script>
+(function(){
+  "use strict";
+  const API = "";
+  const PRODUCE_MAP = { unproduce:"未生产", producing:"生产中", produced:"生产完成" };
+  const SHIP_MAP = { pending:"待发货", shipped:"已发货", virtual_shipped:"虚拟发货" };
+  const ROLE_LABEL = { sales:"销售", factory:"工厂", shipping:"发货", boss:"管理员" };
+  const LAYER_LABEL = { sales:"商品图", factory:"生产实拍", shipping:"发货凭证" };
+  const DISPLAY = [
+    ["order_id","订单号"],
+    ["product_name","商品名称"],
+    ["platform_order_no","平台单号"],
+    ["produce_status","生产状态","produce"],
+    ["shipping_status","发货状态","ship"],
+    ["logistics_company","物流公司"],
+    ["logistics_no","物流单号"],
+    ["freight","运费"],
+    ["receiver_address","收货地址"],
+    ["remark","备注"],
+    ["creator_real_name","创建人"],
+    ["created_at","创建时间"],
+    ["order_days","滞留天数"],
+    ["sales_amount","销售金额"],
+    ["commission_amount","佣金"]
+  ];
+
+  const state = { token:null, user:null, orderId:null, order:null, stream:null, raf:null, logisticsCompanies:[] };
+
+  const $ = (id) => document.getElementById(id);
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function show(view){
+    ["view-login","view-home","view-order"].forEach(v=>$(v).classList.toggle("hidden", v!==view));
+  }
+  function toast(msg){
+    const t=$("toast"); t.textContent=msg; t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"), 1400);
+  }
+
+  function authHeader(){ return state.token ? { Authorization:"Bearer "+state.token } : {}; }
+  async function api(path, opts){
+    opts = opts||{};
+    opts.headers = Object.assign({}, opts.headers||{}, authHeader());
+    const res = await fetch(API+path, opts);
+    let data = {};
+    try { data = await res.json(); } catch(e){}
+    if(res.status===401){ logout(); throw new Error("登录已失效，请重新登录"); }
+    if(!res.ok) throw new Error(data.detail || ("请求失败 ("+res.status+")"));
+    return data;
+  }
+
+  function editableFields(role){
+    if(role==="factory") return ["produce_status","remark"];
+    if(role==="shipping") return ["shipping_status","logistics_company","logistics_no","freight","remark"];
+    return ["produce_status","shipping_status","logistics_company","logistics_no","freight","remark"];
+  }
+  function uploadModule(){
+    if(state.user.role==="shipping") return "shipping";
+    if(state.user.role==="factory") return "production";
+    return ($("moduleSelect").value) || "production";
+  }
+
+  // ---------- 登录 ----------
+  async function doLogin(){
+    const u=$("username").value.trim(), p=$("password").value;
+    if(!u||!p){ toast("请输入账号和密码"); return; }
+    try{
+      const fd=new URLSearchParams({ username:u, password:p });
+      const r=await fetch(API+"/api/auth/login",{ method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body:fd });
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.detail||"登录失败");
+      state.token=data.access_token;
+      localStorage.setItem("m_token", state.token);
+      await loadUser();
+      enterHome();
+    }catch(err){ toast(err.message); }
+  }
+  async function loadUser(){
+    state.user = await api("/api/auth/me");
+    $("homeUser").textContent = (state.user.real_name||state.user.username) + "（"+(ROLE_LABEL[state.user.role]||state.user.role)+"）";
+    await loadLogisticsCompanies();
+  }
+  async function loadLogisticsCompanies(){
+    try{
+      const list = await api("/api/logistics/companies");
+      state.logisticsCompanies = Array.isArray(list) ? list : (list.data||[]);
+    }catch(e){ state.logisticsCompanies=[]; }
+  }
+  function enterHome(){
+    // 销售/管理员可选手选图片类型
+    if(state.user.role==="sales"||state.user.role==="boss"){ $("moduleWrap").classList.remove("hidden"); }
+    else { $("moduleWrap").classList.add("hidden"); }
+    show("view-home");
+  }
+  function logout(){
+    state.token=null; state.user=null; localStorage.removeItem("m_token");
+    show("view-login");
+  }
+
+  // ---------- 扫码 ----------
+  function cameraAvailable(){
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+  function pickQrFromGallery(){ $("qrFileInput").click(); }
+  function decodeQrFile(file){
+    if(!file){ return; }
+    if(!window.jsQR){ toast("扫码库未加载"); return; }
+    toast("正在识别…");
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        // 让"正在识别…"先渲染，再异步执行同步解码，避免界面假死
+        setTimeout(()=>{
+          const code = decodeImageQr(img);
+          if(code && code.data){ stopScan(); loadOrder(code.data.trim()); }
+          else { toast("未能识别：请选本系统的订单二维码（微信/支付/名片码无法识别），确保画面清晰、二维码充满取景框"); }
+        }, 30);
+      };
+      img.onerror=()=>toast("图片读取失败");
+      img.src=reader.result;
+    };
+    reader.onerror=()=>toast("文件读取失败");
+    reader.readAsDataURL(file);
+  }
+  function decodeImageQr(img){
+    if(!window.jsQR) return null;
+    const c=document.createElement("canvas");
+    const ctx=c.getContext("2d");
+    // 限制长边，避免超大拍照原图拖慢；3 档尺度兼顾大图与模糊图
+    const MAXW=1400;
+    const baseW = img.width > MAXW ? MAXW : img.width;
+    const widths = [...new Set([baseW, Math.round(baseW*0.75), Math.round(baseW*0.5)])].filter(w=>w>=240);
+    for(const w of widths){
+      const h = Math.max(1, Math.round(w * img.height / img.width));
+      c.width=w; c.height=h;
+      ctx.drawImage(img,0,0,w,h);
+      let id;
+      try{ id=ctx.getImageData(0,0,w,h); }catch(e){ continue; }
+      // 1) 原图（含正反色）
+      let code=window.jsQR(id.data, w, h, { inversionAttempts:"attemptBoth" });
+      if(code && code.data) return code;
+      // 2) 灰度
+      const gray=toGrayscale(id.data);
+      code=window.jsQR(gray, w, h, { inversionAttempts:"attemptBoth" });
+      if(code && code.data) return code;
+      // 3) 少量阈值二值化
+      for(const thr of [110,140,170]){
+        const bin=threshold(gray, w, h, thr);
+        code=window.jsQR(bin, w, h, { inversionAttempts:"attemptBoth" });
+        if(code && code.data) return code;
+      }
+    }
+    return null;
+  }
+  function toGrayscale(data){
+    const out=new Uint8ClampedArray(data.length);
+    for(let i=0;i<data.length;i+=4){
+      const g=0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+      out[i]=out[i+1]=out[i+2]=g;
+      out[i+3]=255;
+    }
+    return out;
+  }
+  function threshold(data, w, h, thr){
+    const out=new Uint8ClampedArray(w*h*4);
+    for(let i=0;i<out.length;i+=4){
+      const c=data[i] < thr ? 0 : 255;
+      out[i]=out[i+1]=out[i+2]=c;
+      out[i+3]=255;
+    }
+    return out;
+  }
+  async function startScan(){
+    if(!cameraAvailable()){
+      toast("当前为 HTTP 访问，无法调用摄像头，已切换到相册选图");
+      pickQrFromGallery();
+      return;
+    }
+    try{
+      state.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } });
+    }catch(e){
+      toast("摄像头不可用："+(e.message||e)+"（可改用相册选图）");
+      pickQrFromGallery();
+      return;
+    }
+    $("scanOverlay").classList.remove("hidden");
+    const v=$("video"); v.srcObject=state.stream;
+    try{ await v.play(); }catch(e){}
+    scanLoop();
+  }
+  function scanLoop(){
+    const v=$("video");
+    if(v.readyState===v.HAVE_ENOUGH_DATA){
+      const c=document.createElement("canvas");
+      c.width=v.videoWidth; c.height=v.videoHeight;
+      const ctx=c.getContext("2d"); ctx.drawImage(v,0,0,c.width,c.height);
+      const img=ctx.getImageData(0,0,c.width,c.height);
+      const code = window.jsQR && window.jsQR(img.data, img.width, img.height);
+      if(code && code.data){
+        stopScan();
+        loadOrder(code.data.trim());
+        return;
+      }
+    }
+    state.raf = requestAnimationFrame(scanLoop);
+  }
+  function stopScan(){
+    if(state.stream){ state.stream.getTracks().forEach(t=>t.stop()); state.stream=null; }
+    if(state.raf) cancelAnimationFrame(state.raf);
+    $("scanOverlay").classList.add("hidden");
+  }
+
+  // ---------- 订单 ----------
+  async function loadOrder(id){
+    id=id.trim(); if(!id){ toast("订单号不能为空"); return; }
+    state.orderId=id;
+    $("orderTitle").textContent = "订单详情";
+    show("view-order");
+    $("info").innerHTML='<div class="muted">加载中…</div>';
+    try{
+      state.order = await api("/api/orders/"+encodeURIComponent(id));
+      renderOrder();
+    }catch(err){ const m=(err&&err.message)?err.message:"加载失败"; $("info").innerHTML='<div class="muted">已识别二维码内容：<b>'+esc(id)+'</b>，但'+esc(m)+'。请确认这是本系统的订单二维码（微信/支付/名片码无法识别）。</div>'; }
+  }
+  function renderOrder(){
+    const o=state.order;
+    let html="";
+    DISPLAY.forEach(([k,label,type])=>{
+      let v=o[k];
+      if(v==null||v==="") return;
+      if(type==="produce") v=PRODUCE_MAP[v]||v;
+      if(type==="ship") v=SHIP_MAP[v]||v;
+      html+='<div class="row"><span class="k">'+label+'</span><span class="v">'+esc(v)+'</span></div>';
+    });
+    $("info").innerHTML = html || '<div class="muted">暂无信息</div>';
+    renderEdit(o);
+    loadImages();
+  }
+  function renderEdit(o){
+    const fields=editableFields(state.user.role);
+    if(!fields.length){ $("editBox").classList.add("hidden"); return; }
+    $("editBox").classList.remove("hidden");
+    let html="";
+    fields.forEach(f=>{
+      const val=o[f]==null?"":o[f];
+      if(f==="produce_status"){
+        html+='<label>生产状态</label><select id="edit-produce_status">'+Object.entries(PRODUCE_MAP).map(([k,l])=>'<option value="'+k+'"'+(k===val?" selected":"")+'>'+l+'</option>').join("")+'</select>';
+      } else if(f==="shipping_status"){
+        html+='<label>发货状态</label><select id="edit-shipping_status">'+Object.entries(SHIP_MAP).map(([k,l])=>'<option value="'+k+'"'+(k===val?" selected":"")+'>'+l+'</option>').join("")+'</select>';
+      } else if(f==="logistics_company"){
+        const opts = (state.logisticsCompanies||[]).map(c=>'<option value="'+esc(c.company_name)+'"'+(c.company_name===val?" selected":"")+'>'+esc(c.company_name)+'</option>').join("");
+        html+='<label>物流公司</label><select id="edit-logistics_company">'+opts+'</select>';
+      } else if(f==="logistics_no"){
+        html+='<label>物流单号</label><input id="edit-logistics_no" value="'+esc(val)+'">';
+      } else if(f==="freight"){
+        html+='<label>运费</label><input id="edit-freight" value="'+esc(val)+'" inputmode="decimal">';
+      } else if(f==="remark"){
+        html+='<label>备注</label><textarea id="edit-remark" rows="3">'+esc(val)+'</textarea>';
+      }
+    });
+    $("editForm").innerHTML=html;
+  }
+  async function saveEdit(){
+    const fields=editableFields(state.user.role);
+    const body={};
+    fields.forEach(f=>{ const el=$("edit-"+f); if(el) body[f]=el.value; });
+    try{
+      await api("/api/orders/"+encodeURIComponent(state.orderId),{ method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+      state.order = await api("/api/orders/"+encodeURIComponent(state.orderId));
+      renderOrder();
+      toast("保存成功");
+    }catch(err){ toast(err.message); }
+  }
+  async function loadImages(){
+    try{
+      const resp=await api("/api/images/list/"+encodeURIComponent(state.orderId));
+      const list=resp.data||[];
+      let html="";
+      (list||[]).forEach(img=>{
+        const tag = img.layer ? (LAYER_LABEL[img.layer]||img.layer) : "";
+        const url = img.image_url || "";
+        html+='<div class="img-card"><img src="'+esc(url)+'" alt=""><span class="tag">'+esc(tag)+'</span></div>';
+      });
+      $("images").innerHTML = html || '<div class="muted">暂无图片</div>';
+    }catch(err){ $("images").innerHTML='<div class="muted">图片加载失败</div>'; }
+  }
+  async function doUpload(){
+    const file=$("uploadInput").files[0];
+    if(!file) return;
+    const fd=new FormData(); fd.append("file", file);
+    const mod=uploadModule();
+    try{
+      await api("/api/images/upload-direct/"+encodeURIComponent(state.orderId)+"?module="+mod,{ method:"POST", body:fd });
+      await loadImages();
+      toast("上传成功");
+    }catch(err){ toast(err.message); }
+    $("uploadInput").value="";
+  }
+
+  // ---------- 初始化 ----------
+  function init(){
+    $("loginBtn").addEventListener("click", doLogin);
+    $("password").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+    $("logoutBtn").addEventListener("click", logout);
+    $("scanBtn").addEventListener("click", startScan);
+    $("scanClose").addEventListener("click", stopScan);
+    $("scanFileBtn").addEventListener("click", pickQrFromGallery);
+    $("scanFileBtn2").addEventListener("click", pickQrFromGallery);
+    $("qrFileInput").addEventListener("change", (e)=>{
+      const f=e.target.files && e.target.files[0];
+      decodeQrFile(f);
+      e.target.value="";
+    });
+    $("manualBtn").addEventListener("click", ()=>loadOrder($("manualInput").value));
+    $("manualInput").addEventListener("keydown", e=>{ if(e.key==="Enter") loadOrder($("manualInput").value); });
+    $("backBtn").addEventListener("click", ()=>show("view-home"));
+    $("saveBtn").addEventListener("click", saveEdit);
+    $("uploadInput").addEventListener("change", doUpload);
+
+    const t=localStorage.getItem("m_token");
+    if(t){
+      state.token=t;
+      loadUser().then(enterHome).catch(()=>{ localStorage.removeItem("m_token"); show("view-login"); });
+    } else {
+      show("view-login");
+    }
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+</body>
+</html>

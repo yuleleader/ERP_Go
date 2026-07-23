@@ -413,10 +413,6 @@ async def update_order(
 
     if current_user.role == "sales" and str(order.created_by) != str(current_user.username):
         raise HTTPException(status_code=403, detail="您没有权限修改此订单")
-    if current_user.role == "factory":
-        if order.shipping_status != "pending":
-            raise HTTPException(status_code=403, detail="工厂端仅可对未发货订单进行图片上传")
-
     update_data = order_data.model_dump(exclude_unset=True)
     changes = []
     
@@ -426,19 +422,21 @@ async def update_order(
         print(f"[DEBUG] converted created_at to datetime: {update_data['created_at']}")
 
     if current_user.role == "shipping":
-        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "freight"}
+        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "freight", "remark"}
         forbidden_fields = set(update_data.keys()) - allowed_fields
         if forbidden_fields:
             raise HTTPException(
                 status_code=403,
-                detail=f"发货端仅允许编辑发货状态、物流公司、物流单号，禁止修改: {', '.join(forbidden_fields)}"
+                detail=f"发货端仅允许编辑发货状态、物流公司、物流单号、运费、备注，禁止修改: {', '.join(forbidden_fields)}"
             )
 
     if current_user.role == "factory":
-        if update_data:
+        allowed_fields = {"produce_status", "remark"}
+        forbidden_fields = set(update_data.keys()) - allowed_fields
+        if forbidden_fields:
             raise HTTPException(
                 status_code=403,
-                detail=f"工厂端仅允许上传图片，禁止修改订单字段: {', '.join(update_data.keys())}"
+                detail=f"工厂端仅允许修改生产状态、备注，禁止修改: {', '.join(forbidden_fields)}"
             )
 
     old_shipping_status = order.shipping_status

@@ -13,7 +13,12 @@ import webbrowser
 import threading
 import queue
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
+import json
+import shutil
+import sqlite3
+import calendar
+from datetime import datetime, timedelta
 
 if sys.platform == 'win32':
     CREATE_NO_WINDOW = 0x08000000
@@ -132,10 +137,18 @@ class WindowsLauncherApp:
         self._stop_enabled = False
         self._open_enabled = False
 
+        # 备份还原配置
+        self.config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'launcher_config.json')
+        self.backup_config = self._load_backup_config()
+        self.backup_scheduler_event = threading.Event()
+        self.backup_scheduler_thread = None
+        self.settings_window = None
+
         self.create_widgets()
         self.apply_styles()
         self.detect_service_status()
         self.start_animations()
+        self._start_backup_scheduler()
 
     def detect_service_status(self):
         # 先用端口检测快速判断，再用 HTTP 健康检查精准验证
@@ -268,6 +281,24 @@ class WindowsLauncherApp:
             bg=self.colors['bg'], fg=self.colors['text_tertiary'],
             anchor=tk.W
         ).pack(anchor=tk.W)
+
+        # ── Settings Button (top-right) ──
+        header_right = tk.Frame(header_frame, bg=self.colors['bg'])
+        header_right.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.settings_btn = tk.Canvas(
+            header_right, width=100, height=36,
+            bg='#30363d', highlightthickness=0, cursor='hand2'
+        )
+        self.settings_btn.pack(side=tk.RIGHT)
+        self._draw_rounded_btn(self.settings_btn, 100, 36, '#30363d', r=10)
+        self.settings_btn.create_text(
+            50, 18, text="⚙ 设置",
+            font=('微软雅黑', 10, 'bold'), fill='white', tags='btn_text'
+        )
+        self.settings_btn.bind('<Button-1>', lambda e: self.open_settings_window())
+        self.settings_btn.bind('<Enter>', lambda e: self._hover_btn(self.settings_btn, 100, 36, '#3d444d'))
+        self.settings_btn.bind('<Leave>', lambda e: self._hover_btn(self.settings_btn, 100, 36, '#30363d'))
 
         # ═══════════════════════════════════════
         # Status Cards

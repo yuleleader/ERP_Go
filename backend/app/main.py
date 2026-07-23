@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 import os
 from .core.database import init_db
@@ -53,6 +54,15 @@ app.include_router(withdraw.router)
 
 os.makedirs(DATA_DIR / "images", exist_ok=True)
 app.mount("/data/images", StaticFiles(directory=str(DATA_DIR / "images")), name="images")
+
+# 手机端作业页：独立轻量页，由后端同源托管在 /m/，复用现有订单/图片 API
+MOBILE_DIR = BASE_DIR / "mobile"
+if MOBILE_DIR.exists():
+    app.mount("/m", StaticFiles(directory=str(MOBILE_DIR), html=True), name="mobile")
+
+@app.get("/m")
+async def mobile_root():
+    return RedirectResponse("/m/")
 
 @app.get("/")
 async def root():

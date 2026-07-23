@@ -28,6 +28,9 @@ Thumbs.db
 .trae/
 .workbuddy/
 
+# ── Windows 特殊文件 ──
+nul
+
 # ── 本地运行数据（保留目录结构，忽略内容）──
 backend/data/db/*.db-wal
 backend/data/db/*.db-shm

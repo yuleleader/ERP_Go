@@ -701,7 +701,7 @@ import { formatDate, formatDateTime } from '@/utils/format'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { getOrders, createOrder, updateOrder, deleteOrder } from '@/api/order'
+import { getOrders, createOrder, updateOrder, deleteOrder, getOrder } from '@/api/order'
 import { getShops } from '@/api/shop'
 import { migrateImage, getOrderImages, deleteImage } from '@/api/image'
 import { getLogisticsCompanies } from '@/api/logistics'
@@ -1230,7 +1230,15 @@ async function submitProduceStatus() {
  * @param {Object} row - 订单行数据
  */
 async function viewOrder(row) {
-  currentOrder.value = row
+  // 重新从后端拉取最新订单详情，避免沿用列表缓存的旧数据（如手机端已修改）
+  let src = row
+  try {
+    const res = await getOrder(row.order_id)
+    src = res?.data || res || row
+  } catch (e) {
+    console.error('获取订单最新数据失败，使用列表缓存:', e)
+  }
+  currentOrder.value = src
 
   // 生成二维码
   qrCodeUrl.value = await generateQRCodeDataURL(row.order_id)
@@ -1278,7 +1286,14 @@ async function viewOrder(row) {
  * 编辑订单
  * @param {Object} row - 订单行数据
  */
-function editOrder(row) {
+async function editOrder(row) {
+  // 重新从后端拉取最新订单数据，避免沿用列表缓存的旧值
+  try {
+    const res = await getOrder(row.order_id)
+    row = res?.data || res || row
+  } catch (e) {
+    console.error('获取订单最新数据失败，使用列表缓存:', e)
+  }
   currentOrder.value = row
   dialogMode.value = 'edit'
   orderForm.order_id = row.order_id
