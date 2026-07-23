@@ -1,0 +1,19 @@
+.el-image-viewer__wrapper {
+  z-index: 99999 !important;
+}
+
+.el-image-viewer__mask {
+  z-index: 99998 !important;
+}
+
+.el-table__fixed-right {
+  z-index: 10 !important;
+}
+
+.el-table__fixed {
+  z-index: 5 !important;
+}
+
+.el-table-fixed-column--right {
+  z-index: 10 !important;
+}

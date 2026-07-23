@@ -1,0 +1,662 @@
+# -*- coding: utf-8 -*-
+import hashlib
+import os
+import uuid
+import qrcode
+from io import BytesIO
+from datetime import datetime
+from ..models.models import beijing_now
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, cast, String
+from typing import List, Optional
+from ..core.database import get_db
+from ..core.security import get_current_active_user, verify_password
+from ..core.config import TEMP_DIR, OFFICIAL_DIR
+from ..models.models import Order, Shop, User, Image as ImageModel, OperationLog
+from ..schemas.schemas import OrderCreate, OrderUpdate, OrderResponse
+from ..utils.order_id_generator import order_id_generator
+from ..services.notification_service import NotificationService
+
+router = APIRouter(prefix="/api/orders", tags=["订单管理"])
+
+# 定义删除订单的请求体模型
+class DeleteOrderRequest(BaseModel):
+    password: str
+
+def calculate_order_days(order_date: datetime) -> int:
+    """
+    计算订单滞留天数（自然日计算）
+    计算规则：当前自然日 - 订单下单自然日
+    返回纯整数天数，无小数
+    """
+    if not order_date:
+        return 0
+    # 获取当前时间的自然日（归零时分秒）
+    now = datetime.now()
+    today_start = datetime(now.year, now.month, now.day)
+    # 获取订单时间的自然日（归零时分秒）
+    order_date_start = datetime(order_date.year, order_date.month, order_date.day)
+    # 计算天数差
+    days_diff = (today_start - order_date_start).days
+    return max(0, days_diff)
+
+async def generate_order_id(username: str, shop_account: str, platform_order_no: str) -> str:
+    date_str = beijing_now().strftime("%Y%m%d")
+    random_num = order_id_generator.get_random_number()
+    # 按照要求生成订单ID：登录账号 + 年月日 + 网店ID（shop_account） + 平台订单号 + 6位随机数字
+    order_id = f"{username}{date_str}{shop_account}{platform_order_no}{random_num}"
+    return order_id
+
+def generate_qr_code(content: str) -> bytes:
+    """生成二维码并返回字节数据"""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(content)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    return buffer.getvalue()
+
+@router.get("/generate-preview")
+async def generate_order_preview(
+    shop_id: str,
+    platform_order_no: str = "",
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    if current_user.role not in ["boss", "sales"]:
+        raise HTTPException(status_code=403, detail="您没有权限创建订单")
+
+    # 验证shop_id是否存在
+    result = await db.execute(select(Shop).where(Shop.shop_id == shop_id))
+    shop = result.scalar_one_or_none()
+    if not shop:
+        raise HTTPException(status_code=404, detail="网店不存在")
+
+    order_id = await generate_order_id(current_user.username, shop.shop_account, platform_order_no)
+    qr_code = generate_qr_code(order_id)
+
+    return StreamingResponse(
+        BytesIO(qr_code),
+        media_type="image/png",
+        headers={"Content-Disposition": f"inline; filename=qr_{order_id}.png"}
+    )
+
+@router.post("/", response_model=OrderResponse)
+async def create_order(
+    order_data: OrderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    try:
+        if current_user.role not in ["boss", "sales"]:
+            raise HTTPException(status_code=403, detail="您没有权限创建订单")
+
+        result = await db.execute(select(Shop).where(Shop.shop_id == order_data.shop_id))
+        shop = result.scalar_one_or_none()
+        if not shop:
+            raise HTTPException(status_code=400, detail="网店不存在")
+
+        if shop.status == "closed":
+            raise HTTPException(status_code=400, detail="该网店已关店，无法创建订单")
+
+        result = await db.execute(
+            select(Order).where(Order.platform_order_no == order_data.platform_order_no)
+        )
+        existing_order = result.scalar_one_or_none()
+        if existing_order:
+            raise HTTPException(status_code=400, detail="该平台订单号已存在")
+
+        order_id = await generate_order_id(current_user.username, shop.shop_account, order_data.platform_order_no)
+
+        commission_amount = None
+        if order_data.sales_amount and current_user.commission_rate:
+            try:
+                sales = float(order_data.sales_amount)
+                rate = current_user.commission_rate
+                commission_amount = str(round(sales * rate / 100, 2))
+            except ValueError:
+                pass
+
+        # 设置创建时间：如果用户选择了则使用用户选择的，否则使用当前时间
+        created_at_value = order_data.created_at
+        if not created_at_value:
+            created_at_value = beijing_now()
+        elif isinstance(created_at_value, str):
+            # 如果是字符串，转换为 datetime 对象
+            from datetime import datetime as dt
+            created_at_value = dt.fromisoformat(created_at_value.split('T')[0])
+        
+        # 计算订单滞留天数（自然日计算）
+        order_days_value = calculate_order_days(created_at_value)
+        
+        new_order = Order(
+            order_id=order_id,
+            shop_id=order_data.shop_id,
+            product_name=order_data.product_name,
+            platform_order_no=order_data.platform_order_no,
+            sales_amount=order_data.sales_amount,
+            freight=order_data.freight,
+            shipping_status=order_data.shipping_status,
+            receiver_address=order_data.receiver_address,
+            remark=order_data.remark,
+            commission_rate=current_user.commission_rate,
+            commission_amount=commission_amount,
+            created_by=current_user.username,
+            created_at=created_at_value,
+            order_days=order_days_value
+        )
+        db.add(new_order)
+        await db.commit()
+        await db.refresh(new_order)
+
+        # 发送新订单通知给工厂端
+        creator_name = current_user.real_name or current_user.username
+        await NotificationService.send_order_created_notification(db, new_order, creator_name)
+
+        log = OperationLog(
+            username=current_user.username,
+            operation_type="创建订单",
+            operation_content=f"创建订单 {order_id}"
+        )
+        db.add(log)
+        await db.commit()
+
+        order_dict = {
+            "id": new_order.id,
+            "order_id": new_order.order_id,
+            "shop_id": new_order.shop_id,
+            "product_name": new_order.product_name,
+            "platform_order_no": new_order.platform_order_no,
+            "sales_amount": new_order.sales_amount,
+            "shipping_status": new_order.shipping_status,
+            "logistics_company": new_order.logistics_company,
+            "logistics_no": new_order.logistics_no,
+            "freight": new_order.freight,
+            "shipping_operator": new_order.shipping_operator,
+            "shipping_time": new_order.shipping_time,
+            "receiver_address": new_order.receiver_address,
+            "remark": new_order.remark,
+            "commission_rate": new_order.commission_rate,
+            "commission_amount": new_order.commission_amount,
+            "created_by": str(new_order.created_by) if new_order.created_by else None,
+            "creator_real_name": current_user.real_name or current_user.username,
+            "created_at": new_order.created_at,
+            "order_days": new_order.order_days
+        }
+        
+        try:
+            response = OrderResponse(**order_dict)
+            return response
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"OrderResponse creation failed: {e}, order_dict keys: {list(order_dict.keys())}")
+            raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"create_order failed: {e}", exc_info=True)
+        raise
+
+@router.get("/")
+async def get_orders(
+    shipping_status: Optional[str] = None,
+    produce_status: Optional[str] = None,
+    shop_id: Optional[str] = None,
+    keyword: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    query = select(Order)
+    count_query = select(func.count(Order.id))
+
+    if current_user.role == "sales":
+        query = query.where(
+            cast(Order.created_by, String) == str(current_user.username)
+        )
+        count_query = count_query.where(
+            cast(Order.created_by, String) == str(current_user.username)
+        )
+
+    if shipping_status:
+        query = query.where(Order.shipping_status == shipping_status)
+        count_query = count_query.where(Order.shipping_status == shipping_status)
+    if produce_status:
+        query = query.where(Order.produce_status == produce_status)
+        count_query = count_query.where(Order.produce_status == produce_status)
+    if shop_id:
+        query = query.where(Order.shop_id == shop_id)
+        count_query = count_query.where(Order.shop_id == shop_id)
+    if keyword:
+        like_conditions = (
+            (Order.order_id.like(f"%{keyword}%")) |
+            (Order.product_name.like(f"%{keyword}%")) |
+            (Order.platform_order_no.like(f"%{keyword}%")) |
+            (cast(Order.sales_amount, String).like(f"%{keyword}%"))
+        )
+        query = query.where(like_conditions)
+        count_query = count_query.where(like_conditions)
+
+    count_result = await db.execute(count_query)
+    total = count_result.scalar()
+
+    query = query.order_by(Order.order_days.desc().nullslast(), Order.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    orders = result.scalars().all()
+
+    order_responses = []
+    for order in orders:
+        order_dict = {
+            "id": order.id,
+            "order_id": order.order_id,
+            "shop_id": order.shop_id,
+            "product_name": order.product_name,
+            "platform_order_no": order.platform_order_no,
+            "sales_amount": order.sales_amount,
+            "shipping_status": order.shipping_status,
+            "logistics_company": order.logistics_company,
+            "logistics_no": order.logistics_no,
+            "freight": order.freight,
+            "shipping_operator": order.shipping_operator,
+            "shipping_time": order.shipping_time,
+            "receiver_address": order.receiver_address,
+            "remark": order.remark,
+            "commission_rate": order.commission_rate,
+            "commission_amount": order.commission_amount,
+            "created_by": str(order.created_by) if order.created_by else None,
+            "created_at": order.created_at,
+            "order_days": order.order_days,
+            "produce_status": order.produce_status,
+            "produce_status_update_at": order.produce_status_update_at,
+            "produce_status_update_user": order.produce_status_update_user
+        }
+
+        if order.created_by:
+            creator_result = await db.execute(
+                select(User.real_name).where(User.username == order.created_by)
+            )
+            order_dict["creator_real_name"] = creator_result.scalar() or str(order.created_by)
+        else:
+            order_dict["creator_real_name"] = None
+
+        order_responses.append(order_dict)
+
+    return {"data": order_responses, "total": total}
+
+@router.get("/{order_id}", response_model=OrderResponse)
+async def get_order(
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    result = await db.execute(select(Order).where(Order.order_id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    if current_user.role == "sales" and str(order.created_by) != str(current_user.username):
+        raise HTTPException(status_code=403, detail="您没有权限查看此订单")
+
+    order_dict = {
+        "id": order.id,
+        "order_id": order.order_id,
+        "shop_id": order.shop_id,
+        "product_name": order.product_name,
+        "platform_order_no": order.platform_order_no,
+        "sales_amount": order.sales_amount,
+        "shipping_status": order.shipping_status,
+        "logistics_company": order.logistics_company,
+        "logistics_no": order.logistics_no,
+        "freight": order.freight,
+        "shipping_operator": order.shipping_operator,
+        "shipping_time": order.shipping_time,
+        "receiver_address": order.receiver_address,
+        "remark": order.remark,
+        "commission_rate": order.commission_rate,
+        "commission_amount": order.commission_amount,
+        "created_by": str(order.created_by) if order.created_by else None,
+        "created_at": order.created_at,
+        "order_days": order.order_days,
+        "produce_status": order.produce_status,
+        "produce_status_update_at": order.produce_status_update_at,
+        "produce_status_update_user": order.produce_status_update_user
+    }
+
+    if order.created_by:
+        creator_result = await db.execute(
+            select(User.real_name).where(User.username == str(order.created_by))
+        )
+        order_dict["creator_real_name"] = creator_result.scalar() or str(order.created_by)
+    else:
+        order_dict["creator_real_name"] = None
+
+    return OrderResponse(**order_dict)
+
+PRODUCE_STATUS_MAP = {
+    "unproduce": "未生产",
+    "producing": "生产中",
+    "produced": "生产完成"
+}
+
+async def update_produce_status(
+    db: AsyncSession,
+    order: Order,
+    new_status: str,
+    operator: str,
+    change_type: str = "manual",
+    old_status: str = None
+):
+    if old_status is None:
+        old_status = order.produce_status
+    
+    if old_status == new_status:
+        return
+    
+    order.produce_status = new_status
+    order.produce_status_update_at = beijing_now()
+    order.produce_status_update_user = operator
+    
+    old_display = PRODUCE_STATUS_MAP.get(old_status, old_status)
+    new_display = PRODUCE_STATUS_MAP.get(new_status, new_status)
+    
+    if change_type == "manual":
+        content = f"用户{operator}手动调整订单生产状态：{old_display} → {new_display}"
+    elif change_type == "factory_image":
+        content = f"系统自动更新：工厂上传生产图片，订单生产状态由{old_display}变更为生产中"
+    elif change_type == "shipping":
+        content = f"系统自动锁定：订单完成发货，生产状态强制更新为生产完成，生产流程结束"
+    else:
+        content = f"订单生产状态由{old_display}变更为{new_display}"
+    
+    log = OperationLog(
+        username=operator,
+        operation_type="update_produce_status",
+        operation_content=content
+    )
+    db.add(log)
+    
+    await NotificationService.send_produce_status_notification(
+        db=db,
+        order=order,
+        new_status=new_status,
+        operator=operator,
+        change_type=change_type,
+        old_status=old_status
+    )
+
+@router.put("/{order_id}", response_model=OrderResponse)
+async def update_order(
+    order_id: str,
+    order_data: OrderUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    result = await db.execute(select(Order).where(Order.order_id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    if current_user.role == "sales" and str(order.created_by) != str(current_user.username):
+        raise HTTPException(status_code=403, detail="您没有权限修改此订单")
+    if current_user.role == "factory":
+        if order.shipping_status != "pending":
+            raise HTTPException(status_code=403, detail="工厂端仅可对未发货订单进行图片上传")
+
+    update_data = order_data.model_dump(exclude_unset=True)
+    changes = []
+    
+    if "created_at" in update_data and isinstance(update_data["created_at"], str):
+        from datetime import datetime as dt
+        update_data["created_at"] = dt.fromisoformat(update_data["created_at"].split('T')[0])
+        print(f"[DEBUG] converted created_at to datetime: {update_data['created_at']}")
+
+    if current_user.role == "shipping":
+        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "freight"}
+        forbidden_fields = set(update_data.keys()) - allowed_fields
+        if forbidden_fields:
+            raise HTTPException(
+                status_code=403,
+                detail=f"发货端仅允许编辑发货状态、物流公司、物流单号，禁止修改: {', '.join(forbidden_fields)}"
+            )
+
+    if current_user.role == "factory":
+        if update_data:
+            raise HTTPException(
+                status_code=403,
+                detail=f"工厂端仅允许上传图片，禁止修改订单字段: {', '.join(update_data.keys())}"
+            )
+
+    old_shipping_status = order.shipping_status
+    
+    if "produce_status" in update_data:
+        new_produce_status = update_data["produce_status"]
+        
+        if order.shipping_status in ["shipped", "virtual"]:
+            if new_produce_status in ["unproduce", "producing"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="订单已完成发货，生产流程已结束，生产状态锁定为【生产完成】，无法修改"
+                )
+        
+        if new_produce_status not in ["unproduce", "producing", "produced"]:
+            raise HTTPException(status_code=400, detail="生产状态值无效")
+        
+        old_produce_status = order.produce_status
+        await update_produce_status(
+            db=db,
+            order=order,
+            new_status=new_produce_status,
+            operator=current_user.username,
+            change_type="manual",
+            old_status=old_produce_status
+        )
+        update_data.pop("produce_status")
+
+    if "shipping_status" in update_data:
+        new_status = update_data["shipping_status"]
+        if order.shipping_status == "shipped" and new_status != "shipped":
+            raise HTTPException(status_code=403, detail="已发货的订单不允许修改为其他状态")
+        if new_status == "shipped" and order.shipping_status != "shipped":
+            if "shipping_time" not in update_data or not update_data["shipping_time"]:
+                update_data["shipping_time"] = beijing_now()
+            update_data["shipping_operator"] = current_user.username
+            changes.append(f"发货时间: 记录为 {update_data['shipping_time']}")
+            changes.append(f"发货操作员: {current_user.username}")
+            
+            if order.produce_status != "produced":
+                await update_produce_status(
+                    db=db,
+                    order=order,
+                    new_status="produced",
+                    operator="system-auto",
+                    change_type="shipping"
+                )
+
+    if "shipping_time" in update_data and update_data["shipping_time"]:
+        if isinstance(update_data["shipping_time"], str):
+            try:
+                update_data["shipping_time"] = datetime.fromisoformat(update_data["shipping_time"])
+            except ValueError:
+                pass
+
+    if "sales_amount" in update_data and update_data["sales_amount"] != order.sales_amount:
+        if order.commission_rate:
+            try:
+                new_sales = float(update_data["sales_amount"])
+                new_commission = round(new_sales * order.commission_rate / 100, 2)
+                update_data["commission_amount"] = str(new_commission)
+                changes.append(f"销售金额: {order.sales_amount} -> {update_data['sales_amount']}")
+            except ValueError:
+                pass
+    
+    old_receiver_address = order.receiver_address
+    for field, value in update_data.items():
+        old_value = getattr(order, field)
+        if old_value != value and field not in ["shipping_time", "shipping_operator"]:
+            changes.append(f"{field}: {old_value} -> {value}")
+        setattr(order, field, value)
+    
+    if "created_at" in update_data:
+        if isinstance(order.created_at, str):
+            from datetime import datetime as dt
+            order.created_at = dt.fromisoformat(order.created_at.split('T')[0])
+        order.order_days = calculate_order_days(order.created_at)
+        changes.append(f"滞留时长: 更新为 {order.order_days} 天")
+    
+    # 收货地址发生变更 → 重置国家识别结果，智慧大屏下次刷新会按新地址重新识别
+    if "receiver_address" in update_data and update_data["receiver_address"] != old_receiver_address:
+        order.detected_country = None
+        changes.append("收货地址已变更，国家识别已重置（智慧大屏将重新识别）")
+
+    await db.commit()
+    await db.refresh(order)
+
+    if "shipping_status" in update_data and old_shipping_status != "shipped" and update_data["shipping_status"] == "shipped":
+        try:
+            await NotificationService.send_order_shipped_notification(
+                db=db,
+                order_id=order_id,
+                logistics_company=update_data.get("logistics_company") or order.logistics_company,
+                logistics_no=update_data.get("logistics_no") or order.logistics_no
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"发送站内信失败，但不影响订单更新: {e}")
+
+    if changes:
+        log = OperationLog(
+            username=current_user.username,
+            operation_type="更新订单",
+            operation_content=f"更新订单 {order_id}，变更: {', '.join(changes)}"
+        )
+        db.add(log)
+        await db.commit()
+
+    order_dict = {
+        "id": order.id,
+        "order_id": order.order_id,
+        "shop_id": order.shop_id,
+        "product_name": order.product_name,
+        "platform_order_no": order.platform_order_no,
+        "sales_amount": order.sales_amount,
+        "shipping_status": order.shipping_status,
+        "logistics_company": order.logistics_company,
+        "logistics_no": order.logistics_no,
+        "freight": order.freight,
+        "shipping_operator": order.shipping_operator,
+        "shipping_time": order.shipping_time,
+        "receiver_address": order.receiver_address,
+        "remark": order.remark,
+        "commission_rate": order.commission_rate,
+        "commission_amount": order.commission_amount,
+        "created_by": str(order.created_by) if order.created_by else None,
+        "created_at": order.created_at,
+        "order_days": order.order_days,
+        "produce_status": order.produce_status,
+        "produce_status_update_at": order.produce_status_update_at,
+        "produce_status_update_user": order.produce_status_update_user
+    }
+
+    if order.created_by:
+        creator_result = await db.execute(
+            select(User.real_name).where(User.username == str(order.created_by))
+        )
+        order_dict["creator_real_name"] = creator_result.scalar() or str(order.created_by)
+    else:
+        order_dict["creator_real_name"] = None
+
+    return OrderResponse(**order_dict)
+
+@router.delete("/{order_id}", status_code=200)
+async def delete_order(
+    order_id: str,
+    delete_request: DeleteOrderRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    # 验证密码
+    if not verify_password(delete_request.password, current_user.password_hash):
+        raise HTTPException(status_code=401, detail="密码错误")
+
+    result = await db.execute(select(Order).where(Order.order_id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    # 检查权限：仅允许订单创建人删除订单，其他用户（包括管理员）均不允许删除他人订单
+    if str(order.created_by) != str(current_user.username):
+        # 记录未授权的删除尝试
+        log = OperationLog(
+            username=current_user.username,
+            operation_type="删除订单",
+            operation_content=f"尝试删除订单 {order_id} 失败：无权限，操作用户={current_user.real_name or current_user.username}"
+        )
+        db.add(log)
+        await db.commit()
+        
+        raise HTTPException(status_code=403, detail="您没有权限删除此订单，只有订单创建人可以删除")
+
+    # 删除关联的图片记录和物理文件
+    from app.models.models import Image
+    from app.core.config import OFFICIAL_DIR
+    from pathlib import Path
+    import shutil
+    import os
+
+    # 查询该订单关联的所有图片
+    img_result = await db.execute(select(Image).where(Image.order_id == order_id))
+    images = img_result.scalars().all()
+
+    for img in images:
+        # 删除物理文件
+        if img.image_url:
+            file_path = Path(str(OFFICIAL_DIR.parent) + img.image_url.replace("/data/images", ""))
+            if file_path.exists() and file_path.is_file():
+                try:
+                    os.remove(file_path)
+                except Exception as e:
+                    pass
+        
+        # 删除数据库记录
+        await db.delete(img)
+    
+    await db.commit()
+
+    # 删除订单对应的文件夹
+    order_folder = OFFICIAL_DIR / order_id
+    if order_folder.exists() and order_folder.is_dir():
+        try:
+            shutil.rmtree(order_folder)
+        except Exception as e:
+            pass
+
+    # 删除订单
+    await db.delete(order)
+    await db.commit()
+
+    # 记录成功的删除操作
+    log = OperationLog(
+        username=current_user.username,
+        operation_type="删除订单",
+        operation_content=f"成功删除订单 {order_id}（含{len(images)}张图片），操作用户={current_user.real_name or current_user.username}"
+    )
+    db.add(log)
+    await db.commit()
+
+    return {"message": "订单删除成功"}
