@@ -16,10 +16,6 @@
           <span style="margin-left: 10px;">小时</span>
         </el-form-item>
 
-        <el-form-item label="数据备份路径">
-          <el-input v-model="settings.backupPath" placeholder="请输入备份路径" style="width: 400px;" />
-        </el-form-item>
-
         <el-form-item>
           <el-button type="primary" @click="saveSettings">保存设置</el-button>
           <el-button @click="resetSettings">重置</el-button>
@@ -215,8 +211,7 @@ import {
 
 const settings = reactive({
   defaultCommissionRate: 10,
-  tempImageRetentionHours: 24,
-  backupPath: './backup'
+  tempImageRetentionHours: 24
 })
 
 const recordsLoading = ref(false)
@@ -245,7 +240,6 @@ function saveSettings() {
 function resetSettings() {
   settings.defaultCommissionRate = 10
   settings.tempImageRetentionHours = 24
-  settings.backupPath = './backup'
 }
 
 // ==================== 日志清理 ====================
