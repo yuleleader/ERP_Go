@@ -70,50 +70,46 @@ def kill_process_on_port(port):
 class WindowsLauncherApp:
     def __init__(self, root):
         self.root = root
-        # 记录创建本 App 的线程为主线程，用于把子线程里的 Tk 操作调度回主线程，
-        # 避免跨线程访问 Tcl 解释器导致程序直接崩溃闪退（无任何 traceback）。
-        self._main_thread = threading.current_thread()
         self.root.title("订单管理系统")
-        self.root.geometry("1240x880")
-        self.root.minsize(980, 680)
+        self.root.geometry("820x700")
         self.root.resizable(True, True)
-        self.root.configure(bg='#2c3138')
+        self.root.configure(bg='#0d1117')
 
         self.colors = {
-            'bg':              '#2c3138',   # 主背景（深灰蓝，磨砂玻璃风）
-            'bg_light':        '#323841',   # 浅色背景
-            'card':            '#374151',   # 卡片背景
-            'card_border':     '#46505e',   # 卡片边框（淡亮边）
-            'card_border_glow': '#4ade80',  # 卡片霓虹边框
-            'text_primary':    '#e5e7eb',   # 主文字
-            'text_secondary':  '#9ca3af',   # 辅助文字
-            'text_tertiary':   '#6b7280',   # 三级文字
-            'blue':            '#3b82f6',   # 科技蓝
-            'blue_light':      '#60a5fa',   # 蓝色悬停
-            'blue_dark':       '#2563eb',   # 蓝色按下
-            'green':           '#4ade80',   # 成功绿
-            'green_light':     '#6ee7a0',   # 绿色悬停
-            'green_dark':      '#22c55e',   # 绿色按下
-            'red':             '#f87171',   # 危险红
-            'red_light':       '#fca5a5',   # 红色悬停
-            'red_dark':        '#ef4444',   # 红色按下
-            'orange':          '#f59e0b',   # 警告橙
-            'yellow':          '#eab308',   # 黄色
-            'cyan':            '#22d3ee',   # 青色
-            'purple':          '#a78bfa',   # 紫色
-            'progress_track':  '#4b5563',   # 进度条轨道
-            'progress_fill':   '#4ade80',   # 进度条填充
-            'log_bg':          '#1e2228',   # 终端日志背景
-            'log_text':        '#cbd5e1',   # 终端日志文字
-            'log_border':      '#374151',   # 终端边框
-            'divider':         '#4b5563',   # 分割线
-            'tab_active_bg':   '#4ade80',   # 标签页激活背景（绿）
-            'tab_active_border': '#4ade80', # 标签页激活边框
-            'tab_inactive_bg': '#374151',   # 标签页非激活背景
-            'tab_inactive_text': '#9ca3af', # 标签页非激活文字
-            'title_bar_bg':    '#1e2227',   # 标题栏背景
-            'title_bar_btn':   '#374151',   # 标题栏按钮背景
-            'title_bar_btn_hover': '#46505e', # 标题栏按钮悬停
+            'bg':              '#0d1117',   # 主背景（深色）
+            'bg_light':        '#161b22',   # 浅色背景
+            'card':            '#1c2128',   # 卡片背景
+            'card_border':     '#30363d',   # 卡片边框
+            'card_border_glow': '#00d4ff',  # 卡片霓虹边框
+            'text_primary':    '#e6edf3',   # 主文字
+            'text_secondary':  '#8b949e',   # 辅助文字
+            'text_tertiary':   '#484f58',   # 三级文字
+            'blue':            '#58a6ff',   # 科技蓝
+            'blue_light':      '#79c0ff',   # 蓝色悬停
+            'blue_dark':       '#1f6feb',   # 蓝色按下
+            'green':           '#3fb950',   # 成功绿
+            'green_light':     '#56d364',   # 绿色悬停
+            'green_dark':      '#238636',   # 绿色按下
+            'red':             '#f85149',   # 危险红
+            'red_light':       '#ff7b72',   # 红色悬停
+            'red_dark':        '#da3633',   # 红色按下
+            'orange':          '#d29922',   # 警告橙
+            'yellow':          '#e3b341',   # 黄色
+            'cyan':            '#56d4dd',   # 青色
+            'purple':          '#a371f7',   # 紫色
+            'progress_track':  '#30363d',   # 进度条轨道
+            'progress_fill':   '#58a6ff',   # 进度条填充
+            'log_bg':          '#010409',   # 终端日志背景
+            'log_text':        '#c9d1d9',   # 终端日志文字
+            'log_border':      '#21262d',   # 终端边框
+            'divider':         '#30363d',   # 分割线
+            'tab_active_bg':   '#21262d',   # 标签页激活背景
+            'tab_active_border': '#58a6ff', # 标签页激活边框
+            'tab_inactive_bg': '#161b22',   # 标签页非激活背景
+            'tab_inactive_text': '#8b949e', # 标签页非激活文字
+            'title_bar_bg':    '#161b22',   # 标题栏背景
+            'title_bar_btn':   '#1c2128',   # 标题栏按钮背景
+            'title_bar_btn_hover': '#30363d', # 标题栏按钮悬停
         }
 
         self.style = ttk.Style()
@@ -145,7 +141,7 @@ class WindowsLauncherApp:
         self.backup_config = self._load_backup_config()
         self.backup_scheduler_event = threading.Event()
         self.backup_scheduler_thread = None
-        self._settings_view_open = False
+        self.settings_window = None
 
         self.create_widgets()
         self.apply_styles()
@@ -160,7 +156,8 @@ class WindowsLauncherApp:
 
         if backend_port_open:
             if is_service_healthy('http://localhost:8000/health'):
-                self._ui_set_service('backend', "运行中", self.colors['green'])
+                self.backend_status.set("运行中")
+                self.backend_indicator.config(text='●', foreground=self.colors['green'])
                 self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
                 self.add_log("检测到后端服务健康运行中", 'success')
             else:
@@ -171,11 +168,12 @@ class WindowsLauncherApp:
         else:
             self.backend_status.set("未启动")
             self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
-            self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
+            self._update_progress(self.backend_progress_canvas, 0, self.colors['blue'])
 
         if frontend_port_open:
             if is_service_healthy('http://localhost:5173'):
-                self._ui_set_service('frontend', "运行中", self.colors['green'])
+                self.frontend_status.set("运行中")
+                self.frontend_indicator.config(text='●', foreground=self.colors['green'])
                 self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
                 self.add_log("检测到前端服务健康运行中", 'success')
             else:
@@ -186,7 +184,7 @@ class WindowsLauncherApp:
         else:
             self.frontend_status.set("未启动")
             self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
-            self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
+            self._update_progress(self.frontend_progress_canvas, 0, self.colors['blue'])
 
         if backend_port_open or frontend_port_open:
             self._set_button_state(start='normal', stop='normal', open='normal')
@@ -202,34 +200,38 @@ class WindowsLauncherApp:
         backend_port_open = is_port_open(8000)
         if backend_port_open:
             if is_service_healthy('http://localhost:8000/health'):
-                self._ui_set_service('backend', "运行中", self.colors['green'])
+                self.backend_status.set("运行中")
+                self.backend_indicator.config(text='●', foreground=self.colors['green'])
                 self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
                 self.add_log("后端服务: 健康运行 (端口 8000)", 'success')
             else:
-                self._ui_set_service('backend', "异常", self.colors['orange'])
+                self.backend_status.set("异常")
+                self.backend_indicator.config(text='●', foreground=self.colors['orange'])
                 self._update_progress(self.backend_progress_canvas, 100, self.colors['orange'])
                 self.add_log("后端服务: 端口已占用但无响应，可能存在进程残留，请重启", 'warning')
         else:
             self.backend_status.set("未启动")
             self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
-            self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
+            self._update_progress(self.backend_progress_canvas, 0, self.colors['blue'])
             self.add_log("后端服务: 未启动 (端口 8000)", 'warning')
 
         # ── 更新前端状态 ──
         frontend_port_open = is_port_open(5173)
         if frontend_port_open:
             if is_service_healthy('http://localhost:5173'):
-                self._ui_set_service('frontend', "运行中", self.colors['green'])
+                self.frontend_status.set("运行中")
+                self.frontend_indicator.config(text='●', foreground=self.colors['green'])
                 self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
                 self.add_log("前端服务: 健康运行 (端口 5173)", 'success')
             else:
-                self._ui_set_service('frontend', "异常", self.colors['orange'])
+                self.frontend_status.set("异常")
+                self.frontend_indicator.config(text='●', foreground=self.colors['orange'])
                 self._update_progress(self.frontend_progress_canvas, 100, self.colors['orange'])
                 self.add_log("前端服务: 端口已占用但无响应，可能存在进程残留，请重启", 'warning')
         else:
             self.frontend_status.set("未启动")
             self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
-            self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
+            self._update_progress(self.frontend_progress_canvas, 0, self.colors['blue'])
             self.add_log("前端服务: 未启动 (端口 5173)", 'warning')
 
         # ── 更新按钮状态 ──
@@ -241,516 +243,361 @@ class WindowsLauncherApp:
         self.add_log("状态刷新完成", 'system')
 
     def create_widgets(self):
-        root_bg = self.colors['bg']
+        # ── Main Content ──
+        main_frame = tk.Frame(self.root, bg=self.colors['bg'])
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=16)
 
         # ═══════════════════════════════════════
-        # Sidebar (72px)
+        # Header Section
         # ═══════════════════════════════════════
-        sidebar = tk.Frame(self.root, bg='#1e2227', width=72)
-        sidebar.pack(side=tk.LEFT, fill=tk.Y)
-        sidebar.pack_propagate(False)
+        header_frame = tk.Frame(main_frame, bg=self.colors['bg'])
+        header_frame.pack(fill=tk.X, pady=(0, 16))
 
-        sidebar_top = tk.Frame(sidebar, bg='#1e2227')
-        sidebar_top.pack(side=tk.TOP, fill=tk.X, pady=(22, 0))
+        header_left = tk.Frame(header_frame, bg=self.colors['bg'])
+        header_left.pack(side=tk.LEFT)
 
-        # 侧边栏仅保留首页与设置两个有效入口（矢量线性图标）
-        def make_nav_icon(parent, name, cmd, active_view, pad_bottom=0):
-            cv = tk.Canvas(parent, width=40, height=40, bg='#1e2227',
-                           highlightthickness=0, cursor='hand2')
-            cv.pack(pady=(0, pad_bottom))
-            cv._name = name
-            cv._active_view = active_view
+        icon_canvas = tk.Canvas(
+            header_left, width=48, height=48,
+            bg=self.colors['bg'], highlightthickness=0
+        )
+        icon_canvas.pack(side=tk.LEFT, padx=(0, 12))
+        icon_canvas.create_oval(2, 2, 46, 46, fill=self.colors['card'], outline=self.colors['cyan'], width=2)
+        icon_canvas.create_text(24, 24, text="⚡", font=('Segoe UI Emoji', 22), fill=self.colors['cyan'])
 
-            def redraw(hover=False):
-                cv.delete('all')
-                active = getattr(self, '_current_view', 'home') == active_view
-                if active:
-                    bg, icon_color = '#22c55e', '#ffffff'
-                elif hover:
-                    bg, icon_color = '#2a2f37', '#cbd5e1'
-                else:
-                    bg, icon_color = '#1e2227', '#9ca3af'
-                cv.configure(bg=bg)
-                self._draw_icon(cv, name, 20, 20, 22, icon_color)
+        title_text_frame = tk.Frame(header_left, bg=self.colors['bg'])
+        title_text_frame.pack(side=tk.LEFT)
 
-            cv._redraw = redraw
-            cv.bind('<Button-1>', lambda e: cmd())
-            cv.bind('<Enter>', lambda e: redraw(hover=True))
-            cv.bind('<Leave>', lambda e: redraw(hover=False))
-            redraw()
-            return cv
+        tk.Label(
+            title_text_frame, text="订单管理系统",
+            font=('微软雅黑', 22, 'bold'),
+            bg=self.colors['bg'], fg=self.colors['text_primary'],
+            anchor=tk.W
+        ).pack(anchor=tk.W)
 
-        self.nav_home = make_nav_icon(sidebar_top, 'home', self._show_home_view, 'home', pad_bottom=18)
-        sidebar_bottom = tk.Frame(sidebar, bg='#1e2227')
-        sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 22))
-        self.nav_settings = make_nav_icon(sidebar_bottom, 'settings', self.open_settings_window, 'settings')
+        tk.Label(
+            title_text_frame, text="Order Management System Launcher",
+            font=('Segoe UI', 10),
+            bg=self.colors['bg'], fg=self.colors['text_tertiary'],
+            anchor=tk.W
+        ).pack(anchor=tk.W)
 
-        self._current_view = 'home'
-        self._settings_built = False
-        self._settings_view_open = False
-        self._refresh_nav()
+        # ── Settings Button (top-right) ──
+        header_right = tk.Frame(header_frame, bg=self.colors['bg'])
+        header_right.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.settings_btn = tk.Canvas(
+            header_right, width=100, height=36,
+            bg='#30363d', highlightthickness=0, cursor='hand2'
+        )
+        self.settings_btn.pack(side=tk.RIGHT)
+        self._draw_rounded_btn(self.settings_btn, 100, 36, '#30363d', r=10)
+        self.settings_btn.create_text(
+            50, 18, text="⚙ 设置",
+            font=('微软雅黑', 10, 'bold'), fill='white', tags='btn_text'
+        )
+        self.settings_btn.bind('<Button-1>', lambda e: self.open_settings_window())
+        self.settings_btn.bind('<Enter>', lambda e: self._hover_btn(self.settings_btn, 100, 36, '#3d444d'))
+        self.settings_btn.bind('<Leave>', lambda e: self._hover_btn(self.settings_btn, 100, 36, '#30363d'))
 
         # ═══════════════════════════════════════
-        # Main content
+        # Status Cards
         # ═══════════════════════════════════════
-        main = tk.Frame(self.root, bg=root_bg)
-        main.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        status_card = self._create_card(main_frame, "系统状态")
 
-        header = tk.Frame(main, bg=root_bg)
-        header.pack(fill=tk.X, padx=24, pady=(26, 0))
-        tk.Label(header, text="订单管理系统", font=('微软雅黑', 22, 'bold'),
-                 bg=root_bg, fg='#e5e7eb', anchor=tk.CENTER).pack(fill=tk.X)
+        status_container = tk.Frame(status_card, bg=self.colors['card'])
+        status_container.pack(fill=tk.X, padx=16, pady=(0, 5))
 
-        content = tk.Frame(main, bg=root_bg)
-        content.pack(fill=tk.BOTH, expand=True, padx=24, pady=(18, 0))
+        # ── Backend Row ──
+        backend_row = tk.Frame(status_container, bg=self.colors['card'])
+        backend_row.pack(fill=tk.X, pady=(10, 6))
 
-        # 首页视图：服务概览 + 实时日志
-        self.home_view = tk.Frame(content, bg=root_bg)
-        self.home_view.pack(fill=tk.BOTH, expand=True)
-        # 设置视图：数据库备份与还原（默认隐藏，点击 ⚙ 切换，不弹新窗口）
-        self.settings_view = tk.Frame(content, bg=root_bg)
+        backend_icon_canvas = tk.Canvas(
+            backend_row, width=36, height=36,
+            bg=self.colors['card'], highlightthickness=0
+        )
+        backend_icon_canvas.pack(side=tk.LEFT, padx=(0, 12))
+        backend_icon_canvas.create_oval(2, 2, 34, 34, fill='#1a2744', outline='#58a6ff', width=1)
+        backend_icon_canvas.create_text(18, 18, text="⚙", font=('Segoe UI Emoji', 14), fill=self.colors['blue'])
 
-        left_card = self._create_card(self.home_view, "服务概览", side=tk.LEFT, expand=True, padx=(0, 10))
-        right_card = self._create_card(self.home_view, "实时日志", side=tk.LEFT, expand=True, padx=(10, 0))
+        backend_info = tk.Frame(backend_row, bg=self.colors['card'])
+        backend_info.pack(side=tk.LEFT)
 
-        # ── Left: service overview ──
-        left_body = tk.Frame(left_card, bg=self.colors['card'])
-        left_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
+        tk.Label(
+            backend_info, text="后端服务",
+            font=('微软雅黑', 12, 'bold'),
+            bg=self.colors['card'], fg=self.colors['text_primary']
+        ).pack(anchor=tk.W)
 
-        self._create_service_tile(left_body, 'backend', "后端接口服务", "后端在线服务", "后端在线服务", "server",
-                                  self.colors['green'], side=tk.TOP)
-        self._create_service_tile(left_body, 'frontend', "前端网页客户端", "前端页面服务", "前端页面服务", "window",
-                                  self.colors['blue'], side=tk.TOP)
+        backend_status_label = tk.Label(
+            backend_info, textvariable=self.backend_status,
+            font=('Segoe UI', 10),
+            bg=self.colors['card'], fg=self.colors['text_secondary']
+        )
+        backend_status_label.pack(anchor=tk.W)
 
-        # ── Right: realtime log ──
-        right_body = tk.Frame(right_card, bg=self.colors['card'])
-        right_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
+        backend_right = tk.Frame(backend_row, bg=self.colors['card'])
+        backend_right.pack(side=tk.RIGHT)
 
-        tab_frame = tk.Frame(right_body, bg=self.colors['card'])
-        tab_frame.pack(fill=tk.X, padx=12, pady=(8, 6))
+        self.backend_progress_canvas = tk.Canvas(
+            backend_right, width=180, height=6,
+            bg=self.colors['card'], highlightthickness=0
+        )
+        self.backend_progress_canvas.pack(side=tk.RIGHT, padx=(10, 0))
+        self._draw_progress_track(self.backend_progress_canvas, 180, 6)
+        self._update_progress(self.backend_progress_canvas, 0, self.colors['blue'])
+
+        self.backend_indicator = tk.Label(
+            backend_right, text='○',
+            font=('Segoe UI', 12),
+            bg=self.colors['card'], fg=self.colors['text_tertiary']
+        )
+        self.backend_indicator.pack(side=tk.RIGHT)
+
+        divider = tk.Frame(status_container, bg=self.colors['divider'], height=1)
+        divider.pack(fill=tk.X, pady=4)
+
+        # ── Frontend Row ──
+        frontend_row = tk.Frame(status_container, bg=self.colors['card'])
+        frontend_row.pack(fill=tk.X, pady=(6, 10))
+
+        frontend_icon_canvas = tk.Canvas(
+            frontend_row, width=36, height=36,
+            bg=self.colors['card'], highlightthickness=0
+        )
+        frontend_icon_canvas.pack(side=tk.LEFT, padx=(0, 12))
+        frontend_icon_canvas.create_oval(2, 2, 34, 34, fill='#1a272e', outline='#3fb950', width=1)
+        frontend_icon_canvas.create_text(18, 18, text="◈", font=('Segoe UI', 12, 'bold'), fill=self.colors['green'])
+
+        frontend_info = tk.Frame(frontend_row, bg=self.colors['card'])
+        frontend_info.pack(side=tk.LEFT)
+
+        tk.Label(
+            frontend_info, text="前端服务",
+            font=('微软雅黑', 12, 'bold'),
+            bg=self.colors['card'], fg=self.colors['text_primary']
+        ).pack(anchor=tk.W)
+
+        frontend_status_label = tk.Label(
+            frontend_info, textvariable=self.frontend_status,
+            font=('Segoe UI', 10),
+            bg=self.colors['card'], fg=self.colors['text_secondary']
+        )
+        frontend_status_label.pack(anchor=tk.W)
+
+        frontend_right = tk.Frame(frontend_row, bg=self.colors['card'])
+        frontend_right.pack(side=tk.RIGHT)
+
+        self.frontend_progress_canvas = tk.Canvas(
+            frontend_right, width=180, height=6,
+            bg=self.colors['card'], highlightthickness=0
+        )
+        self.frontend_progress_canvas.pack(side=tk.RIGHT, padx=(10, 0))
+        self._draw_progress_track(self.frontend_progress_canvas, 180, 6)
+        self._update_progress(self.frontend_progress_canvas, 0, self.colors['blue'])
+
+        self.frontend_indicator = tk.Label(
+            frontend_right, text='○',
+            font=('Segoe UI', 12),
+            bg=self.colors['card'], fg=self.colors['text_tertiary']
+        )
+        self.frontend_indicator.pack(side=tk.RIGHT)
+
+        # ═══════════════════════════════════════
+        # Action Buttons
+        # ═══════════════════════════════════════
+        button_frame = tk.Frame(main_frame, bg=self.colors['bg'])
+        button_frame.pack(fill=tk.X, pady=14)
+
+        button_container = tk.Frame(button_frame, bg=self.colors['bg'])
+        button_container.pack(anchor=tk.CENTER)
+
+        self.start_btn = tk.Canvas(
+            button_container, width=150, height=40,
+            bg=self.colors['green'], highlightthickness=0, cursor='hand2'
+        )
+        self.start_btn.pack(side=tk.LEFT, padx=8)
+        self._draw_rounded_btn(self.start_btn, 150, 40, self.colors['green'])
+        self.start_btn.create_text(
+            75, 20, text="启动系统",
+            font=('微软雅黑', 11, 'bold'), fill='white'
+        )
+        self.start_btn.bind('<Button-1>', lambda e: self.start_services() if self._start_enabled else None)
+        self.start_btn.bind('<Enter>', lambda e: self._hover_btn(self.start_btn, 150, 40, self.colors['green_light']) if self._start_enabled else None)
+        self.start_btn.bind('<Leave>', lambda e: self._hover_btn(self.start_btn, 150, 40, self.colors['green']) if self._start_enabled else None)
+
+        self.stop_btn = tk.Canvas(
+            button_container, width=150, height=40,
+            bg='#30363d', highlightthickness=0, cursor='hand2'
+        )
+        self.stop_btn.pack(side=tk.LEFT, padx=8)
+        self._draw_rounded_btn(self.stop_btn, 150, 40, '#30363d')
+        self.stop_btn.create_text(
+            75, 20, text="停止系统",
+            font=('微软雅黑', 11, 'bold'), fill='#484f58', tags='btn_text'
+        )
+        self.stop_btn.bind('<Button-1>', lambda e: self.stop_services() if self._stop_enabled else None)
+        self.stop_btn.bind('<Enter>', lambda e: self._hover_btn(self.stop_btn, 150, 40, self.colors['red_light']) if self._stop_enabled else None)
+        self.stop_btn.bind('<Leave>', lambda e: self._hover_btn(self.stop_btn, 150, 40, self.colors['red']) if self._stop_enabled else None)
+
+        self.open_btn = tk.Canvas(
+            button_container, width=150, height=40,
+            bg='#30363d', highlightthickness=0, cursor='hand2'
+        )
+        self.open_btn.pack(side=tk.LEFT, padx=8)
+        self._draw_rounded_btn(self.open_btn, 150, 40, '#30363d')
+        self.open_btn.create_text(
+            75, 20, text="打开页面",
+            font=('微软雅黑', 11, 'bold'), fill='#484f58', tags='btn_text'
+        )
+        self.open_btn.bind('<Button-1>', lambda e: self.open_browser() if self._open_enabled else None)
+        self.open_btn.bind('<Enter>', lambda e: self._hover_btn(self.open_btn, 150, 40, self.colors['blue_light']) if self._open_enabled else None)
+        self.open_btn.bind('<Leave>', lambda e: self._hover_btn(self.open_btn, 150, 40, self.colors['blue']) if self._open_enabled else None)
+
+        # ── Refresh Button ──
+        self.refresh_btn = tk.Canvas(
+            button_container, width=150, height=40,
+            bg=self.colors['purple'], highlightthickness=0, cursor='hand2'
+        )
+        self.refresh_btn.pack(side=tk.LEFT, padx=8)
+        self._draw_rounded_btn(self.refresh_btn, 150, 40, self.colors['purple'])
+        self.refresh_btn.create_text(
+            75, 20, text="刷新状态",
+            font=('微软雅黑', 11, 'bold'), fill='white'
+        )
+        self.refresh_btn.bind('<Button-1>', lambda e: self.refresh_status())
+        self.refresh_btn.bind('<Enter>', lambda e: self._hover_btn(self.refresh_btn, 150, 40, '#bc8cff'))
+        self.refresh_btn.bind('<Leave>', lambda e: self._hover_btn(self.refresh_btn, 150, 40, self.colors['purple']))
+
+        # ═══════════════════════════════════════
+        # Log Panel
+        # ═══════════════════════════════════════
+        self.log_card = self._create_card(main_frame, "实时日志", expand=True)
+
+        tab_frame = tk.Frame(self.log_card, bg=self.colors['card'])
+        tab_frame.pack(fill=tk.X, padx=16, pady=(10, 6))
+
+        self.tabs = []
+        tab_configs = [
+            ('综合日志', 'all'),
+            ('后端日志', 'backend'),
+            ('前端日志', 'frontend'),
+        ]
 
         self.tab_buttons = []
-        tab_specs = [("综合", "grid", "all"), ("前端", "window", "frontend"),
-                     ("后端", "server", "backend"), ("备份", "save", "backup")]
-        for i, (t, ic, key) in enumerate(tab_specs):
-            cv = tk.Canvas(tab_frame, width=86, height=30, bg='#2f3742',
-                           highlightthickness=0, cursor='hand2')
-            cv.pack(side=tk.LEFT, padx=(0, 6))
-            cv._text = t
-            cv._icon = ic
-            cv._active = (i == 0)
+        for i, (tab_text, tab_id) in enumerate(tab_configs):
+            btn = tk.Label(
+                tab_frame, text=tab_text,
+                font=('微软雅黑', 10),
+                bg=self.colors['tab_active_bg'] if i == 0 else self.colors['tab_inactive_bg'],
+                fg=self.colors['text_primary'] if i == 0 else self.colors['tab_inactive_text'],
+                padx=16, pady=5, cursor='hand2'
+            )
+            btn.pack(side=tk.LEFT, padx=(0, 6))
+            btn.bind('<Button-1>', lambda e, idx=i: self._switch_tab(idx))
+            self.tab_buttons.append(btn)
 
-            def tab_redraw(cv=cv):
-                cv.delete('all')
-                if cv._active:
-                    bg, fg = self.colors['green'], '#111827'
-                else:
-                    bg, fg = '#2f3742', self.colors['text_secondary']
-                cv.configure(bg=bg)
-                cv.create_text(43, 15, text=cv._text, font=('微软雅黑', 11), fill=fg, tags='t')
+        log_container = tk.Frame(self.log_card, bg=self.colors['log_bg'], highlightthickness=0)
+        log_container.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 12))
 
-            cv._redraw = tab_redraw
-            tab_redraw()
-            cv.bind('<Button-1>', lambda e, idx=i: self._switch_tab(idx))
-            self.tab_buttons.append(cv)
+        self.log_text_container = tk.Frame(log_container, bg=self.colors['log_bg'])
+        self.log_text_container.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
-        search_row = tk.Frame(right_body, bg=self.colors['card'])
-        search_row.pack(fill=tk.X, padx=12, pady=(0, 8))
+        self.all_log_text = tk.Text(
+            self.log_text_container, height=16, state=tk.DISABLED,
+            font=('Cascadia Code', 9) if sys.platform == 'win32' else ('Menlo', 10),
+            wrap=tk.WORD, bg=self.colors['log_bg'], fg=self.colors['log_text'],
+            insertbackground=self.colors['blue'],
+            selectbackground='#264f78', selectforeground='white',
+            highlightthickness=0, relief=tk.FLAT,
+            padx=10, pady=8, spacing1=2
+        )
+        self.all_log_text.pack(fill=tk.BOTH, expand=True)
 
-        search = tk.Entry(search_row, bg='#1e2228', fg=self.colors['text_secondary'],
-                          insertbackground=self.colors['text_secondary'], relief=tk.FLAT,
-                          font=('微软雅黑', 10))
-        search.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        search.insert(0, "检索日志")
-        search.bind('<FocusIn>', lambda e: search.delete(0, tk.END) if search.get() == "检索日志" else None)
-        search.bind('<KeyRelease>', lambda e: self._filter_log(search.get()))
-        self.log_search_entry = search
+        self.backend_log_text = tk.Text(
+            self.log_text_container, height=16, state=tk.DISABLED,
+            font=('Cascadia Code', 9) if sys.platform == 'win32' else ('Menlo', 10),
+            wrap=tk.WORD, bg=self.colors['log_bg'], fg=self.colors['log_text'],
+            highlightthickness=0, relief=tk.FLAT,
+            padx=10, pady=8, spacing1=2
+        )
 
-        search_btn = tk.Canvas(search_row, width=74, height=26, bg=self.colors['card'],
-                                highlightthickness=0, cursor='hand2')
-        search_btn.pack(side=tk.RIGHT)
+        self.frontend_log_text = tk.Text(
+            self.log_text_container, height=16, state=tk.DISABLED,
+            font=('Cascadia Code', 9) if sys.platform == 'win32' else ('Menlo', 10),
+            wrap=tk.WORD, bg=self.colors['log_bg'], fg=self.colors['log_text'],
+            highlightthickness=0, relief=tk.FLAT,
+            padx=10, pady=8, spacing1=2
+        )
 
-        def search_redraw(hot=False):
-            search_btn.delete('all')
-            col = self.colors['text_primary'] if hot else self.colors['text_secondary']
-            self._draw_icon(search_btn, 'search', 14, 13, 15, col)
-            search_btn.create_text(34, 13, text="搜索", font=('微软雅黑', 10), fill=col, tags='s')
-
-        search_btn.bind('<Enter>', lambda e: search_redraw(hot=True))
-        search_btn.bind('<Leave>', lambda e: search_redraw(hot=False))
-        search_btn.bind('<Button-1>', lambda e: self._filter_log(search.get()))
-        search_redraw()
-
-        log_area = tk.Frame(right_body, bg='#1e2228')
-        log_area.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
-
-        log_font = ('Consolas', 9) if sys.platform == 'win32' else ('Menlo', 10)
-        self.all_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                    bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
-                                    padx=10, pady=8, spacing1=2, highlightthickness=0,
-                                    insertbackground=self.colors['blue'])
-        self.all_log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        self.backend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                         bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
-                                         padx=10, pady=8, spacing1=2, highlightthickness=0)
-        self.frontend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                          bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
-                                          padx=10, pady=8, spacing1=2, highlightthickness=0)
-        self.backup_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                        bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
-                                        padx=10, pady=8, spacing1=2, highlightthickness=0)
-
-        scrollbar_frame = tk.Frame(log_area, bg='#1e2228', width=12)
+        scrollbar_frame = tk.Frame(log_container, bg=self.colors['log_bg'], width=12)
         scrollbar_frame.pack(side=tk.RIGHT, fill=tk.Y)
         scrollbar_frame.pack_propagate(False)
-        self.log_scrollbar = ttk.Scrollbar(scrollbar_frame, orient=tk.VERTICAL,
-                                           command=self.all_log_text.yview,
-                                           style='DarkScrollbar.Vertical.TScrollbar')
+
+        self.log_scrollbar = ttk.Scrollbar(
+            scrollbar_frame, orient=tk.VERTICAL,
+            command=self.all_log_text.yview,
+            style='DarkScrollbar.Vertical.TScrollbar'
+        )
         self.log_scrollbar.pack(fill=tk.Y, expand=True)
         self.all_log_text.configure(yscrollcommand=self.log_scrollbar.set)
 
         self.active_tab = 0
-        self.tab_text_widgets = [self.all_log_text, self.frontend_log_text, self.backend_log_text, self.backup_log_text]
+        self.tab_text_widgets = [self.all_log_text, self.backend_log_text, self.frontend_log_text]
 
         log_tags = {
             'system':  self.colors['text_tertiary'],
-            'backend': '#60a5fa',
-            'frontend': '#4ade80',
-            'error':   '#f87171',
-            'success': '#4ade80',
-            'warning': '#f59e0b',
-            'info':    '#60a5fa',
+            'backend': '#58a6ff',
+            'frontend': '#3fb950',
+            'error':   '#f85149',
+            'success': '#3fb950',
+            'warning': '#d29922',
+            'info':    '#58a6ff',
         }
         for tw in self.tab_text_widgets:
             for tag, color in log_tags.items():
                 tw.tag_config(tag, foreground=color)
 
         # ═══════════════════════════════════════
-        # Bottom function buttons
+        # Info Bar
         # ═══════════════════════════════════════
-        # 每个按钮由左右两部分组成：左侧放图标+文字，右侧为纯色色块
-        self._btn_spec = {
-            'start':   {'color': '#22c55e', 'hover': '#4ade80', 'press': '#16a34a', 'off': '#374151'},
-            'stop':    {'color': '#ef4444', 'hover': '#f87171', 'press': '#dc2626', 'off': '#374151'},
-            'open':    {'color': '#3b82f6', 'hover': '#60a5fa', 'press': '#2563eb', 'off': '#374151'},
-            'refresh': {'color': '#06b6d4', 'hover': '#22d3ee', 'press': '#0891b2', 'off': '#374151'},
-        }
+        info_card = self._create_card(main_frame, None)
 
-        btn_row = tk.Frame(main, bg=root_bg)
-        btn_row.pack(fill=tk.X, padx=24, pady=(16, 24))
-        for _i in range(4):
-            btn_row.grid_columnconfigure(_i, weight=1)
-        btn_row.grid_rowconfigure(0, weight=1)
+        info_grid = tk.Frame(info_card, bg=self.colors['card'])
+        info_grid.pack(fill=tk.X, padx=16, pady=10)
 
-        self.start_btn = self._make_func_btn(btn_row, "启动系统", "play",
-                                             self._btn_spec['start'], self.start_services, '_start_enabled', col=0)
-        self.stop_btn = self._make_func_btn(btn_row, "停止系统", "stop",
-                                            self._btn_spec['stop'], self.stop_services, '_stop_enabled', col=1)
-        self.open_btn = self._make_func_btn(btn_row, "打开页面", "browser",
-                                            self._btn_spec['open'], self.open_browser, '_open_enabled', col=2)
-        self.refresh_btn = self._make_func_btn(btn_row, "刷新状态", "refresh",
-                                               self._btn_spec['refresh'], self.refresh_status, None, col=3)
+        info_items = [
+            ('前端地址', 'http://localhost:5173'),
+            ('后端 API', 'http://localhost:8000'),
+            ('默认账号', '1001'),
+            ('默认密码', '1001'),
+        ]
 
-    # ─────────────────────────────────────────
-    # Service tile / toggle / wave helpers
-    # ─────────────────────────────────────────
-    def _create_service_tile(self, parent, key, name, tag_on, tag_off, glyph, accent=None, side=tk.LEFT):
-        tile = tk.Frame(parent, bg='#2b323b', highlightbackground=self.colors['card_border'], highlightthickness=1)
-        if side == tk.TOP:
-            tile.pack(side=tk.TOP, fill=tk.X, expand=False, padx=8, pady=6)
-        else:
-            tile.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=6, pady=6)
+        for label, value in info_items:
+            row = tk.Frame(info_grid, bg=self.colors['card'])
+            row.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 20))
 
-        icon = tk.Canvas(tile, width=64, height=64, bg='#2b323b', highlightthickness=0)
-        icon.pack(pady=(20, 4))
-        accent = accent or self.colors['green']
-        self._hex(icon, 32, 32, 30, fill='#1e2228', outline=accent, width=1)
-        self._draw_icon(icon, glyph, 32, 32, 36, accent)
+            tk.Label(
+                row, text=label,
+                font=('微软雅黑', 9),
+                bg=self.colors['card'], fg=self.colors['text_tertiary']
+            ).pack(side=tk.LEFT, padx=(0, 6))
 
-        tk.Label(tile, text=name, font=('微软雅黑', 13, 'bold'), bg='#2b323b',
-                 fg=self.colors['text_primary']).pack(pady=(2, 10))
+            tk.Label(
+                row, text=value,
+                font=('Cascadia Code', 9) if sys.platform == 'win32' else ('Menlo', 9),
+                bg=self.colors['card'], fg=self.colors['text_primary']
+            ).pack(side=tk.LEFT)
 
-        wave = tk.Canvas(tile, width=180, height=14, bg='#2b323b', highlightthickness=0)
-        wave.pack()
-        self._draw_wave(wave, accent)
-        setattr(self, f'{key}_wave_canvas', wave)
-
-        slider = tk.Canvas(tile, width=180, height=14, bg='#2b323b', highlightthickness=0)
-        slider.pack(pady=(8, 4))
-        self._draw_progress_track(slider, 180, 6)
-        setattr(self, f'{key}_progress_canvas', slider)
-
-        row = tk.Frame(tile, bg='#2b323b')
-        row.pack(fill=tk.X, pady=(2, 12), padx=14)
-        indicator = tk.Label(row, text="未启动", font=('微软雅黑', 11), bg='#2b323b',
-                             fg=self.colors['text_tertiary'])
-        indicator.pack(side=tk.LEFT)
-        setattr(self, f'{key}_indicator', indicator)
-        toggle = tk.Canvas(row, width=44, height=22, bg='#2b323b', highlightthickness=0)
-        toggle.pack(side=tk.RIGHT)
-        setattr(self, f'{key}_toggle_canvas', toggle)
-        self._draw_toggle(toggle, False)
-
-        slider._indicator = indicator
-        slider._toggle = toggle
-        slider._tag = None
-        slider._tag_on = tag_on
-        slider._tag_off = tag_off
-        slider._wave = wave
-        slider._icon = icon
-        slider._glyph = glyph
-        slider._accent = accent
-        self._update_progress(slider, 0, self.colors['text_tertiary'])
-
-    def _draw_toggle(self, canvas, on):
-        canvas.delete('all')
-        w, h = 44, 22
-        r = h // 2
-        bg = self.colors['green'] if on else '#4b5563'
-        self._draw_rounded_rect(canvas, 0, 0, w, h, r, fill=bg, outline='', tags='tg')
-        knob_r = 8
-        padding = 1.5
-        cx = w - r - padding if on else r + padding
-        cy = h / 2
-        canvas.create_oval(cx - knob_r, cy - knob_r, cx + knob_r, cy + knob_r, fill='#ffffff', outline='')
-
-    def _draw_wave(self, canvas, color):
-        canvas.delete('all')
-        w, h = 180, 14
-        bar_w = 3
-        gap = 4
-        n = w // (bar_w + gap)
-        # 固定高度的竖条均衡器样式，与截图一致
-        heights = [5, 9, 6, 11, 7, 13, 8, 12, 6, 10, 7, 14, 9, 11, 6, 8, 10, 7, 12, 6, 9, 5]
-        for i in range(n):
-            x = i * (bar_w + gap) + gap
-            hh = min(heights[i % len(heights)], h - 2)
-            y1 = (h - hh) / 2
-            y2 = y1 + hh
-            self._draw_rounded_rect(canvas, x, y1, x + bar_w, y2, 1.5, fill=color, outline='', tags='wave')
-
-    def _draw_slider_knob(self, canvas, x):
-        r = 6
-        max_w = 180
-        x = max(r, min(x, max_w - r))
-        cy = 3
-        canvas.create_oval(x - r, cy - r, x + r, cy + r, fill='#ffffff', outline='', tags='knob')
-
-    def _hex(self, canvas, cx, cy, r, **kw):
-        import math
-        pts = []
-        for i in range(6):
-            ang = math.radians(60 * i - 30)
-            pts.append(cx + r * math.cos(ang))
-            pts.append(cy + r * math.sin(ang))
-        canvas.create_polygon(pts, **kw)
-
-    # ─────────────────────────────────────────
-    # 统一线性图标库（24x24 网格，中心对齐，圆角线帽）
-    # ─────────────────────────────────────────
-    def _draw_icon(self, canvas, name, cx, cy, size, color, width=None):
-        """绘制统一风格的线性图标。name 决定图标种类；size 为外接边长(px)。"""
-        import math
-        u = size / 24.0
-        lw = width if width is not None else max(1.6, size * 0.09)
-
-        def P(x, y):
-            return (cx + (x - 12) * u, cy + (y - 12) * u)
-
-        def line(*pts, w=lw):
-            canvas.create_line(*pts, fill=color, width=w, joinstyle=tk.ROUND,
-                               capstyle=tk.ROUND, tags='icon')
-
-        def rect(x1, y1, x2, y2, w=lw):
-            canvas.create_rectangle(*P(x1, y1), *P(x2, y2), outline=color, fill='',
-                                    width=w, tags='icon')
-
-        def oval(x1, y1, x2, y2, w=lw):
-            canvas.create_oval(*P(x1, y1), *P(x2, y2), outline=color, fill='',
-                               width=w, tags='icon')
-
-        def poly(*pts, w=lw):
-            canvas.create_polygon(*pts, outline=color, fill='', width=w,
-                                  joinstyle=tk.ROUND, tags='icon')
-
-        if name == 'home':
-            line(*P(12, 3), *P(5, 11), *P(19, 11))
-            line(*P(7, 10), *P(7, 21), *P(17, 21), *P(17, 10))
-            line(*P(11, 21), *P(11, 15), *P(13, 15), *P(13, 21))
-        elif name == 'settings':
-            oval(8, 8, 16, 16)
-            canvas.create_oval(*P(10.5, 10.5), *P(13.5, 13.5), outline=color, fill='',
-                               width=lw * 0.7, tags='icon')
-            for k in range(8):
-                a = math.radians(45 * k)
-                line(cx + (7.6 * math.cos(a)) * u, cy + (7.6 * math.sin(a)) * u,
-                     cx + (10 * math.cos(a)) * u, cy + (10 * math.sin(a)) * u, w=lw * 0.8)
-        elif name == 'play':
-            poly(*P(8, 6), *P(8, 18), *P(18, 12))
-        elif name == 'stop':
-            rect(7, 7, 17, 17)
-        elif name == 'browser':
-            rect(4, 5, 20, 19)
-            line(*P(4, 9), *P(20, 9))
-            oval(6.3, 7, 8, 8.7, lw * 0.7)
-            oval(9.3, 7, 11, 8.7, lw * 0.7)
-            oval(12.3, 7, 14, 8.7, lw * 0.7)
-        elif name == 'refresh' or name == 'refresh_list':
-            oval(6, 6, 18, 18)
-            poly(*P(12, 3.5), *P(9, 7), *P(15, 7))
-        elif name == 'server':
-            oval(5, 6, 19, 10)
-            line(*P(5, 6), *P(5, 18))
-            line(*P(19, 6), *P(19, 18))
-            canvas.create_arc(*P(5, 14), *P(19, 18), start=0, extent=180,
-                              style=tk.ARC, outline=color, width=lw, tags='icon')
-            line(*P(5, 12), *P(19, 12))
-        elif name == 'window':
-            rect(5, 5, 19, 15)
-            line(*P(12, 15), *P(12, 18))
-            line(*P(8, 18), *P(16, 18))
-        elif name == 'folder':
-            rect(4, 7, 20, 18)
-            line(*P(4, 7), *P(8, 7), *P(10, 4), *P(20, 4))
-        elif name == 'save':
-            rect(5, 5, 19, 19)
-            rect(9, 5, 15, 11)
-            rect(8, 13, 16, 17)
-        elif name == 'save_settings':
-            rect(5, 5, 19, 19)
-            line(*P(9, 12), *P(12, 15), *P(16, 9))
-        elif name == 'import':
-            rect(7, 4, 17, 20)
-            line(*P(12, 17), *P(12, 9))
-            poly(*P(9, 12), *P(12, 9), *P(15, 12))
-        elif name == 'restore':
-            oval(6, 6, 18, 18)
-            line(*P(12, 12), *P(12, 7))
-            line(*P(12, 12), *P(16, 13))
-        elif name == 'search':
-            oval(6, 6, 15, 15)
-            line(*P(13.5, 13.5), *P(18, 18))
-        elif name == 'grid':
-            rect(5, 5, 19, 19)
-            line(*P(12, 5), *P(12, 19))
-            line(*P(5, 12), *P(19, 12))
-        else:
-            oval(9, 9, 15, 15)
-
-    def _darken(self, hex_color, factor=0.8):
-        hex_color = hex_color.lstrip('#')
-        if len(hex_color) == 3:
-            hex_color = ''.join(c * 2 for c in hex_color)
-        try:
-            r = int(hex_color[0:2], 16)
-            g = int(hex_color[2:4], 16)
-            b = int(hex_color[4:6], 16)
-        except ValueError:
-            return hex_color
-        r = max(0, min(255, int(r * factor)))
-        g = max(0, min(255, int(g * factor)))
-        b = max(0, min(255, int(b * factor)))
-        return f'#{r:02x}{g:02x}{b:02x}'
-
-    def _make_func_btn(self, parent, text, icon, spec, cmd, enabled_attr, col=None):
-        c = tk.Canvas(parent, height=120, bg=parent.cget('bg'), highlightthickness=0, cursor='hand2')
-        if col is not None:
-            c.grid(row=0, column=col, sticky='nsew', padx=8)
-        else:
-            c.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=8)
-        c._spec = spec
-        c._text = text
-        c._icon = icon
-        c._enabled_attr = enabled_attr
-        c._cmd = cmd
-        c._hover = False
-        c._press = False
-
-        def redraw(event=None):
-            w = c.winfo_width()
-            h = c.winfo_height()
-            if w < 20 or h < 20:
-                w, h = 200, 120
-            enabled = (enabled_attr is None) or getattr(self, enabled_attr, True)
-            if not enabled:
-                color = spec['off']
-            elif c._press:
-                color = spec['press']
-            elif c._hover:
-                color = spec['hover']
-            else:
-                color = spec['color']
-            c.delete('all')
-            self._draw_rounded_rect(c, 0, 0, w, h, 12, fill=color, outline='', tags='btn_bg')
-            icon_color = '#ffffff' if enabled else '#9aa3af'
-            icon_size = min(34, w * 0.28)
-            self._draw_icon(c, icon, w / 2, h * 0.38, icon_size, icon_color)
-            c.create_text(w / 2, h * 0.72, text=text, font=('微软雅黑', 13, 'bold'),
-                          fill=icon_color, tags='tx')
-
-        c._redraw = redraw
-
-        def on_enter(e):
-            c._hover = True
-            redraw()
-
-        def on_leave(e):
-            c._hover = False
-            c._press = False
-            redraw()
-
-        def on_press(e):
-            if (enabled_attr is None) or getattr(self, enabled_attr, True):
-                c._press = True
-                redraw()
-
-        def on_release(e):
-            c._press = False
-            redraw()
-            if (enabled_attr is None) or getattr(self, enabled_attr, True):
-                cmd()
-
-        c.bind('<Enter>', on_enter)
-        c.bind('<Leave>', on_leave)
-        c.bind('<ButtonPress-1>', on_press)
-        c.bind('<ButtonRelease-1>', on_release)
-        c.bind('<Configure>', redraw)
-        c.update_idletasks()
-        redraw()
-        c.after(100, redraw)
-        return c
-
-    def _style_func_btn(self, c, spec, enabled):
-        c._spec = spec
-        c._redraw()
-
-    def _filter_log(self, query):
-        widget = self.tab_text_widgets[self.active_tab]
-        try:
-            widget.config(state=tk.NORMAL)
-            widget.tag_remove('hidden', '1.0', tk.END)
-            q = (query or '').strip().lower()
-            if q and q != "检索日志":
-                lines = widget.get('1.0', tk.END).split('\n')
-                for i, line in enumerate(lines):
-                    if q not in line.lower():
-                        widget.tag_add('hidden', f'{i+1}.0', f'{i+1}.end')
-                widget.tag_config('hidden', elide=True)
-            widget.config(state=tk.DISABLED)
-        except Exception:
-            pass
-
-    def _create_card(self, parent, title, expand=False, side=None, padx=0, pady=10):
+    def _create_card(self, parent, title=None, expand=False):
         outer = tk.Frame(parent, bg=self.colors['bg'])
-        if side is not None:
-            outer.pack(side=side, fill=tk.BOTH if expand else tk.X, expand=expand, padx=padx, pady=(0, pady))
-        elif expand:
-            outer.pack(fill=tk.BOTH, expand=True, pady=(0, pady))
+        if expand:
+            outer.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         else:
-            outer.pack(fill=tk.X, pady=(0, pady))
+            outer.pack(fill=tk.X, pady=(0, 10))
 
-        card = tk.Canvas(outer, bg=self.colors['card'], highlightthickness=0)
+        card = tk.Canvas(
+            outer, bg=self.colors['card'], highlightthickness=0
+        )
         if expand:
             card.pack(fill=tk.BOTH, expand=True)
         else:
@@ -758,7 +605,7 @@ class WindowsLauncherApp:
 
         def _on_card_configure(event):
             card.delete('bg')
-            r = 10
+            r = 8
             w, h = event.width, event.height
             self._draw_rounded_rect(card, 0, 0, w, h, r, fill=self.colors['card'], outline=self.colors['card_border'], width=1, tags='bg')
 
@@ -767,182 +614,102 @@ class WindowsLauncherApp:
         if title:
             title_label = tk.Label(
                 card, text=title,
-                font=('微软雅黑', 13, 'bold'),
+                font=('微软雅黑', 11, 'bold'),
                 bg=self.colors['card'], fg=self.colors['text_primary'],
                 anchor=tk.W
             )
-            title_label.pack(fill=tk.X, padx=16, pady=(14, 6))
+            title_label.pack(fill=tk.X, padx=16, pady=(12, 0))
 
         return card
+
     def _draw_rounded_rect(self, canvas, x1, y1, x2, y2, r, **kwargs):
-        """四角均为圆角的矩形。改用密集线段（smooth=False）绘制真实圆弧，
-        避免 Tkinter 对直角顶点使用 smooth 贝塞尔曲线时在拐角处产生抗锯齿杂色边。"""
-        return self._draw_partial_rounded_rect(
-            canvas, x1, y1, x2, y2, r, (True, True, True, True), **kwargs)
+        points = [
+            x1 + r, y1,
+            x2 - r, y1,
+            x2, y1,
+            x2, y1 + r,
+            x2, y2 - r,
+            x2, y2,
+            x2 - r, y2,
+            x1 + r, y2,
+            x1, y2,
+            x1, y2 - r,
+            x1, y1 + r,
+            x1, y1,
+        ]
+        return canvas.create_polygon(points, smooth=True, **kwargs)
 
     def _draw_rounded_btn(self, canvas, w, h, color, r=20):
         canvas.delete('btn_bg')
         self._draw_rounded_rect(canvas, 0, 0, w, h, r, fill=color, outline='', tags='btn_bg')
         canvas.tag_lower('btn_bg')
 
-    def _draw_partial_rounded_rect(self, canvas, x1, y1, x2, y2, r, rounded, **kwargs):
-        """绘制可指定哪些角圆角的矩形。rounded 为 (tl, tr, br, bl) 布尔元组。
-        使用密集线段近似圆弧，smooth=False，避免 Tkinter 把直边也弯成曲线。"""
-        import math
-        pts = []
-        # top-left corner: 圆心 (x1+r, y1+r), 角度 180 -> 270
-        if rounded[0]:
-            for i in range(180, 271, 5):
-                ang = math.radians(i)
-                pts.extend([x1 + r + r * math.cos(ang), y1 + r + r * math.sin(ang)])
-        else:
-            pts.extend([x1, y1])
-        # top edge -> top-right start
-        pts.extend([x2 - (r if rounded[1] else 0), y1])
-        # top-right corner: 圆心 (x2-r, y1+r), 角度 270 -> 360
-        if rounded[1]:
-            for i in range(270, 361, 5):
-                ang = math.radians(i)
-                pts.extend([x2 - r + r * math.cos(ang), y1 + r + r * math.sin(ang)])
-        else:
-            pts.extend([x2, y1])
-        # right edge -> bottom-right start
-        pts.extend([x2, y2 - (r if rounded[2] else 0)])
-        # bottom-right corner: 圆心 (x2-r, y2-r), 角度 0 -> 90
-        if rounded[2]:
-            for i in range(0, 91, 5):
-                ang = math.radians(i)
-                pts.extend([x2 - r + r * math.cos(ang), y2 - r + r * math.sin(ang)])
-        else:
-            pts.extend([x2, y2])
-        # bottom edge -> bottom-left start
-        pts.extend([x1 + (r if rounded[3] else 0), y2])
-        # bottom-left corner: 圆心 (x1+r, y2-r), 角度 90 -> 180
-        if rounded[3]:
-            for i in range(90, 181, 5):
-                ang = math.radians(i)
-                pts.extend([x1 + r + r * math.cos(ang), y2 - r + r * math.sin(ang)])
-        else:
-            pts.extend([x1, y2])
-        return canvas.create_polygon(pts, smooth=False, **kwargs)
-
-    def _draw_two_part_btn(self, canvas, w, h, left_color, right_color, split=0.72, r=12):
-        """绘制左右两部分组成的按钮：左侧放图标文字，右侧为纯色色块。
-        先以 right_color 画完整圆角矩形作为外框底色（确保四个圆角处都不透出窗口背景），
-        再用只有左侧两个圆角的 left_color 块覆盖左半部分，并向右多覆盖 2px 以避免中间接缝出现缝隙。"""
-        canvas.delete('btn_bg')
-        s = w * split
-        overlap = 2
-        # 完整右侧色块外框：所有圆角/接缝处均由 right_color 兜底
-        self._draw_rounded_rect(canvas, 0, 0, w, h, r, fill=right_color, outline='', tags='btn_bg')
-        # 左侧色块覆盖左半部分，仅保留左上、左下圆角
-        self._draw_partial_rounded_rect(canvas, 0, 0, s + overlap, h, r,
-                                        (True, False, False, True),
-                                        fill=left_color, outline='', tags='btn_bg')
-        canvas.tag_lower('btn_bg')
-
     def _draw_progress_track(self, canvas, w, h, r=3):
         self._draw_rounded_rect(canvas, 0, 0, w, h, r, fill=self.colors['progress_track'], outline='')
 
     def _update_progress(self, canvas, width, color):
-        # 子线程调用时切回主线程执行，避免跨线程访问 Tk 导致闪退
-        if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self._update_progress, canvas, width, color)
-            return
         max_w = 180
         width = max(0, min(width, max_w))
         canvas.delete('progress_fill')
-        canvas.delete('knob')
-
-        # 根据传入 color 判断状态：green=运行中 orange=异常 blue=启动中 其它=未启动
-        if color == self.colors['green']:
-            state, accent = 'running', self.colors['green']
-        elif color == self.colors['orange']:
-            state, accent = 'error', self.colors['orange']
-        elif color == self.colors['blue']:
-            state, accent = 'starting', self.colors['blue']
-        else:
-            state, accent = 'off', getattr(canvas, '_accent', self.colors['text_tertiary'])
-
-        # 已启动/异常/启动中时绘制填充条；未启动时仅显示灰色轨道
-        if state in ('running', 'error', 'starting') and width > 0:
-            self._draw_rounded_rect(canvas, 0, 0, width, 6, 3, fill=accent, outline='', tags='progress_fill')
-
-        # 白色圆形滑块，位于填充条末端（未启动时在左侧）
-        self._draw_slider_knob(canvas, width)
-
-        indicator = getattr(canvas, '_indicator', None)
-        toggle = getattr(canvas, '_toggle', None)
-        tag = getattr(canvas, '_tag', None)
-        wave = getattr(canvas, '_wave', None)
-        icon = getattr(canvas, '_icon', None)
-        glyph = getattr(canvas, '_glyph', '')
-
-        if state == 'running':
-            word, fg, on, hex_fill = "运行中", self.colors['green'], True, '#16351f'
-        elif state == 'error':
-            word, fg, on, hex_fill = "异常", self.colors['orange'], True, '#3f2c1e'
-        elif state == 'starting':
-            word, fg, on, hex_fill = "启动中...", self.colors['blue'], True, '#1e293b'
-        else:
-            word, fg, on, hex_fill = "未启动", self.colors['text_tertiary'], False, '#1e2228'
-
-        if indicator:
-            indicator.config(text=word, fg=fg)
-        if toggle:
-            self._draw_toggle(toggle, on)
-        if wave:
-            self._draw_wave(wave, accent)
-        if icon:
-            icon.delete('all')
-            self._hex(icon, 32, 32, 30, fill=hex_fill, outline=accent, width=1)
-            self._draw_icon(icon, glyph, 32, 32, 36, accent)
+        if width > 0:
+            self._draw_rounded_rect(canvas, 0, 0, width, 6, 3, fill=color, outline='', tags='progress_fill')
 
     def _hover_btn(self, canvas, w, h, color):
         self._draw_rounded_btn(canvas, w, h, color)
 
     def _set_button_state(self, start='normal', stop='disabled', open='disabled'):
-        # 子线程调用时切回主线程执行，避免跨线程访问 Tk 导致闪退
-        if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self._set_button_state, start, stop, open)
-            return
         """Update button visual state WITHOUT using tk.DISABLED (which applies gray stipple mask)."""
         # ── Start button ──
-        self._style_func_btn(self.start_btn, self._btn_spec['start'], start != 'disabled')
-        self._start_enabled = (start != 'disabled')
-        self.start_btn.config(cursor='hand2' if self._start_enabled else 'arrow')
+        if start == 'disabled':
+            self._draw_rounded_btn(self.start_btn, 150, 40, '#30363d')
+            self.start_btn.delete('btn_text')
+            self.start_btn.create_text(75, 20, text="启动系统", font=('微软雅黑', 11, 'bold'), fill='#484f58', tags='btn_text')
+            self._start_enabled = False
+            self.start_btn.config(cursor='arrow')
+        else:
+            self._draw_rounded_btn(self.start_btn, 150, 40, self.colors['green'])
+            self.start_btn.delete('btn_text')
+            self.start_btn.create_text(75, 20, text="启动系统", font=('微软雅黑', 11, 'bold'), fill='white', tags='btn_text')
+            self._start_enabled = True
+            self.start_btn.config(cursor='hand2')
 
         # ── Stop button ──
-        self._style_func_btn(self.stop_btn, self._btn_spec['stop'], stop != 'disabled')
-        self._stop_enabled = (stop != 'disabled')
-        self.stop_btn.config(cursor='hand2' if self._stop_enabled else 'arrow')
+        if stop == 'disabled':
+            self._draw_rounded_btn(self.stop_btn, 150, 40, '#30363d')
+            self.stop_btn.delete('btn_text')
+            self.stop_btn.create_text(75, 20, text="停止系统", font=('微软雅黑', 11, 'bold'), fill='#484f58', tags='btn_text')
+            self._stop_enabled = False
+            self.stop_btn.config(cursor='arrow')
+        else:
+            self._draw_rounded_btn(self.stop_btn, 150, 40, self.colors['red'])
+            self.stop_btn.delete('btn_text')
+            self.stop_btn.create_text(75, 20, text="停止系统", font=('微软雅黑', 11, 'bold'), fill='white', tags='btn_text')
+            self._stop_enabled = True
+            self.stop_btn.config(cursor='hand2')
 
         # ── Open button ──
-        self._style_func_btn(self.open_btn, self._btn_spec['open'], open != 'disabled')
-        self._open_enabled = (open != 'disabled')
-        self.open_btn.config(cursor='hand2' if self._open_enabled else 'arrow')
-
-    def _to_ui(self, fn, *args):
-        """线程安全地执行 Tk 操作：非主线程时通过 after 切回主线程，
-        避免跨线程访问 Tcl 导致解释器崩溃/闪退。"""
-        if threading.current_thread() is self._main_thread:
-            fn(*args)
+        if open == 'disabled':
+            self._draw_rounded_btn(self.open_btn, 150, 40, '#30363d')
+            self.open_btn.delete('btn_text')
+            self.open_btn.create_text(75, 20, text="打开页面", font=('微软雅黑', 11, 'bold'), fill='#484f58', tags='btn_text')
+            self._open_enabled = False
+            self.open_btn.config(cursor='arrow')
         else:
-            self.root.after(0, fn, *args)
-
-    def _ui_set_service(self, which, word, fg):
-        """线程安全地设置某服务的状态文字与指示灯（供子线程调用）。"""
-        status_var = self.backend_status if which == 'backend' else self.frontend_status
-        ind = self.backend_indicator if which == 'backend' else self.frontend_indicator
-        self._to_ui(lambda: (status_var.set(word), ind.config(text='●', foreground=fg)))
+            self._draw_rounded_btn(self.open_btn, 150, 40, self.colors['blue'])
+            self.open_btn.delete('btn_text')
+            self.open_btn.create_text(75, 20, text="打开页面", font=('微软雅黑', 11, 'bold'), fill='white', tags='btn_text')
+            self._open_enabled = True
+            self.open_btn.config(cursor='hand2')
 
     def _switch_tab(self, index):
         if index == self.active_tab:
             return
 
         for i, btn in enumerate(self.tab_buttons):
-            btn._active = (i == index)
-            btn._redraw()
+            if i == index:
+                btn.config(bg=self.colors['tab_active_bg'], fg=self.colors['text_primary'])
+            else:
+                btn.config(bg=self.colors['tab_inactive_bg'], fg=self.colors['tab_inactive_text'])
 
         for i, tw in enumerate(self.tab_text_widgets):
             if i == index:
@@ -1000,11 +767,7 @@ class WindowsLauncherApp:
             darkcolor=[('active', '#30363d')],
             lightcolor=[('active', '#30363d')])
 
-    def add_log(self, text, source='system', level='info', channel=None):
-        # 子线程调用时切回主线程执行，避免跨线程访问 Text 控件导致闪退
-        if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self.add_log, text, source, level, channel)
-            return
+    def add_log(self, text, source='system', level='info'):
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
 
         tag = source if source in ('system', 'backend', 'frontend', 'error', 'success', 'warning') else 'info'
@@ -1028,14 +791,6 @@ class WindowsLauncherApp:
             tw.insert(tk.END, log_line, tag)
             tw.config(state=tk.DISABLED)
             tw.see(tk.END)
-
-        # 备份/还原相关日志额外写入“备份”标签页
-        if channel == 'backup' and getattr(self, 'backup_log_text', None):
-            bt = self.backup_log_text
-            bt.config(state=tk.NORMAL)
-            bt.insert(tk.END, log_line, tag)
-            bt.config(state=tk.DISABLED)
-            bt.see(tk.END)
 
     def add_backend_log(self, text, level='info'):
         self.add_log(text, 'backend')
@@ -1324,8 +1079,8 @@ class WindowsLauncherApp:
 
     def start_services(self):
         self._set_button_state(start='disabled')
-        self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
-        self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
+        self._update_progress(self.backend_progress_canvas, 0, self.colors['blue'])
+        self._update_progress(self.frontend_progress_canvas, 0, self.colors['blue'])
         self.add_log("开始启动系统...", 'system')
 
         def run_start():
@@ -1363,14 +1118,16 @@ class WindowsLauncherApp:
             external_backend_healthy = is_port_open(8000) and is_service_healthy('http://localhost:8000/health', timeout=3)
             if external_backend_healthy:
                 self.add_log("复用外部已运行的后端服务 (端口:8000)，本启动器不再重复启动", 'success')
-                self._ui_set_service('backend', "运行中", self.colors['green'])
+                self.backend_status.set("运行中")
+                self.backend_indicator.config(text='●', foreground=self.colors['green'])
                 self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
             else:
                 if is_port_open(8000):
                     self.add_log("8000 端口被占用但无 HTTP 响应，可能是外部异常进程，请手动停止后重试", 'warning')
                 self.add_log("正在启动后端服务...", 'system')
-                self._ui_set_service('backend', "启动中...", self.colors['blue'])
-                self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
+                self.backend_status.set("启动中...")
+                self.backend_indicator.config(text='●', foreground=self.colors['blue'])
+                self._update_progress(self.backend_progress_canvas, 0, self.colors['blue'])
 
                 self.backend_process = self._start_backend()
 
@@ -1379,33 +1136,39 @@ class WindowsLauncherApp:
                     # 端口通了后再做 HTTP 健康检查确保服务真正可用
                     if is_service_healthy('http://localhost:8000/health', timeout=3):
                         self.add_log("后端服务启动成功并健康就绪 (端口:8000)", 'success')
-                        self._ui_set_service('backend', "运行中", self.colors['green'])
+                        self.backend_status.set("运行中")
+                        self.backend_indicator.config(text='●', foreground=self.colors['green'])
                     else:
                         self.add_log("后端端口已开放但 HTTP 服务未就绪，继续等待...", 'warning')
                         time.sleep(2)
                         if is_service_healthy('http://localhost:8000/health', timeout=5):
                             self.add_log("后端服务最终就绪 (端口:8000)", 'success')
-                            self._ui_set_service('backend', "运行中", self.colors['green'])
+                            self.backend_status.set("运行中")
+                            self.backend_indicator.config(text='●', foreground=self.colors['green'])
                         else:
                             self.add_log("后端服务可能异常，请检查后端控制台日志", 'error')
-                            self._ui_set_service('backend', "异常", self.colors['orange'])
+                            self.backend_status.set("异常")
+                            self.backend_indicator.config(text='●', foreground=self.colors['orange'])
                 else:
                     self._update_progress(self.backend_progress_canvas, 180, self.colors['orange'])
                     self.add_log("后端服务启动超时，可能仍在启动中...", 'warning')
-                    self._ui_set_service('backend', "运行中", self.colors['green'])
+                    self.backend_status.set("运行中")
+                    self.backend_indicator.config(text='●', foreground=self.colors['green'])
 
             # 若 5173 已被外部健康进程占用，则复用而非重复启动（避免端口冲突与误杀）
             external_frontend_healthy = is_port_open(5173) and is_service_healthy('http://localhost:5173', timeout=3)
             if external_frontend_healthy:
                 self.add_log("复用外部已运行的前端服务 (端口:5173)，本启动器不再重复启动", 'success')
-                self._ui_set_service('frontend', "运行中", self.colors['green'])
+                self.frontend_status.set("运行中")
+                self.frontend_indicator.config(text='●', foreground=self.colors['green'])
                 self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
             else:
                 if is_port_open(5173):
                     self.add_log("5173 端口被占用但无 HTTP 响应，可能是外部异常进程，请手动停止后重试", 'warning')
                 self.add_log("正在启动前端服务...", 'system')
-                self._ui_set_service('frontend', "启动中...", self.colors['blue'])
-                self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
+                self.frontend_status.set("启动中...")
+                self.frontend_indicator.config(text='●', foreground=self.colors['blue'])
+                self._update_progress(self.frontend_progress_canvas, 0, self.colors['blue'])
 
                 frontend_dir = os.path.join(os.path.dirname(__file__), 'frontend')
                 self.frontend_process = subprocess.Popen(
@@ -1428,27 +1191,31 @@ class WindowsLauncherApp:
                     self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
                     if is_service_healthy('http://localhost:5173', timeout=3):
                         self.add_log("前端服务启动成功并健康就绪 (端口:5173)", 'success')
-                        self._ui_set_service('frontend', "运行中", self.colors['green'])
+                        self.frontend_status.set("运行中")
+                        self.frontend_indicator.config(text='●', foreground=self.colors['green'])
                     else:
                         self.add_log("前端端口已开放但 HTTP 服务未就绪，继续等待...", 'warning')
                         time.sleep(2)
                         if is_service_healthy('http://localhost:5173', timeout=5):
                             self.add_log("前端服务最终就绪 (端口:5173)", 'success')
-                            self._ui_set_service('frontend', "运行中", self.colors['green'])
+                            self.frontend_status.set("运行中")
+                            self.frontend_indicator.config(text='●', foreground=self.colors['green'])
                         else:
                             self.add_log("前端服务可能异常，请检查前端控制台日志", 'error')
-                            self._ui_set_service('frontend', "异常", self.colors['orange'])
+                            self.frontend_status.set("异常")
+                            self.frontend_indicator.config(text='●', foreground=self.colors['orange'])
                 else:
                     self._update_progress(self.frontend_progress_canvas, 180, self.colors['orange'])
                     self.add_log("前端服务启动超时，可能仍在启动中...", 'warning')
-                    self._ui_set_service('frontend', "运行中", self.colors['green'])
+                    self.frontend_status.set("运行中")
+                    self.frontend_indicator.config(text='●', foreground=self.colors['green'])
 
             self.add_log("所有服务启动完成", 'success')
 
             self._set_button_state(start='normal', stop='normal', open='normal')
 
             time.sleep(2)
-            self._to_ui(self.open_browser)
+            self.open_browser()
 
         threading.Thread(target=run_start, daemon=True).start()
 
@@ -1478,11 +1245,11 @@ class WindowsLauncherApp:
         if not is_port_open(8000):
             self.backend_status.set("未启动")
             self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
-            self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
+            self._update_progress(self.backend_progress_canvas, 0, self.colors['blue'])
         if not is_port_open(5173):
             self.frontend_status.set("未启动")
             self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
-            self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
+            self._update_progress(self.frontend_progress_canvas, 0, self.colors['blue'])
 
         self.backend_process = None
         self.frontend_process = None
@@ -1532,7 +1299,7 @@ class WindowsLauncherApp:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.backup_config, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            self.add_log(f"保存备份配置失败: {e}", 'error', channel='backup')
+            self.add_log(f"保存备份配置失败: {e}", 'error')
 
     def _start_backup_scheduler(self):
         self._stop_backup_scheduler()
@@ -1557,7 +1324,7 @@ class WindowsLauncherApp:
             next_time = self._compute_next_backup_time(cfg)
             now = datetime.now()
             wait_seconds = max(60, int((next_time - now).total_seconds()))
-            self.add_log(f"下次自动备份时间: {next_time.strftime('%Y-%m-%d %H:%M')}", 'system', channel='backup')
+            self.add_log(f"下次自动备份时间: {next_time.strftime('%Y-%m-%d %H:%M')}", 'system')
             slept = 0
             while slept < wait_seconds and not self.backup_scheduler_event.is_set():
                 chunk = min(60, wait_seconds - slept)
@@ -1567,7 +1334,7 @@ class WindowsLauncherApp:
                 break
             if not self.backup_config.get('auto_backup', {}).get('enabled'):
                 break
-            self.add_log("执行定时自动备份...", 'system', channel='backup')
+            self.add_log("执行定时自动备份...", 'system')
             self._run_backup_task()
 
     def _compute_next_backup_time(self, cfg):
@@ -1612,6 +1379,7 @@ class WindowsLauncherApp:
         try:
             backup_dir = self.backup_config.get('backup_dir')
             if not backup_dir:
+                self.add_log("备份失败: 未配置备份目录", 'error')
                 self._log_to_settings("备份失败: 未配置备份目录", 'error')
                 return
             os.makedirs(backup_dir, exist_ok=True)
@@ -1619,6 +1387,7 @@ class WindowsLauncherApp:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             db_path = os.path.join(base_dir, 'backend', 'data', 'db', 'order_system.db')
             if not os.path.exists(db_path):
+                self.add_log(f"备份失败: 数据库文件不存在 {db_path}", 'error')
                 self._log_to_settings(f"备份失败: 数据库文件不存在 {db_path}", 'error')
                 return
 
@@ -1632,58 +1401,51 @@ class WindowsLauncherApp:
             size = os.path.getsize(backup_path)
             size_str = f"{size/1024/1024:.2f} MB" if size > 1024*1024 else f"{size/1024:.1f} KB"
             msg = f"数据库备份成功: {backup_path} ({size_str})"
+            self.add_log(msg, 'success')
             self._log_to_settings(msg, 'success')
         except Exception as e:
             msg = f"数据库备份失败: {e}"
+            self.add_log(msg, 'error')
             self._log_to_settings(msg, 'error')
 
     def open_settings_window(self):
-        """点击设置：在主窗口内切换到「数据库备份与还原」视图，不弹出独立窗口。"""
-        if not getattr(self, '_settings_built', False):
-            self._build_settings_view(self.settings_view)
-            self._settings_built = True
-            self._settings_view_open = True
-        self.home_view.pack_forget()
-        self.settings_view.pack(fill=tk.BOTH, expand=True)
-        self._current_view = 'settings'
-        self._refresh_nav()
+        if self.settings_window and self.settings_window.winfo_exists():
+            self.settings_window.lift()
+            return
 
-    def _show_home_view(self):
-        if getattr(self, '_settings_built', False):
-            self.settings_view.pack_forget()
-        self.home_view.pack(fill=tk.BOTH, expand=True)
-        self._current_view = 'home'
-        self._settings_view_open = False
-        self._refresh_nav()
+        sw = tk.Toplevel(self.root)
+        sw.title("数据库备份与还原")
+        sw.geometry("760x640")
+        sw.configure(bg=self.colors['bg'])
+        sw.transient(self.root)
+        # 注意：不要调用 sw.grab_set()，否则会变成模态并独占输入。
+        # 一旦用户切到桌面再回来，被锁定的设置窗口隐藏但 grab 仍在，
+        # 会导致整个启动器（含主窗口）点击无响应、连窗口都唤不出来。
+        # 保持为非模态顶层窗口，可自由切换桌面、再点回主窗口。
+        self.settings_window = sw
 
-    def _refresh_nav(self):
-        if getattr(self, 'nav_home', None):
-            self.nav_home._redraw(hover=False)
-        if getattr(self, 'nav_settings', None):
-            self.nav_settings._redraw(hover=False)
-
-    def _build_settings_view(self, parent):
-        parent.configure(bg=self.colors['bg'])
-
-        header = tk.Frame(parent, bg=self.colors['bg'])
+        header = tk.Frame(sw, bg=self.colors['bg'])
         header.pack(fill=tk.X, padx=20, pady=(16, 8))
         tk.Label(header, text="数据库备份与还原", font=('微软雅黑', 16, 'bold'),
                  bg=self.colors['bg'], fg=self.colors['text_primary']).pack(anchor=tk.W)
         tk.Label(header, text="管理数据库备份目录、自动备份计划与还原操作",
                  font=('Segoe UI', 9), bg=self.colors['bg'], fg=self.colors['text_secondary']).pack(anchor=tk.W)
 
-        # 内容区：双列网格布局，无右侧滚动条，确保整体在一屏内显示
-        content = tk.Frame(parent, bg=self.colors['bg'])
-        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=8)
-        cols = tk.Frame(content, bg=self.colors['bg'])
-        cols.pack(fill=tk.BOTH, expand=True)
-        left_col = tk.Frame(cols, bg=self.colors['bg'])
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
-        right_col = tk.Frame(cols, bg=self.colors['bg'])
-        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
+        body_container = tk.Frame(sw, bg=self.colors['bg'])
+        body_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=8)
+
+        canvas = tk.Canvas(body_container, bg=self.colors['bg'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(body_container, orient=tk.VERTICAL, command=canvas.yview)
+        scroll_frame = tk.Frame(canvas, bg=self.colors['bg'])
+
+        scroll_frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW, width=720)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # 1. Backup settings
-        backup_card = self._create_card(left_col, "备份设置")
+        backup_card = self._create_card(scroll_frame, "备份设置")
         row1 = tk.Frame(backup_card, bg=self.colors['card'])
         row1.pack(fill=tk.X, padx=16, pady=(8, 8))
         tk.Label(row1, text="备份目录:", font=('微软雅黑', 10),
@@ -1693,15 +1455,15 @@ class WindowsLauncherApp:
                  bg=self.colors['card'], fg=self.colors['text_secondary'],
                  wraplength=420, justify=tk.LEFT).pack(side=tk.LEFT, padx=(12, 0), fill=tk.X, expand=True)
         self._create_settings_button(row1, "选择目录", self.colors['blue'], self.colors['blue_light'],
-                                     self._choose_backup_dir, width=130, height=32, icon='folder')
+                                     self._choose_backup_dir, width=90, height=30)
 
         row1b = tk.Frame(backup_card, bg=self.colors['card'])
         row1b.pack(fill=tk.X, padx=16, pady=(0, 12))
         self._create_settings_button(row1b, "立即备份", self.colors['green'], self.colors['green_light'],
-                                     self._do_backup_now, width=130, height=34, icon='save')
+                                     self._do_backup_now, width=110, height=34)
 
         # 2. Auto backup config
-        auto_card = self._create_card(left_col, "自动备份配置", expand=True)
+        auto_card = self._create_card(scroll_frame, "自动备份配置")
         auto_cfg = self.backup_config.get('auto_backup', {})
         period_labels = {'daily': '每日', 'weekly': '每周', 'monthly': '每月'}
         weekday_labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -1751,16 +1513,16 @@ class WindowsLauncherApp:
         tk.Label(row2c, textvariable=self.settings_next_backup_var, font=('Segoe UI', 9),
                  bg=self.colors['card'], fg=self.colors['text_secondary']).pack(side=tk.LEFT)
         self._create_settings_button(row2c, "保存设置", self.colors['purple'], '#bc8cff',
-                                     self._save_auto_backup_settings, width=130, height=34, icon='save_settings')
+                                     self._save_auto_backup_settings, width=110, height=34)
 
         # 3. Restore
-        restore_card = self._create_card(right_col, "还原操作")
+        restore_card = self._create_card(scroll_frame, "还原操作")
         row3 = tk.Frame(restore_card, bg=self.colors['card'])
         row3.pack(fill=tk.X, padx=16, pady=(8, 8))
         tk.Label(row3, text="备份文件列表:", font=('微软雅黑', 10),
                  bg=self.colors['card'], fg=self.colors['text_primary']).pack(side=tk.LEFT)
         self._create_settings_button(row3, "刷新列表", self.colors['blue'], self.colors['blue_light'],
-                                     self._refresh_backup_list, width=120, height=32, icon='refresh_list')
+                                     self._refresh_backup_list, width=90, height=30)
 
         row3b = tk.Frame(restore_card, bg=self.colors['card'])
         row3b.pack(fill=tk.BOTH, padx=16, pady=(0, 8), expand=True)
@@ -1768,70 +1530,54 @@ class WindowsLauncherApp:
         list_frame.pack(fill=tk.BOTH, expand=True)
         self.settings_backup_listbox = tk.Listbox(list_frame, bg=self.colors['log_bg'], fg=self.colors['log_text'],
                                                   selectbackground=self.colors['blue'], font=('Consolas', 10),
-                                                  highlightthickness=0, relief=tk.FLAT, height=6)
-        self.settings_backup_listbox.pack(fill=tk.BOTH, expand=True)
+                                                  highlightthickness=0, relief=tk.FLAT)
+        self.settings_backup_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        list_scroll = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.settings_backup_listbox.yview)
+        list_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.settings_backup_listbox.config(yscrollcommand=list_scroll.set)
 
         row3c = tk.Frame(restore_card, bg=self.colors['card'])
         row3c.pack(fill=tk.X, padx=16, pady=(0, 12))
-        self._create_settings_button(row3c, "从文件还原", self.colors['orange'], '#e3b341',
-                                     self._do_restore_from_file, width=130, height=34, icon='import')
-        self._create_settings_button(row3c, "还原选中备份", self.colors['purple'], '#bc8cff',
-                                     self._do_restore, width=130, height=34, icon='restore')
+        self._create_settings_button(row3c, "还原选中备份", self.colors['orange'], '#e3b341',
+                                     self._do_restore, width=120, height=34)
 
         # 4. Log
-        log_card = self._create_card(right_col, "操作日志", expand=True)
+        log_card = self._create_card(scroll_frame, "操作日志", expand=True)
         log_frame = tk.Frame(log_card, bg=self.colors['card'])
         log_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=(8, 12))
-        self.settings_log_text = tk.Text(log_frame, height=6, wrap=tk.WORD, bg=self.colors['log_bg'],
+        self.settings_log_text = tk.Text(log_frame, height=8, wrap=tk.WORD, bg=self.colors['log_bg'],
                                          fg=self.colors['log_text'], insertbackground=self.colors['blue'],
                                          font=('Consolas', 9), highlightthickness=0, relief=tk.FLAT)
-        self.settings_log_text.pack(fill=tk.BOTH, expand=True)
+        self.settings_log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        log_scroll = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.settings_log_text.yview)
+        log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.settings_log_text.config(yscrollcommand=log_scroll.set)
         self.settings_log_text.tag_config('success', foreground=self.colors['green'])
         self.settings_log_text.tag_config('warning', foreground=self.colors['orange'])
         self.settings_log_text.tag_config('error', foreground=self.colors['red'])
         self.settings_log_text.tag_config('info', foreground=self.colors['log_text'])
-        self.settings_log_text.tag_config('system', foreground=self.colors['text_tertiary'])
 
         self._update_settings_ui()
         self._refresh_backup_list()
 
-    def _create_settings_button(self, parent, text, color, hover_color, command, width=140, height=34, icon=None):
+        def _on_settings_close():
+            self.settings_window = None
+            sw.destroy()
+
+        sw.protocol("WM_DELETE_WINDOW", _on_settings_close)
+
+    def _create_settings_button(self, parent, text, color, hover_color, command, width=120, height=34):
         canvas = tk.Canvas(parent, width=width, height=height, bg=color, highlightthickness=0, cursor='hand2')
         canvas.pack(side=tk.RIGHT, padx=(8, 0))
-        canvas._color = color
-        canvas._hl = hover_color
-        canvas._icon = icon
-        canvas._pressed = False
-        canvas._hot = False
-
-        def redraw():
-            if canvas._pressed:
-                bg = self._darken(canvas._color, 0.85)
-            elif canvas._hot:
-                bg = canvas._hl
-            else:
-                bg = canvas._color
-            canvas.delete('all')
-            self._draw_rounded_btn(canvas, width, height, bg, r=8)
-            if canvas._icon:
-                self._draw_icon(canvas, canvas._icon, 20, height / 2, 16, '#ffffff')
-                canvas.create_text(width / 2 + 12, height / 2, text=text,
-                                   font=('微软雅黑', 9, 'bold'), fill='white', tags='btn_text')
-            else:
-                canvas.create_text(width / 2, height / 2, text=text,
-                                   font=('微软雅黑', 9, 'bold'), fill='white', tags='btn_text')
-
-        canvas._redraw = redraw
-        canvas.bind('<Enter>', lambda e: (setattr(canvas, '_hot', True), redraw()))
-        canvas.bind('<Leave>', lambda e: (setattr(canvas, '_hot', False),
-                                          setattr(canvas, '_pressed', False), redraw()))
-        canvas.bind('<ButtonPress-1>', lambda e: (setattr(canvas, '_pressed', True), redraw()))
-        canvas.bind('<ButtonRelease-1>', lambda e: (setattr(canvas, '_pressed', False), redraw(), command()))
-        redraw()
+        self._draw_rounded_btn(canvas, width, height, color, r=8)
+        canvas.create_text(width//2, height//2, text=text, font=('微软雅黑', 9, 'bold'), fill='white', tags='btn_text')
+        canvas.bind('<Button-1>', lambda e: command())
+        canvas.bind('<Enter>', lambda e: self._hover_btn(canvas, width, height, hover_color))
+        canvas.bind('<Leave>', lambda e: self._hover_btn(canvas, width, height, color))
         return canvas
 
     def _update_settings_ui(self, *args):
-        if not getattr(self, '_settings_view_open', False):
+        if not self.settings_window or not self.settings_window.winfo_exists():
             return
         period_map = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly'}
         weekday_labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -1865,49 +1611,36 @@ class WindowsLauncherApp:
             self.settings_next_backup_var.set("请检查自动备份设置")
 
     def _log_to_settings(self, text, level='info'):
-        # 子线程调用时切回主线程，避免跨线程操作 Text 控件导致闪退
-        if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self._log_to_settings, text, level)
+        if not self.settings_window or not self.settings_window.winfo_exists():
             return
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-        tag = level if level in ('info', 'success', 'warning', 'error', 'system') else 'info'
+        tag = level if level in ('info', 'success', 'warning', 'error') else 'info'
         line = f"[{timestamp}] [{tag.upper()}] {text}\n"
-        # 同步写入首页「实时日志 - 综合」标签页与「备份」标签页（聚合前端/后端/备份）
-        for tw in (getattr(self, 'all_log_text', None), getattr(self, 'backup_log_text', None)):
-            if not tw:
-                continue
-            try:
-                tw.config(state=tk.NORMAL)
-                tw.insert(tk.END, line, tag)
-                tw.config(state=tk.DISABLED)
-                tw.see(tk.END)
-            except Exception:
-                pass
-        # 仅当设置界面打开时，额外写入其本地「操作日志」卡片
-        if getattr(self, '_settings_view_open', False) and getattr(self, 'settings_log_text', None):
-            self.settings_log_text.config(state=tk.NORMAL)
-            self.settings_log_text.insert(tk.END, line, tag)
-            self.settings_log_text.config(state=tk.DISABLED)
-            self.settings_log_text.see(tk.END)
+        self.settings_log_text.config(state=tk.NORMAL)
+        self.settings_log_text.insert(tk.END, line, tag)
+        self.settings_log_text.config(state=tk.DISABLED)
+        self.settings_log_text.see(tk.END)
 
     def _choose_backup_dir(self):
         initial = self.backup_config.get('backup_dir') or os.path.dirname(os.path.abspath(__file__))
-        dir_path = filedialog.askdirectory(initialdir=initial, parent=self.root)
+        dir_path = filedialog.askdirectory(initialdir=initial, parent=self.settings_window)
         if dir_path:
             self.backup_config['backup_dir'] = dir_path
             self.settings_backup_dir_var.set(dir_path)
             self._save_backup_config()
+            self.add_log(f"备份目录已设置为: {dir_path}", 'system')
             self._log_to_settings(f"备份目录已设置为: {dir_path}", 'success')
 
     def _do_backup_now(self):
         def run():
             self._log_to_settings("开始手动备份...", 'system')
             self._run_backup_task()
-            self.root.after(0, self._refresh_backup_list)
+            if self.settings_window and self.settings_window.winfo_exists():
+                self.settings_window.after(0, self._refresh_backup_list)
         threading.Thread(target=run, daemon=True).start()
 
     def _refresh_backup_list(self):
-        if not getattr(self, '_settings_view_open', False):
+        if not self.settings_window or not self.settings_window.winfo_exists():
             return
         self.settings_backup_listbox.delete(0, tk.END)
         backup_dir = self.backup_config.get('backup_dir', '')
@@ -1923,62 +1656,46 @@ class WindowsLauncherApp:
             self.settings_backup_listbox.insert(tk.END, f"{f}  |  {size_str}  |  {mtime}")
 
     def _do_restore(self):
-        """从备份列表中选中的文件还原。"""
         selection = self.settings_backup_listbox.curselection()
         if not selection:
-            messagebox.showwarning("提示", "请先选择一个备份文件", parent=self.root)
+            messagebox.showwarning("提示", "请先选择一个备份文件", parent=self.settings_window)
             return
         item = self.settings_backup_listbox.get(selection[0])
         backup_name = item.split('  |  ')[0].strip()
         backup_dir = self.backup_config.get('backup_dir', '')
         backup_path = os.path.join(backup_dir, backup_name)
-        if not messagebox.askyesno("确认还原",
-                f"确定要用备份 {backup_name} 还原数据库吗？\n还原将停止后端服务、替换当前数据库，并自动重新启动。",
-                parent=self.root):
+
+        if not messagebox.askyesno("确认还原", f"确定要用备份 {backup_name} 还原数据库吗？\n还原将停止后端服务、替换当前数据库，并自动重新启动。", parent=self.settings_window):
             return
-        threading.Thread(target=lambda: self._run_restore_task(backup_path, backup_name), daemon=True).start()
 
-    def _do_restore_from_file(self):
-        """从电脑上任意位置选择 .db 备份文件进行还原。"""
-        file_path = filedialog.askopenfilename(
-            title="选择要还原的数据库备份文件",
-            filetypes=[("SQLite 数据库", "*.db"), ("所有文件", "*.*")],
-            parent=self.root)
-        if not file_path:
-            return
-        backup_name = os.path.basename(file_path)
-        if not messagebox.askyesno("确认还原",
-                f"确定要用备份 {backup_name} 还原数据库吗？\n还原将停止后端服务、替换当前数据库，并自动重新启动。",
-                parent=self.root):
-            return
-        threading.Thread(target=lambda: self._run_restore_task(file_path, backup_name), daemon=True).start()
+        def run_restore():
+            self._log_to_settings(f"开始还原数据库: {backup_name}", 'system')
+            try:
+                self._log_to_settings("正在停止后端服务...", 'system')
+                self.stop_services()
+                time.sleep(2)
 
-    def _run_restore_task(self, backup_path, backup_name):
-        """还原核心逻辑：停止服务 → 紧急备份当前库 → 替换 → 重启服务。"""
-        self._log_to_settings(f"开始还原数据库: {backup_name}", 'system')
-        try:
-            self._log_to_settings("正在停止后端服务...", 'system')
-            self.stop_services()
-            time.sleep(2)
+                db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend', 'data', 'db', 'order_system.db')
+                if not os.path.exists(backup_path):
+                    raise FileNotFoundError(f"备份文件不存在: {backup_path}")
 
-            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend', 'data', 'db', 'order_system.db')
-            if not os.path.exists(backup_path):
-                raise FileNotFoundError(f"备份文件不存在: {backup_path}")
+                emergency = os.path.join(backup_dir, f"order_system_emergency_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
+                if os.path.exists(db_path):
+                    shutil.copy2(db_path, emergency)
+                    self._log_to_settings(f"当前数据库已紧急备份到: {emergency}", 'system')
 
-            backup_dir = self.backup_config.get('backup_dir', '')
-            emergency = os.path.join(backup_dir, f"order_system_emergency_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
-            if os.path.exists(db_path):
-                shutil.copy2(db_path, emergency)
-                self._log_to_settings(f"当前数据库已紧急备份到: {emergency}", 'system')
+                shutil.copy2(backup_path, db_path)
+                self._log_to_settings("数据库文件已替换", 'success')
 
-            shutil.copy2(backup_path, db_path)
-            self._log_to_settings("数据库文件已替换", 'success')
+                self._log_to_settings("正在重新启动服务...", 'system')
+                self.start_services()
+                self._log_to_settings("数据库还原完成，服务已重新启动", 'success')
+                self.add_log(f"数据库还原完成: {backup_name}", 'success')
+            except Exception as e:
+                self._log_to_settings(f"还原失败: {e}", 'error')
+                self.add_log(f"数据库还原失败: {e}", 'error')
 
-            self._log_to_settings("正在重新启动服务...", 'system')
-            self.start_services()
-            self._log_to_settings("数据库还原完成，服务已重新启动", 'success')
-        except Exception as e:
-            self._log_to_settings(f"还原失败: {e}", 'error')
+        threading.Thread(target=run_restore, daemon=True).start()
 
     def _save_auto_backup_settings(self):
         period_map = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly'}
@@ -2000,8 +1717,9 @@ class WindowsLauncherApp:
             self._start_backup_scheduler()
             self._update_settings_ui()
             self._log_to_settings("自动备份设置已保存", 'success')
+            self.add_log(f"自动备份已{'启用' if cfg['enabled'] else '禁用'}: {period_label} {time_str}", 'system')
         except Exception as e:
-            messagebox.showerror("保存失败", f"设置保存失败: {e}", parent=self.root)
+            messagebox.showerror("保存失败", f"设置保存失败: {e}", parent=self.settings_window)
 
     def _on_close(self):
         self.animation_running = False
@@ -2025,7 +1743,7 @@ def main():
     except:
         pass
 
-    root.configure(bg='#2c3138')
+    root.configure(bg='#0d1117')
 
     app = WindowsLauncherApp(root)
 
