@@ -76,6 +76,10 @@ async function handleLogin() {
     try {
       await userStore.loginAction(loginForm)
       ElMessage.success('登录成功')
+      // 默认管理员仍使用初始弱口令时，提醒修改密码
+      if (loginForm.username === '1001' && loginForm.password === '1001') {
+        ElMessage.warning('当前使用默认管理员密码，安全风险高，请尽快在【用户管理】中修改密码')
+      }
       router.push('/')
     } catch (error) {
       console.error('Login error:', error)

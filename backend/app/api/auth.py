@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..core.database import get_db
 from ..core.security import verify_password, get_password_hash, create_access_token, get_current_active_user
 from ..models.models import User, LoginLog, OperationLog
@@ -17,27 +17,68 @@ class ChangePasswordRequest(BaseModel):
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 
+# ── 登录防爆破（进程内限流）：同一账号连续失败 N 次，锁定 LOCK_MINUTES 分钟 ──
+# 本项目为单进程部署（uvicorn 单 worker），进程内计数即可覆盖实际场景
+MAX_LOGIN_FAILS = 5
+LOCK_MINUTES = 15
+_login_fails = {}  # username -> {"count": int, "locked_until": datetime}
+
+
 @router.post("/login", response_model=Token)
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
+    now = datetime.now()
+
+    # 锁定检查：锁定期间直接拒绝（即使密码正确也拒绝，防止持续爆破）
+    lock = _login_fails.get(form_data.username)
+    if lock and lock["locked_until"] and lock["locked_until"] > now:
+        remain = int((lock["locked_until"] - now).total_seconds() // 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"登录失败次数过多，账号已锁定，请 {remain} 分钟后再试"
+        )
+
+    client_ip = request.client.host if request.client else None
+    ua = (request.headers.get("user-agent") or "")[:255]
+
+    async def write_login_log(status_val: str):
+        db.add(LoginLog(username=form_data.username, ip_address=client_ip, user_agent=ua, status=status_val))
+        await db.commit()
+
     try:
         result = await db.execute(select(User).where(User.username == form_data.username))
         user = result.scalar_one_or_none()
 
         if not user or not verify_password(form_data.password, user.password_hash):
+            # 记录失败并累计限流
+            fail = _login_fails.setdefault(form_data.username, {"count": 0, "locked_until": None})
+            fail["count"] += 1
+            await write_login_log("failed")
+            if fail["count"] >= MAX_LOGIN_FAILS:
+                fail["locked_until"] = now + timedelta(minutes=LOCK_MINUTES)
+                fail["count"] = 0
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"登录失败次数过多，账号已锁定 {LOCK_MINUTES} 分钟"
+                )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="用户名或密码错误"
             )
 
         if not user.is_active:
+            await write_login_log("failed")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="用户已被禁用"
             )
+
+        # 登录成功：清除限流计数并记录日志
+        _login_fails.pop(form_data.username, None)
+        await write_login_log("success")
 
         access_token = create_access_token(data={"sub": user.username})
         return {"access_token": access_token, "token_type": "bearer"}
