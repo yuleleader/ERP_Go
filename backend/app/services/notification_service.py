@@ -128,7 +128,7 @@ class NotificationService:
             return False
 
     @staticmethod
-    async def send_order_shipped_notification(db: AsyncSession, order_id: str, logistics_company: str = None, logistics_no: str = None) -> bool:
+    async def send_order_shipped_notification(db: AsyncSession, order_id: str, logistics_company: str = None, logistics_no: str = None, logistics_no_2: str = None) -> bool:
         """
         发送订单已发货通知
         
@@ -136,7 +136,8 @@ class NotificationService:
             db: 数据库会话
             order_id: 订单ID
             logistics_company: 物流公司
-            logistics_no: 物流单号
+            logistics_no: 物流单号（运单号1）
+            logistics_no_2: 运单号2（选填）
         
         Returns:
             是否发送成功
@@ -159,7 +160,9 @@ class NotificationService:
             if logistics_company:
                 content += f"物流公司: {logistics_company}\n"
             if logistics_no:
-                content += f"物流单号: {logistics_no}\n"
+                content += f"运单号1: {logistics_no}\n"
+            if logistics_no_2:
+                content += f"运单号2: {logistics_no_2}\n"
             content += f"时间: {beijing_now().strftime('%Y-%m-%d %H:%M:%S')}"
             
             return await NotificationService.send_notification(

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -64,13 +64,22 @@ class ShopResponse(ShopBase):
 class OrderBase(BaseModel):
     product_name: Optional[str] = None
     platform_order_no: Optional[str] = None
-    sales_amount: Optional[str] = None
-    freight: Optional[str] = None
+    # 金额为数字类型（数据库 REAL）：前端留空传 "" 时按未填处理
+    sales_amount: Optional[float] = None
+    freight: Optional[float] = None
     shipping_status: str = "pending"
     logistics_company: Optional[str] = None
     logistics_no: Optional[str] = None
+    logistics_no_2: Optional[str] = None  # 运单号2（选填）
     receiver_address: Optional[str] = None
     remark: Optional[str] = None
+
+    @field_validator("sales_amount", "freight", mode="before")
+    @classmethod
+    def _blank_amount_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 class OrderCreate(OrderBase):
     shop_id: str
@@ -80,16 +89,25 @@ class OrderUpdate(BaseModel):
     shop_id: Optional[str] = None
     platform_order_no: Optional[str] = None
     product_name: Optional[str] = None
-    sales_amount: Optional[str] = None
+    # 金额为数字类型（数据库 REAL）：前端留空传 "" 时按未填处理
+    sales_amount: Optional[float] = None
     shipping_status: Optional[str] = None
     logistics_company: Optional[str] = None
     logistics_no: Optional[str] = None
-    freight: Optional[str] = None
+    logistics_no_2: Optional[str] = None  # 运单号2（选填）
+    freight: Optional[float] = None
     receiver_address: Optional[str] = None
     remark: Optional[str] = None
     created_at: Optional[datetime] = None
     shipping_time: Optional[datetime] = None
     produce_status: Optional[str] = None
+
+    @field_validator("sales_amount", "freight", mode="before")
+    @classmethod
+    def _blank_amount_to_none(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 class OrderResponse(OrderBase):
     id: int
@@ -98,7 +116,7 @@ class OrderResponse(OrderBase):
     shipping_operator: Optional[str] = None
     shipping_time: Optional[datetime] = None
     commission_rate: Optional[int] = None
-    commission_amount: Optional[str] = None
+    commission_amount: Optional[float] = None
     created_by: Optional[str] = None
     creator_real_name: Optional[str] = None
     created_at: Optional[datetime] = None

@@ -194,17 +194,36 @@ async def get_dashboard_finance_summary(
     order_count = row.order_count or 0
     avg_order_value = round(total_revenue / order_count, 2) if order_count > 0 else 0
     
-    months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-    current_month = end_date.month - 1
+    # 真实月度营收趋势：取最近 12 个自然月，按订单创建时间(北京时间)聚合真实销售额
     trend_data = []
-    
-    for i in range(12):
-        month_index = (current_month - 11 + i) % 12
-        trend_data.append({
-            "period": months[month_index],
-            "revenue": round(800000 + (current_month - month_index) * 50000 + (i % 3) * 30000, 2)
-        })
-    
+    try:
+        trend_start = end_date - timedelta(days=365)
+        trend_query = select(
+            func.strftime('%Y-%m', Order.created_at).label("ym"),
+            func.sum(func.cast(Order.sales_amount, Float)).label("revenue")
+        ).filter(
+            Order.created_at >= trend_start,
+            Order.created_at <= end_date
+        ).group_by("ym")
+        trend_rows = (await db.execute(trend_query)).all()
+        revenue_by_month = {r.ym: (r.revenue or 0) for r in trend_rows}
+        # 组装最近 12 个自然月（含当月），未产生订单的月份营收为 0
+        first_of_this_month = end_date.replace(day=1)
+        for i in range(11, -1, -1):
+            year = first_of_this_month.year
+            month = first_of_this_month.month - i
+            while month <= 0:
+                year -= 1
+                month += 12
+            key = f"{year:04d}-{month:02d}"
+            trend_data.append({
+                "period": f"{month}月",
+                "revenue": round(revenue_by_month.get(key, 0.0), 2)
+            })
+    except Exception:
+        # 聚合失败时返回空趋势，避免整个接口报错（保留 total 数据）
+        trend_data = []
+
     return {
         "total_revenue": round(total_revenue, 2),
         "order_count": order_count,
@@ -640,123 +659,28 @@ def detect_country(address):
     return _TOKEN_TO_ENTRY.get(key)
 
 
-class _NetworkUnavailable(Exception):
-    """翻译/搜索等联网识别手段全部失败（网络不通或被限流），交由上层等待重试"""
-
-
-def _translate_to_english(text):
-    """免密钥在线翻译：将任意语言地址译为英文。成功返回译文，失败/异常返回 None。
-    优先使用 deep-translator（若已安装），否则回退到 Google Translate 公共接口（纯标准库）。"""
-    text = (text or "").strip()
-    if not text:
-        return None
-    try:
-        from deep_translator import GoogleTranslator
-        return GoogleTranslator(source="auto", target="en").translate(text)
-    except Exception:
-        pass
-    try:
-        import json
-        import urllib.parse
-        import urllib.request
-        url = ("https://translate.googleapis.com/translate_a/single?client=gtx"
-               "&sl=auto&tl=en&dt=t&q=" + urllib.parse.quote(text))
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        parts = [seg[0] for seg in data[0] if seg and seg[0]]
-        return "".join(parts)
-    except Exception:
-        return None
-
-
-def _web_search_text(query):
-    """免密钥联网搜索：根据地址查其所属国家。返回拼接的搜索摘要文本，失败返回 None。
-    优先使用 ddgs（若已安装），否则回退到 DuckDuckGo lite（纯标准库）。"""
-    query = (query or "").strip()
-    if not query:
-        return None
-    try:
-        from ddgs import DDGS
-        snippets = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=5):
-                if r.get("body"):
-                    snippets.append(r["body"])
-        return " ".join(snippets) if snippets else None
-    except Exception:
-        pass
-    try:
-        import re
-        import urllib.parse
-        import urllib.request
-        url = "https://lite.duckduckgo.com/lite/?q=" + urllib.parse.quote(query)
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            html = resp.read().decode("utf-8", "ignore")
-        texts = re.findall(r'class="result-snippet"[^>]*>(.*?)</td>', html, re.S)
-        clean = re.sub(r"<[^>]+>", " ", " ".join(texts))
-        clean = re.sub(r"\s+", " ", clean).strip()
-        return clean or None
-    except Exception:
-        return None
-
-
 def resolve_country(address):
-    """多级识别国家：离线词典 -> 联网翻译后识别 -> 联网搜索后识别。
-    返回国家条目(dict)；识别不到返回 None；联网手段全部失败时抛 _NetworkUnavailable。"""
+    """从收货地址文本中离线识别所属国家：仅本地多语言词典匹配，不发起任何网络请求，
+    客户地址不会外发到任何第三方服务。返回国家条目(dict)；识别不到返回 None。"""
     if not address:
         return None
-    # 1) 离线多语言词典（最快、零成本、无需联网）
-    entry = detect_country(address)
-    if entry:
-        return entry
-    # 2) 联网翻译为英文后再识别
-    translated = _translate_to_english(address)
-    network_ok = translated is not None
-    if translated and translated.strip().lower() != address.strip().lower():
-        entry = detect_country(translated)
-        if entry:
-            return entry
-    # 3) 联网搜索地址所属国家，再识别
-    searched = _web_search_text(address)
-    if searched is not None:
-        network_ok = True
-        entry = detect_country(searched)
-        if entry:
-            return entry
-    if not network_ok:
-        # 翻译与搜索都未能真正联网（网络不通/被限流），交由上层下次刷新重试
-        raise _NetworkUnavailable("translation and search both unavailable")
-    return None
+    return detect_country(address)
 
 
-# ── 国家分布计算的保护层（避免事件循环被阻塞 / 线程被打爆）──
-# 结果缓存：大屏每 3 分钟刷新一次，缓存 TTL 略小于刷新间隔，
-# 避免每次刷新、每次并发请求都重复触发联网翻译/搜索。
+# ── 国家分布计算的保护层 ──
+# 结果缓存：大屏每 3 分钟刷新一次，缓存 TTL 略小于刷新间隔，避免每次刷新重复计算
 _country_cache = {"data": None, "update_time": None, "ts": 0.0}
 _COUNTRY_CACHE_TTL = 150  # 秒
-# 同一时刻只允许一个计算过程（防止多用户/多标签并发时线程风暴）
+# 同一时刻只允许一个计算过程（防止多用户/多标签并发）
 _country_compute_lock = asyncio.Lock()
-# 限制并发联网识别数量（保护线程池，单笔最多 20s）
-_resolve_sem = asyncio.Semaphore(8)
-# 哨兵：表示“联网失败，应保留 NULL 待下次刷新重试”，与“识别不到(NULL)”区分
-_RESOLVE_RETRY = object()
 
 
 async def _resolve_one(address):
-    """线程池中执行单笔地址识别，超时/异常均安全返回，绝不阻塞事件循环。
-    返回：国家条目 / None(识别不到) / _RESOLVE_RETRY(联网不可用，需重试)。"""
-    async with _resolve_sem:
-        try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(resolve_country, address),
-                timeout=20,
-            )
-        except _NetworkUnavailable:
-            return _RESOLVE_RETRY  # 联网手段不可用 -> 不缓存，下次刷新重试
-        except Exception:
-            return None  # 其他异常 -> 视为识别不到
+    """单笔地址离线识别：本地词典匹配，不联网、不阻塞事件循环。返回国家条目或 None。"""
+    try:
+        return resolve_country(address)
+    except Exception:
+        return None  # 任何异常 -> 视为识别不到
 
 
 @router.get("/country-distribution")
@@ -807,13 +731,10 @@ async def get_country_distribution(
         for order_id, address, amount, shipping_status, detected in rows:
             resolved_now = False
             if detected is None:
-                # 首次计算：离线 -> 翻译 -> 搜索（线程池执行，绝不阻塞事件循环）
+                # 首次计算：本地离线词典识别（不发起任何网络请求）
                 res = await _resolve_one(address)
-                if res is _RESOLVE_RETRY:
-                    detected = None  # 联网失败，保留 NULL 待下次刷新重试，不写回
-                else:
-                    detected = res["cn"] if res else ""
-                    resolved_now = True
+                detected = res["cn"] if res else ""
+                resolved_now = True
             if not detected:
                 continue  # 识别不到国家 -> 丢弃（"" 与 None 均跳过）
             if resolved_now:

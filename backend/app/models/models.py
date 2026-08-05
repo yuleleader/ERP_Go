@@ -52,6 +52,7 @@ class Order(Base):
     shipping_status = Column(String(20), default="pending")
     logistics_company = Column(String(100), nullable=True)
     logistics_no = Column(String(100), nullable=True)
+    logistics_no_2 = Column(String(100), nullable=True)  # 运单号2（选填，发货端维护）
     freight = Column(String(20), nullable=True)  # 运费：仅老板端可编辑、发货端可填写，销售端/工厂端只读
     shipping_operator = Column(String(50), nullable=True)
     shipping_time = Column(DateTime, nullable=True)

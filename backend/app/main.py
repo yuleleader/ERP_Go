@@ -53,7 +53,8 @@ app.include_router(commission_settlement.router)
 app.include_router(withdraw.router)
 
 os.makedirs(DATA_DIR / "images", exist_ok=True)
-app.mount("/data/images", StaticFiles(directory=str(DATA_DIR / "images")), name="images")
+# 图片改为带登录鉴权的路由（?token= / Authorization），关闭免登录静态直链
+app.include_router(images.serve_router)
 
 # 手机端作业页：独立轻量页，由后端同源托管在 /m/，复用现有订单/图片 API
 MOBILE_DIR = BASE_DIR / "mobile"

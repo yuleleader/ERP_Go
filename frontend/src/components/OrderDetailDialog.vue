@@ -53,8 +53,12 @@
             <span class="detail-value">{{ order.logistics_company || '——' }}</span>
           </div>
           <div class="detail-info-row">
-            <span class="detail-label">物流单号</span>
+            <span class="detail-label">运单号1</span>
             <span class="detail-value">{{ order.logistics_no || '——' }}</span>
+          </div>
+          <div class="detail-info-row">
+            <span class="detail-label">运单号2</span>
+            <span class="detail-value">{{ order.logistics_no_2 || '——' }}</span>
           </div>
           <div class="detail-info-row">
             <span class="detail-label">运费</span>

@@ -4,7 +4,7 @@
 提供商品的增删改查功能，支持分页、搜索、筛选
 """
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from typing import Optional, List
@@ -44,19 +44,18 @@ async def create_product(
     if current_user.role not in ["boss", "sales"]:
         raise HTTPException(status_code=403, detail="您没有权限创建商品")
 
-    # 生成商品编码（顺序编号：PLU-000001）
-    product_code = await generate_product_code(db)
-
-    # 创建商品记录
+    # 创建商品记录：先插入占位编码，flush 拿到自增 id 后回填唯一编码
+    # （编码=PLU-{id:06d}，与 id 绑定，从根上避免 max(id)+1 在并发下的重复问题）
     new_product = Product(
-        product_code=product_code,
+        product_code="",
         product_name=product_data.product_name,
         product_remark=product_data.product_remark,
         status="active",
         created_by=current_user.username
     )
-    
     db.add(new_product)
+    await db.flush()
+    new_product.product_code = f"PLU-{new_product.id:06d}"
     await db.commit()
     await db.refresh(new_product)
 
@@ -64,7 +63,7 @@ async def create_product(
     log = OperationLog(
         username=current_user.username,
         operation_type="创建商品",
-        operation_content=f"创建商品 {product_code} - {product_data.product_name}"
+        operation_content=f"创建商品 {new_product.product_code} - {product_data.product_name}"
     )
     db.add(log)
     await db.commit()
@@ -85,8 +84,8 @@ async def create_product(
 async def get_products(
     keyword: Optional[str] = None,
     status: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):

@@ -2,13 +2,15 @@
   <div class="commission-settlement">
     <div class="search-bar">
       <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="结算月份">
+        <el-form-item label="结算日期">
           <el-date-picker
-            v-model="searchForm.month"
-            type="month"
-            placeholder="选择月份"
-            format="YYYY-MM"
-            value-format="YYYY-MM"
+            v-model="searchForm.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
             @change="handleSearch"
           />
         </el-form-item>
@@ -21,19 +23,25 @@
     <div class="summary-cards" v-if="summaryData">
       <el-card class="summary-card">
         <div class="summary-item">
-          <span class="summary-label">结算月份</span>
-          <span class="summary-value">{{ summaryData.month }}</span>
+          <span class="summary-label">结算日期</span>
+          <span class="summary-value">{{ summaryData.start_date }} 至 {{ summaryData.end_date }}</span>
         </div>
       </el-card>
       <el-card class="summary-card">
         <div class="summary-item">
-          <span class="summary-label">应发提成总额</span>
+          <span class="summary-label">未结算应发总额</span>
           <span class="summary-value text-primary">¥{{ summaryData.total_amount.toFixed(2) }}</span>
         </div>
       </el-card>
       <el-card class="summary-card">
         <div class="summary-item">
-          <span class="summary-label">订单数量</span>
+          <span class="summary-label">已结算金额</span>
+          <span class="summary-value" style="color: #67c23a;">¥{{ summaryData.paid_amount.toFixed(2) }}</span>
+        </div>
+      </el-card>
+      <el-card class="summary-card">
+        <div class="summary-item">
+          <span class="summary-label">未结算订单数</span>
           <span class="summary-value">{{ summaryData.total_orders }}</span>
         </div>
       </el-card>
@@ -67,10 +75,16 @@
             ¥{{ row.total_sales.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column prop="order_count" label="订单数量" width="100" />
-        <el-table-column prop="total_commission" label="应发提成" width="120">
+        <el-table-column prop="order_count" label="订单数" width="90" />
+        <el-table-column label="未结算应发" width="130">
           <template #default="{ row }">
-            <span class="commission-amount">¥{{ row.total_commission.toFixed(2) }}</span>
+            <span class="commission-amount">¥{{ row.unpaid_commission.toFixed(2) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="已结算" width="120">
+          <template #default="{ row }">
+            <span style="color: #67c23a;">¥{{ row.paid_commission.toFixed(2) }}</span>
+            <span style="font-size: 12px; color: #999;">（{{ row.paid_order_count }}单）</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200">
@@ -80,7 +94,7 @@
               size="small"
               type="success"
               @click="handlePaySingle(row)"
-              :disabled="row.total_commission <= 0"
+              :disabled="row.unpaid_commission <= 0"
             >
               发放提成
             </el-button>
@@ -124,7 +138,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { commissionSettlementApi } from '@/api'
 
 const searchForm = reactive({
-  month: ''
+  dateRange: []
 })
 
 const summaryData = ref(null)
@@ -133,13 +147,14 @@ const orderDialogVisible = ref(false)
 const currentUser = ref(null)
 
 const handleSearch = async () => {
-  if (!searchForm.month) {
-    ElMessage.warning('请选择结算月份')
+  if (!searchForm.dateRange || searchForm.dateRange.length !== 2) {
+    ElMessage.warning('请选择结算日期区间')
     return
   }
+  const [startDate, endDate] = searchForm.dateRange
 
   try {
-    const res = await commissionSettlementApi.getUnpaidCommission(searchForm.month)
+    const res = await commissionSettlementApi.getUnpaidCommission(startDate, endDate)
     if (res.code === 200) {
       summaryData.value = res.data
     }
@@ -150,7 +165,8 @@ const handleSearch = async () => {
 
 const viewOrderDetail = async (row) => {
   try {
-    const res = await commissionSettlementApi.getUnpaidOrders(searchForm.month, row.username)
+    const [startDate, endDate] = searchForm.dateRange
+    const res = await commissionSettlementApi.getUnpaidOrders(startDate, endDate, row.username)
     if (res.code === 200) {
       orderDetailList.value = res.data
       orderDialogVisible.value = true
@@ -162,13 +178,14 @@ const viewOrderDetail = async (row) => {
 
 const handlePaySingle = async (row) => {
   try {
+    const [startDate, endDate] = searchForm.dateRange
     await ElMessageBox.confirm(
-      `确认发放 ${row.real_name}（${searchForm.month}）的提成 ¥${row.total_commission.toFixed(2)} 吗？`,
+      `确认发放 ${row.real_name}（${startDate} 至 ${endDate}）的未结算提成 ¥${row.unpaid_commission.toFixed(2)} 吗？`,
       '确认发放',
       { type: 'warning' }
     )
 
-    const res = await commissionSettlementApi.payCommission(searchForm.month, row.username)
+    const res = await commissionSettlementApi.payCommission(startDate, endDate, row.username)
     if (res.code === 200) {
       ElMessage.success('发放成功')
       handleSearch()
@@ -182,13 +199,14 @@ const handlePaySingle = async (row) => {
 
 const handlePayAll = async () => {
   try {
+    const [startDate, endDate] = searchForm.dateRange
     await ElMessageBox.confirm(
-      `确认发放 ${searchForm.month} 月份所有销售的提成，总计 ¥${summaryData.value.total_amount.toFixed(2)} 吗？`,
+      `确认发放 ${startDate} 至 ${endDate} 期间所有销售的未结算提成，总计 ¥${summaryData.value.total_amount.toFixed(2)} 吗？`,
       '确认批量发放',
       { type: 'warning' }
     )
 
-    const res = await commissionSettlementApi.payCommission(searchForm.month, null)
+    const res = await commissionSettlementApi.payCommission(startDate, endDate, null)
     if (res.code === 200) {
       ElMessage.success('批量发放成功')
       handleSearch()
@@ -202,7 +220,9 @@ const handlePayAll = async () => {
 
 const init = () => {
   const now = new Date()
-  searchForm.month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  // 默认：本月 1 号 至 今天
+  searchForm.dateRange = [fmt(new Date(now.getFullYear(), now.getMonth(), 1)), fmt(now)]
   handleSearch()
 }
 

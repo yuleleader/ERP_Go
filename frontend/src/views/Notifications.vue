@@ -180,8 +180,12 @@
               <span style="color: #333;">{{ orderDetailData.logistics_company || '——' }}</span>
             </div>
             <div style="display: flex; align-items: center; margin-bottom: 16px;">
-              <span style="width: 100px; color: #666; font-weight: 500;">物流单号：</span>
+              <span style="width: 100px; color: #666; font-weight: 500;">运单号1：</span>
               <span style="color: #333;">{{ orderDetailData.logistics_no || '——' }}</span>
+            </div>
+            <div style="display: flex; align-items: center; margin-bottom: 16px;">
+              <span style="width: 100px; color: #666; font-weight: 500;">运单号2：</span>
+              <span style="color: #333;">{{ orderDetailData.logistics_no_2 || '——' }}</span>
             </div>
             <div style="display: flex; align-items: center; margin-bottom: 16px;">
               <span style="width: 100px; color: #666; font-weight: 500;">运费：</span>

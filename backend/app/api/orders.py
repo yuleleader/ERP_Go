@@ -182,6 +182,7 @@ async def create_order(
             "shipping_status": new_order.shipping_status,
             "logistics_company": new_order.logistics_company,
             "logistics_no": new_order.logistics_no,
+            "logistics_no_2": new_order.logistics_no_2,
             "freight": new_order.freight,
             "shipping_operator": new_order.shipping_operator,
             "shipping_time": new_order.shipping_time,
@@ -271,6 +272,7 @@ async def get_orders(
             "shipping_status": order.shipping_status,
             "logistics_company": order.logistics_company,
             "logistics_no": order.logistics_no,
+            "logistics_no_2": order.logistics_no_2,
             "freight": order.freight,
             "shipping_operator": order.shipping_operator,
             "shipping_time": order.shipping_time,
@@ -322,6 +324,7 @@ async def get_order(
         "shipping_status": order.shipping_status,
         "logistics_company": order.logistics_company,
         "logistics_no": order.logistics_no,
+        "logistics_no_2": order.logistics_no_2,
         "freight": order.freight,
         "shipping_operator": order.shipping_operator,
         "shipping_time": order.shipping_time,
@@ -422,7 +425,7 @@ async def update_order(
         print(f"[DEBUG] converted created_at to datetime: {update_data['created_at']}")
 
     if current_user.role == "shipping":
-        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "freight", "remark"}
+        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "logistics_no_2", "freight", "remark"}
         forbidden_fields = set(update_data.keys()) - allowed_fields
         if forbidden_fields:
             raise HTTPException(
@@ -530,7 +533,8 @@ async def update_order(
                 db=db,
                 order_id=order_id,
                 logistics_company=update_data.get("logistics_company") or order.logistics_company,
-                logistics_no=update_data.get("logistics_no") or order.logistics_no
+                logistics_no=update_data.get("logistics_no") or order.logistics_no,
+                logistics_no_2=update_data.get("logistics_no_2") or order.logistics_no_2
             )
         except Exception as e:
             import logging
@@ -556,6 +560,7 @@ async def update_order(
         "shipping_status": order.shipping_status,
         "logistics_company": order.logistics_company,
         "logistics_no": order.logistics_no,
+        "logistics_no_2": order.logistics_no_2,
         "freight": order.freight,
         "shipping_operator": order.shipping_operator,
         "shipping_time": order.shipping_time,

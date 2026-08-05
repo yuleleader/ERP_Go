@@ -346,14 +346,18 @@
               </el-select>
             </div>
             <div class="compact-item" style="flex: 1;">
-              <span class="compact-label">运单号：</span>
-              <el-input v-model="orderForm.logistics_no" placeholder="请输入运单号" style="width: 200px;" size="small" />
+              <span class="compact-label">运费：</span>
+              <el-input v-model="orderForm.freight" placeholder="请输入运费" style="width: 200px;" size="small" type="number" :min="0" step="0.01" :disabled="isFieldReadonly('freight')" />
             </div>
           </div>
           <div class="compact-row" style="margin-top: 10px;">
             <div class="compact-item" style="flex: 1;">
-              <span class="compact-label">运费：</span>
-              <el-input v-model="orderForm.freight" placeholder="请输入运费" style="width: 200px;" size="small" type="number" :min="0" step="0.01" :disabled="isFieldReadonly('freight')" />
+              <span class="compact-label">运单号1：</span>
+              <el-input v-model="orderForm.logistics_no" placeholder="请输入运单号1（选填）" style="width: 200px;" size="small" />
+            </div>
+            <div class="compact-item" style="flex: 1;">
+              <span class="compact-label">运单号2：</span>
+              <el-input v-model="orderForm.logistics_no_2" placeholder="请输入运单号2（选填）" style="width: 200px;" size="small" />
             </div>
           </div>
         </div>
@@ -514,8 +518,12 @@
             <span style="color: #333;">{{ currentOrder.logistics_company || '——' }}</span>
           </div>
           <div style="display: flex; align-items: center; margin-bottom: 16px;">
-            <span style="width: 100px; color: #666; font-weight: 500;">物流单号：</span>
+            <span style="width: 100px; color: #666; font-weight: 500;">运单号1：</span>
             <span style="color: #333;">{{ currentOrder.logistics_no || '——' }}</span>
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 16px;">
+            <span style="width: 100px; color: #666; font-weight: 500;">运单号2：</span>
+            <span style="color: #333;">{{ currentOrder.logistics_no_2 || '——' }}</span>
           </div>
           <div style="display: flex; align-items: flex-start;" v-if="isFullFieldRole">
             <span style="width: 100px; color: #666; font-weight: 500; flex-shrink: 0;">备注：</span>
@@ -848,6 +856,7 @@ const orderForm = reactive({
   remark: '',
   logistics_company: '',
   logistics_no: '',
+  logistics_no_2: '',
   shipping_status: 'pending',
   shipping_time: '',
   created_at: '',
@@ -968,7 +977,7 @@ function isFieldReadonly(fieldName) {
     return false
   }
   if (role === 'shipping') {
-    const editableFields = ['logistics_company', 'logistics_no', 'shipping_status', 'freight']
+    const editableFields = ['logistics_company', 'logistics_no', 'logistics_no_2', 'shipping_status', 'freight']
     return !editableFields.includes(fieldName)
   }
   return true
@@ -1306,6 +1315,7 @@ async function editOrder(row) {
   orderForm.remark = row.remark
   orderForm.logistics_company = row.logistics_company || ''
   orderForm.logistics_no = row.logistics_no || ''
+  orderForm.logistics_no_2 = row.logistics_no_2 || ''
   orderForm.shipping_status = row.shipping_status || 'pending'
   // 设置发货时间（从ISO格式转换为日期格式）
   if (row.shipping_time) {
@@ -1507,12 +1517,13 @@ async function submitOrder() {
     try {
       const isShippingRole = userStore.role === 'shipping'
 
-      // 发货端仅允许编辑发货状态、物流公司、物流单号，禁止发送其他字段
+      // 发货端仅允许编辑发货状态、物流公司、运单号1、运单号2、运费，禁止发送其他字段
       const data = isShippingRole
         ? {
             shipping_status: orderForm.shipping_status,
             logistics_company: orderForm.logistics_company,
             logistics_no: orderForm.logistics_no,
+            logistics_no_2: orderForm.logistics_no_2,
             freight: orderForm.freight ?? ''
           }
         : {
@@ -1525,6 +1536,7 @@ async function submitOrder() {
             remark: orderForm.remark,
             logistics_company: orderForm.logistics_company,
             logistics_no: orderForm.logistics_no,
+            logistics_no_2: orderForm.logistics_no_2,
             shipping_status: orderForm.shipping_status,
             shipping_time: orderForm.shipping_time || null,
             created_at: orderForm.created_at
@@ -1575,6 +1587,7 @@ function resetForm() {
   orderForm.remark = ''
   orderForm.logistics_company = ''
   orderForm.logistics_no = ''
+  orderForm.logistics_no_2 = ''
   orderForm.shipping_status = 'pending'
   orderForm.shipping_time = ''
   orderForm.created_at = ''
@@ -1922,7 +1935,8 @@ function exportOrders() {
       '发货时间': formatDate(row.shipping_time) || '',
       '创建人': row.creator_real_name || '',
       '物流平台': row.logistics_company || '',
-      '运单号': row.logistics_no || '',
+      '运单号1': row.logistics_no || '',
+      '运单号2': row.logistics_no_2 || '',
       '收货地址': row.receiver_address || '',
       '备注': row.remark || ''
     }))

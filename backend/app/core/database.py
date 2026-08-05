@@ -59,12 +59,15 @@ async def get_db():
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # SQLite 不会自动 ALTER：为已存在的 orders 表补充 freight 列（带存在性判定，可重复执行）
+        # SQLite 不会自动 ALTER：为已存在的 orders 表补充列（带存在性判定，可重复执行）
         try:
             from sqlalchemy import text
             cols = [r[1] for r in (await conn.execute(text("PRAGMA table_info(orders)"))).fetchall()]
             if "freight" not in cols:
                 await conn.execute(text("ALTER TABLE orders ADD COLUMN freight VARCHAR(20)"))
                 logger.info("已为 orders 表新增 freight 列")
+            if "logistics_no_2" not in cols:
+                await conn.execute(text("ALTER TABLE orders ADD COLUMN logistics_no_2 VARCHAR(100)"))
+                logger.info("已为 orders 表新增 logistics_no_2 列（运单号2）")
         except Exception as e:
-            logger.warning(f"freight 列迁移检查失败（可忽略，新建库已包含该列）: {e}")
+            logger.warning(f"列迁移检查失败（可忽略，新建库已包含该列）: {e}")
