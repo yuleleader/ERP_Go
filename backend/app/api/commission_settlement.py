@@ -100,8 +100,9 @@ async def get_unpaid_commission(
             "end_date": end_date,
             "total_amount": round(unpaid_total, 2),                       # 未结算总额（用于发放）
             "paid_amount": round(paid_total, 2),                          # 已结算总额
-            "total_all_amount": round(unpaid_total + paid_total, 2),      # 区间提成总额
+            "total_all_amount": round(unpaid_total + paid_total, 2),      # 区间应发提成总额（已发+未发）
             "total_orders": unpaid_orders,                                # 未结算订单数
+            "total_order_count": sum(u["order_count"] for u in users),    # 区间全部已发货订单数
             "total_sales": round(sum(u["total_sales"] for u in users), 2),
             "users": users
         }
@@ -130,13 +131,13 @@ async def get_unpaid_orders(
         query = select(Order).filter(
             Order.shipping_time >= start_datetime,
             Order.shipping_time < end_datetime,
-            Order.shipping_status == "shipped",
-            Order.commission_paid == False
+            Order.shipping_status == "shipped"
         )
         if current_user.role == "sales":
             query = query.filter(Order.created_by == current_user.username)
         elif username:
             query = query.filter(Order.created_by == username)
+        query = query.order_by(Order.shipping_time.desc())
 
         result = await db.execute(query)
         orders = result.scalars().all()
@@ -145,12 +146,14 @@ async def get_unpaid_orders(
         for order in orders:
             order_list.append({
                 "id": order.id,
+                "shop_id": order.shop_id,                                  # 平台（网店ID）
                 "platform_order_no": order.platform_order_no,
                 "product_name": order.product_name,
                 "sales_amount": round(_safe_float(order.sales_amount), 2),
                 "commission_amount": round(_safe_float(order.commission_amount), 2),
                 "created_by": order.created_by,
-                "shipping_time": order.shipping_time.isoformat() if order.shipping_time else None
+                "shipping_time": order.shipping_time.isoformat() if order.shipping_time else None,
+                "commission_paid": bool(order.commission_paid)             # 发放状态
             })
 
         return {"code": 200, "message": "success", "data": order_list}

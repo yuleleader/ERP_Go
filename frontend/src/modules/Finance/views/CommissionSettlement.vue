@@ -24,31 +24,37 @@
       <el-card class="summary-card">
         <div class="summary-item">
           <span class="summary-label">结算日期</span>
-          <span class="summary-value">{{ summaryData.start_date }} 至 {{ summaryData.end_date }}</span>
+          <span class="summary-value" style="font-size: 16px;">{{ summaryData.start_date }} 至 {{ summaryData.end_date }}</span>
         </div>
       </el-card>
       <el-card class="summary-card">
         <div class="summary-item">
-          <span class="summary-label">未结算应发总额</span>
-          <span class="summary-value text-primary">¥{{ summaryData.total_amount.toFixed(2) }}</span>
+          <span class="summary-label">总销售金额</span>
+          <span class="summary-value">¥{{ summaryData.total_sales.toFixed(2) }}</span>
         </div>
       </el-card>
       <el-card class="summary-card">
         <div class="summary-item">
-          <span class="summary-label">已结算金额</span>
+          <span class="summary-label">订单数</span>
+          <span class="summary-value">{{ summaryData.total_order_count }}</span>
+        </div>
+      </el-card>
+      <el-card class="summary-card">
+        <div class="summary-item">
+          <span class="summary-label">区间应发提成总额</span>
+          <span class="summary-value text-primary">¥{{ summaryData.total_all_amount.toFixed(2) }}</span>
+        </div>
+      </el-card>
+      <el-card class="summary-card">
+        <div class="summary-item">
+          <span class="summary-label">已发放提成总额</span>
           <span class="summary-value" style="color: #67c23a;">¥{{ summaryData.paid_amount.toFixed(2) }}</span>
         </div>
       </el-card>
       <el-card class="summary-card">
         <div class="summary-item">
-          <span class="summary-label">未结算订单数</span>
-          <span class="summary-value">{{ summaryData.total_orders }}</span>
-        </div>
-      </el-card>
-      <el-card class="summary-card">
-        <div class="summary-item">
-          <span class="summary-label">销售金额</span>
-          <span class="summary-value">¥{{ summaryData.total_sales.toFixed(2) }}</span>
+          <span class="summary-label">未发提成总额</span>
+          <span class="summary-value" style="color: #e6a23c;">¥{{ summaryData.total_amount.toFixed(2) }}</span>
         </div>
       </el-card>
     </div>
@@ -70,21 +76,26 @@
       <el-table :data="summaryData?.users || []" border>
         <el-table-column prop="real_name" label="销售姓名" />
         <el-table-column prop="username" label="账号" />
-        <el-table-column prop="total_sales" label="销售金额" width="120">
+        <el-table-column prop="total_sales" label="总销售金额" width="120">
           <template #default="{ row }">
             ¥{{ row.total_sales.toFixed(2) }}
           </template>
         </el-table-column>
         <el-table-column prop="order_count" label="订单数" width="90" />
-        <el-table-column label="未结算应发" width="130">
+        <el-table-column label="区间应发提成" width="120">
           <template #default="{ row }">
-            <span class="commission-amount">¥{{ row.unpaid_commission.toFixed(2) }}</span>
+            <span class="commission-amount">¥{{ row.total_commission.toFixed(2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="已结算" width="120">
+        <el-table-column label="已发放提成" width="130">
           <template #default="{ row }">
             <span style="color: #67c23a;">¥{{ row.paid_commission.toFixed(2) }}</span>
             <span style="font-size: 12px; color: #999;">（{{ row.paid_order_count }}单）</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="未发提成" width="120">
+          <template #default="{ row }">
+            <span style="color: #e6a23c; font-weight: bold;">¥{{ row.unpaid_commission.toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200">
@@ -110,23 +121,34 @@
     <el-dialog
       v-model="orderDialogVisible"
       title="订单明细"
-      width="800px"
+      width="900px"
       @close="orderDialogVisible = false"
     >
       <el-table :data="orderDetailList" border>
-        <el-table-column prop="platform_order_no" label="平台订单号" />
-        <el-table-column prop="product_name" label="商品名称" />
-        <el-table-column prop="sales_amount" label="销售金额" width="120">
+        <el-table-column prop="shop_id" label="平台" min-width="130" show-overflow-tooltip />
+        <el-table-column prop="platform_order_no" label="平台订单号" min-width="130" show-overflow-tooltip />
+        <el-table-column prop="product_name" label="商品名称" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="sales_amount" label="销售金额" width="110">
           <template #default="{ row }">
             ¥{{ row.sales_amount.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column prop="commission_amount" label="提成金额" width="120">
+        <el-table-column prop="commission_amount" label="提成金额" width="110">
           <template #default="{ row }">
             ¥{{ row.commission_amount.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column prop="shipping_time" label="发货时间" width="160" />
+        <el-table-column label="发货时间" width="120">
+          <template #default="{ row }">
+            {{ row.shipping_time ? row.shipping_time.slice(0, 10) : '——' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="发放状态" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.commission_paid" type="success" size="small">已发放</el-tag>
+            <el-tag v-else type="warning" size="small">未发放</el-tag>
+          </template>
+        </el-table-column>
       </el-table>
     </el-dialog>
   </div>
