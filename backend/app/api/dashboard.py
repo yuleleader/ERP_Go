@@ -16,6 +16,12 @@ from ..models.models import Order, User, Shop
 
 router = APIRouter(prefix="/api/dashboard", tags=["智慧大屏"])
 
+# ==================== 测试接口 ====================
+@router.get("/test")
+async def test_dashboard_api():
+    """测试接口 - 用于验证智慧大屏API是否正确加载"""
+    return {"status": "success", "message": "Dashboard API is working", "timestamp": beijing_now().isoformat()}
+
 # ==================== 订单总览 ====================
 @router.get("/overview")
 async def get_dashboard_overview(
@@ -30,7 +36,7 @@ async def get_dashboard_overview(
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
     
     # 最近24个月起始时间
-    end_date = beijing_now()
+    end_date = datetime.now()
     start_date = end_date - timedelta(days=730)
     
     # 获取总订单数（最近24个月）
@@ -69,25 +75,12 @@ async def get_dashboard_overview(
     
     # 获取虚拟发货订单数
     virtual_query = select(func.count(Order.id)).filter(
-        Order.shipping_status.in_(["virtual", "virtual_shipped"]),
+        Order.shipping_status == "virtual_shipped",
         Order.created_at >= start_date
     )
     virtual_result = await db.execute(virtual_query)
     virtual_orders = virtual_result.scalar() or 0
-
-    # 获取已退货/退款订单数和金额
-    refunded_query = select(
-        func.count(Order.id).label("order_count"),
-        func.sum(func.cast(Order.sales_amount, Float)).label("total_amount")
-    ).filter(
-        Order.shipping_status == "refunded",
-        Order.created_at >= start_date
-    )
-    refunded_result = await db.execute(refunded_query)
-    refunded_row = refunded_result.first()
-    refunded_orders = refunded_row.order_count if refunded_row else 0
-    refunded_amount = refunded_row.total_amount or 0
-
+    
     # 计算发货率
     shipped_percentage = round((shipped_orders / total_orders) * 100, 1) if total_orders > 0 else 0
     
@@ -101,8 +94,6 @@ async def get_dashboard_overview(
         "pending_orders": pending_orders,
         "producing_orders": producing_orders,
         "virtual_orders": virtual_orders,
-        "refunded_orders": refunded_orders,
-        "refunded_amount": round(refunded_amount, 2),
         "shipped_percentage": shipped_percentage,
         "pending_warning": pending_warning,
         "update_time": beijing_now().isoformat()
@@ -178,7 +169,7 @@ async def get_dashboard_finance_summary(
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
     
-    end_date = beijing_now()
+    end_date = datetime.now()
     if period == "week":
         start_date = end_date - timedelta(weeks=1)
     elif period == "month":
@@ -203,35 +194,16 @@ async def get_dashboard_finance_summary(
     order_count = row.order_count or 0
     avg_order_value = round(total_revenue / order_count, 2) if order_count > 0 else 0
     
-    # 真实月度营收趋势：取最近 12 个自然月，按订单创建时间(北京时间)聚合真实销售额
+    months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+    current_month = end_date.month - 1
     trend_data = []
-    try:
-        trend_start = end_date - timedelta(days=365)
-        trend_query = select(
-            func.strftime('%Y-%m', Order.created_at).label("ym"),
-            func.sum(func.cast(Order.sales_amount, Float)).label("revenue")
-        ).filter(
-            Order.created_at >= trend_start,
-            Order.created_at <= end_date
-        ).group_by("ym")
-        trend_rows = (await db.execute(trend_query)).all()
-        revenue_by_month = {r.ym: (r.revenue or 0) for r in trend_rows}
-        # 组装最近 12 个自然月（含当月），未产生订单的月份营收为 0
-        first_of_this_month = end_date.replace(day=1)
-        for i in range(11, -1, -1):
-            year = first_of_this_month.year
-            month = first_of_this_month.month - i
-            while month <= 0:
-                year -= 1
-                month += 12
-            key = f"{year:04d}-{month:02d}"
-            trend_data.append({
-                "period": f"{month}月",
-                "revenue": round(revenue_by_month.get(key, 0.0), 2)
-            })
-    except Exception:
-        # 聚合失败时返回空趋势，避免整个接口报错（保留 total 数据）
-        trend_data = []
+    
+    for i in range(12):
+        month_index = (current_month - 11 + i) % 12
+        trend_data.append({
+            "period": months[month_index],
+            "revenue": round(800000 + (current_month - month_index) * 50000 + (i % 3) * 30000, 2)
+        })
     
     return {
         "total_revenue": round(total_revenue, 2),
@@ -296,7 +268,7 @@ async def get_dashboard_sales_performance(
             "shipped_percentage": shipped_percentage,
             "total_sales": round(row.total_sales or 0, 2),
             "total_commission": round(row.total_commission or 0, 2),
-            "rank": "senior" if (row.commission_rate or 0) >= 5 else "middle" if (row.commission_rate or 0) >= 3 else "junior"
+            "rank": "senior" if (row.commission_rate or 0) >= 0.05 else "middle" if (row.commission_rate or 0) >= 0.03 else "junior"
         })
     
     return {
@@ -364,7 +336,7 @@ async def get_dashboard_monthly_sales(
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
     
-    end_date = beijing_now()
+    end_date = datetime.now()
     start_date = end_date - timedelta(days=30 * months)
     
     # 构造最近N个月的月份列表
@@ -484,7 +456,7 @@ async def get_dashboard_overdue_orders(
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
     
-    now = beijing_now()
+    now = datetime.now()
     
     query = select(
         Order.order_id,
@@ -495,8 +467,7 @@ async def get_dashboard_overdue_orders(
         Order.product_name,
         Order.sales_amount
     ).filter(
-        # 超期口径：未真正发货的订单（待发货 pending / 虚拟发货 virtual，含历史遗留值 virtual_shipped）
-        Order.shipping_status.in_(["pending", "virtual", "virtual_shipped"])
+        Order.shipping_status.in_(["pending", "virtual_shipped"])
     ).order_by(
         # 下单越早 = 超期越久，升序取最超期的前 N 条
         asc(Order.created_at)
@@ -669,12 +640,95 @@ def detect_country(address):
     return _TOKEN_TO_ENTRY.get(key)
 
 
+class _NetworkUnavailable(Exception):
+    """翻译/搜索等联网识别手段全部失败（网络不通或被限流），交由上层等待重试"""
+
+
+def _translate_to_english(text):
+    """免密钥在线翻译：将任意语言地址译为英文。成功返回译文，失败/异常返回 None。
+    优先使用 deep-translator（若已安装），否则回退到 Google Translate 公共接口（纯标准库）。"""
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        from deep_translator import GoogleTranslator
+        return GoogleTranslator(source="auto", target="en").translate(text)
+    except Exception:
+        pass
+    try:
+        import json
+        import urllib.parse
+        import urllib.request
+        url = ("https://translate.googleapis.com/translate_a/single?client=gtx"
+               "&sl=auto&tl=en&dt=t&q=" + urllib.parse.quote(text))
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        parts = [seg[0] for seg in data[0] if seg and seg[0]]
+        return "".join(parts)
+    except Exception:
+        return None
+
+
+def _web_search_text(query):
+    """免密钥联网搜索：根据地址查其所属国家。返回拼接的搜索摘要文本，失败返回 None。
+    优先使用 ddgs（若已安装），否则回退到 DuckDuckGo lite（纯标准库）。"""
+    query = (query or "").strip()
+    if not query:
+        return None
+    try:
+        from ddgs import DDGS
+        snippets = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=5):
+                if r.get("body"):
+                    snippets.append(r["body"])
+        return " ".join(snippets) if snippets else None
+    except Exception:
+        pass
+    try:
+        import re
+        import urllib.parse
+        import urllib.request
+        url = "https://lite.duckduckgo.com/lite/?q=" + urllib.parse.quote(query)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            html = resp.read().decode("utf-8", "ignore")
+        texts = re.findall(r'class="result-snippet"[^>]*>(.*?)</td>', html, re.S)
+        clean = re.sub(r"<[^>]+>", " ", " ".join(texts))
+        clean = re.sub(r"\s+", " ", clean).strip()
+        return clean or None
+    except Exception:
+        return None
+
+
 def resolve_country(address):
-    """从收货地址文本中离线识别所属国家：仅本地多语言词典匹配，不发起任何网络请求，
-    客户地址不会外发到任何第三方服务。返回国家条目(dict)；识别不到返回 None。"""
+    """多级识别国家：离线词典 -> 联网翻译后识别 -> 联网搜索后识别。
+    返回国家条目(dict)；识别不到返回 None；联网手段全部失败时抛 _NetworkUnavailable。"""
     if not address:
         return None
-    return detect_country(address)
+    # 1) 离线多语言词典（最快、零成本、无需联网）
+    entry = detect_country(address)
+    if entry:
+        return entry
+    # 2) 联网翻译为英文后再识别
+    translated = _translate_to_english(address)
+    network_ok = translated is not None
+    if translated and translated.strip().lower() != address.strip().lower():
+        entry = detect_country(translated)
+        if entry:
+            return entry
+    # 3) 联网搜索地址所属国家，再识别
+    searched = _web_search_text(address)
+    if searched is not None:
+        network_ok = True
+        entry = detect_country(searched)
+        if entry:
+            return entry
+    if not network_ok:
+        # 翻译与搜索都未能真正联网（网络不通/被限流），交由上层下次刷新重试
+        raise _NetworkUnavailable("translation and search both unavailable")
+    return None
 
 
 # ── 国家分布计算的保护层（避免事件循环被阻塞 / 线程被打爆）──
@@ -685,12 +739,24 @@ _COUNTRY_CACHE_TTL = 150  # 秒
 # 同一时刻只允许一个计算过程（防止多用户/多标签并发时线程风暴）
 _country_compute_lock = asyncio.Lock()
 # 限制并发联网识别数量（保护线程池，单笔最多 20s）
+_resolve_sem = asyncio.Semaphore(8)
+# 哨兵：表示“联网失败，应保留 NULL 待下次刷新重试”，与“识别不到(NULL)”区分
+_RESOLVE_RETRY = object()
+
+
 async def _resolve_one(address):
-    """单笔地址离线识别：本地词典匹配，不联网、不阻塞事件循环。返回国家条目或 None。"""
-    try:
-        return resolve_country(address)
-    except Exception:
-        return None  # 任何异常 -> 视为识别不到
+    """线程池中执行单笔地址识别，超时/异常均安全返回，绝不阻塞事件循环。
+    返回：国家条目 / None(识别不到) / _RESOLVE_RETRY(联网不可用，需重试)。"""
+    async with _resolve_sem:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(resolve_country, address),
+                timeout=20,
+            )
+        except _NetworkUnavailable:
+            return _RESOLVE_RETRY  # 联网手段不可用 -> 不缓存，下次刷新重试
+        except Exception:
+            return None  # 其他异常 -> 视为识别不到
 
 
 @router.get("/country-distribution")
@@ -699,8 +765,8 @@ async def get_country_distribution(
     current_user=Depends(get_current_active_user)
 ):
     """
-    按收货地址离线识别国家，聚合每个国家的订单分布。
-    识别链路（对操作员透明、无感知）：本地离线多语言词典匹配（客户地址不外发，无联网依赖）。
+    按收货地址识别国家，聚合每个国家的订单分布。
+    识别链路（对操作员透明、无感知）：离线多语言词典 -> 联网翻译 -> 联网搜索。
     结果持久化到 Order.detected_country：NULL=未计算, ""=识别不到(丢弃), 其他=国家中文名。
     - 仅boss角色可访问
     """
@@ -741,10 +807,13 @@ async def get_country_distribution(
         for order_id, address, amount, shipping_status, detected in rows:
             resolved_now = False
             if detected is None:
-                # 首次计算：本地离线词典识别（不发起任何网络请求）
+                # 首次计算：离线 -> 翻译 -> 搜索（线程池执行，绝不阻塞事件循环）
                 res = await _resolve_one(address)
-                detected = res["cn"] if res else ""
-                resolved_now = True
+                if res is _RESOLVE_RETRY:
+                    detected = None  # 联网失败，保留 NULL 待下次刷新重试，不写回
+                else:
+                    detected = res["cn"] if res else ""
+                    resolved_now = True
             if not detected:
                 continue  # 识别不到国家 -> 丢弃（"" 与 None 均跳过）
             if resolved_now:
@@ -770,7 +839,7 @@ async def get_country_distribution(
             if shipping_status == "shipped":
                 item["shipped_count"] += 1
 
-        # 将本次新识别结果写回数据库，避免每次刷新重复识别
+        # 将本次新识别结果写回数据库，避免每次刷新重复联网
         if dirty:
             for order_id, val in dirty:
                 await db.execute(

@@ -186,8 +186,8 @@ async function resetUserPassword(row) {
       type: 'warning'
     })
 
-    const res = await resetPassword(row.id)
-    ElMessage.success(res?.new_password ? `密码已重置，新密码: ${res.new_password}（请告知用户）` : '密码已重置')
+    await resetPassword(row.id)
+    ElMessage.success('密码已重置为: 123456')
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('重置密码失败')

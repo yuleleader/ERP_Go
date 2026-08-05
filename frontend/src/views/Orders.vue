@@ -345,7 +345,6 @@ import { getShops } from '@/api/shop'
 import { migrateImage } from '@/api/image'
 import { getLogisticsCompanies } from '@/api/logistics'
 import { getProducts } from '@/api/product'
-import { authImageUrl } from '@/utils/request'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import OrderDetailDialog from '@/components/OrderDetailDialog.vue'
@@ -665,19 +664,19 @@ function createImageUploadHandler(imageType, layer) {
     if (layer === 'sales') {
       salesProductImages.value.push({
         name: uploadFile.name,
-        url: authImageUrl(response.image_url),
+        url: response.image_url,
         temp_id: tempId
       })
     } else if (layer === 'factory') {
       factoryProductionImages.value.push({
         name: uploadFile.name,
-        url: authImageUrl(response.image_url),
+        url: response.image_url,
         temp_id: tempId
       })
     } else if (layer === 'shipping') {
       shippingDeliveryImages.value.push({
         name: uploadFile.name,
-        url: authImageUrl(response.image_url),
+        url: response.image_url,
         temp_id: tempId
       })
     }

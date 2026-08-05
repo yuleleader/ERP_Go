@@ -31,7 +31,6 @@
               <el-option label="新订单提醒" value="order_created" />
               <el-option label="图片上传完成" value="image_uploaded" />
               <el-option label="订单已发货" value="order_shipped" />
-              <el-option label="订单已退货/退款" value="order_refunded" />
               <el-option label="生产状态变更" value="produce_status_changed" />
             </el-select>
           </el-col>
@@ -62,7 +61,6 @@
             <el-icon v-if="notification.event_type === 'order_created'"><Document /></el-icon>
             <el-icon v-else-if="notification.event_type === 'image_uploaded'"><Picture /></el-icon>
             <el-icon v-else-if="notification.event_type === 'order_shipped'"><Van /></el-icon>
-            <el-icon v-else-if="notification.event_type === 'order_refunded'"><RefreshLeft /></el-icon>
             <el-icon v-else><Bell /></el-icon>
           </div>
           <div class="notification-content">
@@ -123,7 +121,6 @@
           <el-icon v-if="selectedNotification.event_type === 'order_created'" class="detail-icon"><Document /></el-icon>
           <el-icon v-else-if="selectedNotification.event_type === 'image_uploaded'" class="detail-icon"><Picture /></el-icon>
           <el-icon v-else-if="selectedNotification.event_type === 'order_shipped'" class="detail-icon"><Van /></el-icon>
-          <el-icon v-else-if="selectedNotification.event_type === 'order_refunded'" class="detail-icon"><RefreshLeft /></el-icon>
           <el-icon v-else class="detail-icon"><Bell /></el-icon>
           <div class="detail-title">{{ selectedNotification.title }}</div>
         </div>
@@ -183,12 +180,8 @@
               <span style="color: #333;">{{ orderDetailData.logistics_company || '——' }}</span>
             </div>
             <div style="display: flex; align-items: center; margin-bottom: 16px;">
-              <span style="width: 100px; color: #666; font-weight: 500;">运单号1：</span>
+              <span style="width: 100px; color: #666; font-weight: 500;">物流单号：</span>
               <span style="color: #333;">{{ orderDetailData.logistics_no || '——' }}</span>
-            </div>
-            <div style="display: flex; align-items: center; margin-bottom: 16px;">
-              <span style="width: 100px; color: #666; font-weight: 500;">运单号2：</span>
-              <span style="color: #333;">{{ orderDetailData.logistics_no_2 || '——' }}</span>
             </div>
             <div style="display: flex; align-items: center; margin-bottom: 16px;">
               <span style="width: 100px; color: #666; font-weight: 500;">运费：</span>
@@ -261,9 +254,10 @@
                 v-for="(img, index) in orderTabImages.slice(0, 3)"
                 :key="index"
                 :src="img.url"
-                style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee; cursor: zoom-in;"
+                style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee;"
                 fit="cover"
-                @click="openOrderImagePreview(index)"
+                :preview-src-list="orderTabImages.map(i => i.url)"
+                :preview-index="index"
               />
               <div
                 v-if="orderTabImages.length > 3"
@@ -279,59 +273,18 @@
         </div>
       </div>
     </el-dialog>
-
-  <!-- 图片预览对话框（自制：屏幕按钮/关闭/键盘左右键与 Esc 均可用） -->
-  <el-dialog v-model="imagePreviewVisible" title="图片预览" width="85%" top="5vh" :close-on-click-modal="true">
-    <div style="max-height: 68vh; overflow: auto; display: flex; justify-content: center; position: relative;">
-      <img
-        v-if="previewImageList.length > 0"
-        :src="previewImageList[previewImageIndex]"
-        :style="[previewImgStyle, { maxWidth: '100%', maxHeight: '62vh', objectFit: 'contain' }]"
-        alt="图片预览"
-      />
-      <el-button
-        v-if="previewImageList.length > 1"
-        style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); z-index: 5;"
-        icon="ArrowLeft"
-        circle
-        @click="prevOrderImage"
-      />
-      <el-button
-        v-if="previewImageList.length > 1"
-        style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 5;"
-        icon="ArrowRight"
-        circle
-        @click="nextOrderImage"
-      />
-      <div
-        v-if="previewImageList.length > 1"
-        style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); color: #fff; padding: 2px 14px; border-radius: 12px; font-size: 13px; z-index: 5;"
-      >
-        {{ previewImageIndex + 1 }} / {{ previewImageList.length }}
-      </div>
-    </div>
-    <!-- 缩放/旋转控制条：位于滚动区域之外，旋转后依然固定可见 -->
-    <div style="margin-top: 12px; display: flex; justify-content: center; align-items: center; gap: 10px;">
-      <el-button size="small" @click="zoomOut">缩小</el-button>
-      <span style="min-width: 64px; text-align: center; font-size: 13px; color: #666;">{{ Math.round(previewScale * 100) }}%</span>
-      <el-button size="small" @click="zoomIn">放大</el-button>
-      <el-button size="small" @click="rotatePreview">旋转</el-button>
-      <el-button size="small" @click="resetPreview">重置</el-button>
-    </div>
-  </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { formatDate, formatDateTime } from '@/utils/format'
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Picture, Van, Bell, Box, Search, Document, RefreshLeft } from '@element-plus/icons-vue'
+import { Picture, Van, Bell, Box, Search, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getNotifications, markAsRead, markAllAsRead, deleteNotification } from '@/api/notification'
 import { getOrder, updateOrder } from '@/api/order'
 import { getOrderImages } from '@/api/image'
-import { authImageUrl } from '@/utils/request'
 
 const router = useRouter()
 
@@ -530,13 +483,13 @@ async function handleViewOrderDetail(orderId) {
     const imgResult = await getOrderImages(orderId)
     if (imgResult.code === 200 && imgResult.data) {
       orderSalesImages.value = imgResult.data.filter(item => item.layer === 'sales').map(item => ({
-        id: item.id, name: `sales_${item.id}`, url: authImageUrl(item.image_url)
+        id: item.id, name: `sales_${item.id}`, url: item.image_url
       }))
       orderFactoryImages.value = imgResult.data.filter(item => item.layer === 'factory').map(item => ({
-        id: item.id, name: `factory_${item.id}`, url: authImageUrl(item.image_url)
+        id: item.id, name: `factory_${item.id}`, url: item.image_url
       }))
       orderShippingImages.value = imgResult.data.filter(item => item.layer === 'shipping').map(item => ({
-        id: item.id, name: `shipping_${item.id}`, url: authImageUrl(item.image_url)
+        id: item.id, name: `shipping_${item.id}`, url: item.image_url
       }))
     }
   } catch (error) {
@@ -557,59 +510,13 @@ async function generateOrderQRCode(orderId) {
   }
 }
 
-// 图片预览（自制弹窗：屏幕按钮/关闭/键盘均可用，替代内置查看器）
-const imagePreviewVisible = ref(false)
-const previewImageList = ref([])
-const previewImageIndex = ref(0)
-// 预览缩放与旋转
-const previewScale = ref(1)
-const previewRotate = ref(0)
-const previewImgStyle = computed(() => ({
-  transform: `rotate(${previewRotate.value}deg) scale(${previewScale.value})`,
-  transition: 'transform .2s ease'
-}))
-
-function zoomIn() { previewScale.value = Math.min(5, +(previewScale.value + 0.25).toFixed(2)) }
-function zoomOut() { previewScale.value = Math.max(0.2, +(previewScale.value - 0.25).toFixed(2)) }
-function rotatePreview() { previewRotate.value = (previewRotate.value + 90) % 360 }
-function resetPreview() { previewScale.value = 1; previewRotate.value = 0 }
-
-function openOrderImagePreview(index = 0) {
-  const images = orderTabImages.value
-  if (!images.length) return
-  previewImageList.value = images.map(i => i.url)
-  previewImageIndex.value = Math.min(index, images.length - 1)
-  previewScale.value = 1
-  previewRotate.value = 0
-  imagePreviewVisible.value = true
-}
-
 // 预览全部图片
 function previewOrderAllImages() {
-  openOrderImagePreview(0)
+  const imgEls = document.querySelectorAll('.order-detail-content .el-image')
+  if (imgEls.length > 0) {
+    imgEls[0].click()
+  }
 }
-
-function prevOrderImage() {
-  const len = previewImageList.value.length
-  previewImageIndex.value = (previewImageIndex.value - 1 + len) % len
-}
-
-function nextOrderImage() {
-  const len = previewImageList.value.length
-  previewImageIndex.value = (previewImageIndex.value + 1) % len
-}
-
-// 预览弹窗全局键盘支持：左右切换、Esc 关闭（绑定 document，不依赖焦点）
-function handleOrderImagePreviewKeydown(e) {
-  if (!imagePreviewVisible.value) return
-  if (e.key === 'ArrowLeft') { e.preventDefault(); prevOrderImage() }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); nextOrderImage() }
-  else if (e.key === 'Escape') { imagePreviewVisible.value = false }
-}
-watch(imagePreviewVisible, (visible) => {
-  if (visible) document.addEventListener('keydown', handleOrderImagePreviewKeydown)
-  else document.removeEventListener('keydown', handleOrderImagePreviewKeydown)
-})
 
 // 获取第一张商品图片URL
 function getFirstOrderProductImage() {

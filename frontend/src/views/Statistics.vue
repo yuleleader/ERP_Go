@@ -77,7 +77,7 @@
             </el-col>
           </el-row>
 
-          <!-- 销售提成统计（按发货时间统计） -->
+          <!-- 提成统计表格 -->
           <el-card style="margin-top: 20px;">
             <template #header>
               <div class="table-header">
@@ -91,94 +91,59 @@
                     end-placeholder="结束日期"
                     format="YYYY-MM-DD"
                     value-format="YYYY-MM-DD"
-                    @change="fetchCommissionSummary"
+                    @change="fetchCommissionByUser"
                     style="width: 260px; margin-right: 10px;"
                   />
-                  <el-select v-model="selectedUserId" placeholder="全部用户" clearable @change="fetchCommissionSummary" style="width: 150px; margin-right: 10px;">
+                  <el-select v-model="selectedUserId" placeholder="全部用户" clearable @change="fetchCommissionByUser" style="width: 150px; margin-right: 10px;">
                     <el-option label="全部用户" :value="null" />
                     <el-option v-for="user in salesUserList" :key="user.user_id" :label="user.real_name || user.username" :value="user.user_id" />
                   </el-select>
                   <div class="table-summary">
-                    <span class="summary-item">总销售金额：<strong>¥{{ commissionSummary.total_sales.toLocaleString() }}</strong></span>
-                    <span class="summary-item">退货金额：<strong>¥{{ commissionSummary.refund_amount.toLocaleString() }}</strong></span>
-                    <span class="summary-item">总发货订单：<strong>{{ commissionSummary.shipped_count }}</strong> 单</span>
-                    <span class="summary-item">退货订单：<strong>{{ commissionSummary.refunded_count }}</strong> 单</span>
-                    <span class="summary-item">应发提成：<strong>¥{{ commissionSummary.due_commission.toLocaleString() }}</strong></span>
-                    <span class="summary-item">实发提成：<strong>¥{{ commissionSummary.paid_commission.toLocaleString() }}</strong></span>
+                    <span class="summary-item">
+                      总计提成：<strong>¥{{ commissionByUserSummary.total_commission.toLocaleString() }}</strong>
+                    </span>
+                    <span class="summary-item">
+                      总计订单：<strong>{{ commissionByUserSummary.total_orders }}</strong> 单
+                    </span>
+                    <span class="summary-item">
+                      总计销售：<strong>¥{{ commissionByUserSummary.total_sales.toLocaleString() }}</strong>
+                    </span>
                   </div>
                 </div>
               </div>
             </template>
-
-            <el-table :data="commissionList" border style="width: 100%">
+            
+            <el-table :data="commissionByUserList" border style="width: 100%">
               <el-table-column prop="username" label="登录账号" width="120" />
               <el-table-column prop="real_name" label="真实姓名" width="120" />
-              <el-table-column prop="commission_rate" label="提成比例" width="110">
-                <template #default="scope">{{ scope.row.commission_rate }}%</template>
-              </el-table-column>
-              <el-table-column prop="total_sales" label="总销售金额" width="140">
-                <template #default="scope">¥{{ scope.row.total_sales.toLocaleString() }}</template>
-              </el-table-column>
-              <el-table-column prop="refund_amount" label="退货金额" width="140">
-                <template #default="scope">¥{{ scope.row.refund_amount.toLocaleString() }}</template>
-              </el-table-column>
-              <el-table-column label="总发货订单数" width="130">
+              <el-table-column prop="commission_rate" label="提成比例" width="120">
                 <template #default="scope">
-                  <span class="clickable-cell" @click="openOrderDialog(scope.row, 'shipped')">{{ scope.row.shipped_count }}</span>
+                  {{ scope.row.commission_rate }}%
                 </template>
               </el-table-column>
-              <el-table-column label="退货订单数" width="130">
+              <el-table-column prop="total_sales" label="销售金额" width="140">
                 <template #default="scope">
-                  <span class="clickable-cell danger" @click="openOrderDialog(scope.row, 'refunded')">{{ scope.row.refunded_count }}</span>
+                  ¥{{ scope.row.total_sales.toLocaleString() }}
                 </template>
               </el-table-column>
-              <el-table-column prop="due_commission" label="应发提成" width="140">
-                <template #default="scope"><span class="commission-highlight">¥{{ scope.row.due_commission.toLocaleString() }}</span></template>
+              <el-table-column prop="order_count" label="发货订单数" width="120" />
+              <el-table-column prop="total_commission" label="应得提成" width="140">
+                <template #default="scope">
+                  <span class="commission-highlight">¥{{ scope.row.total_commission.toLocaleString() }}</span>
+                </template>
               </el-table-column>
-              <el-table-column prop="paid_commission" label="实发提成" width="140">
-                <template #default="scope">¥{{ scope.row.paid_commission.toLocaleString() }}</template>
+              <el-table-column prop="avg_commission" label="单笔提成" width="120">
+                <template #default="scope">
+                  ¥{{ scope.row.avg_commission.toLocaleString() }}
+                </template>
               </el-table-column>
             </el-table>
 
-            <div v-if="commissionList.length === 0" class="empty-state">
+            <div v-if="commissionByUserList.length === 0" class="empty-state">
               <el-icon size="48" style="margin-bottom: 10px;"><User /></el-icon>
               <p>暂无提成数据</p>
             </div>
           </el-card>
-
-          <!-- 提成订单明细弹窗（点击订单数弹出，非跳转） -->
-          <el-dialog v-model="orderDialogVisible" :title="orderDialogTitle" width="82%" top="5vh">
-            <div v-if="orderDialogLoading" class="loading-container">
-              <el-icon class="is-loading"><Loading /></el-icon>
-              <span>加载中...</span>
-            </div>
-            <template v-else>
-              <el-table :data="orderDialogList" border max-height="60vh">
-                <el-table-column prop="order_id" label="订单ID" width="200" />
-                <el-table-column prop="platform_order_no" label="平台单号" width="180" />
-                <el-table-column prop="product_name" label="商品名称" min-width="160" show-overflow-tooltip />
-                <el-table-column prop="sales_amount" label="销售金额" width="120">
-                  <template #default="scope">¥{{ scope.row.sales_amount.toLocaleString() }}</template>
-                </el-table-column>
-                <el-table-column prop="commission_amount" label="提成金额" width="120">
-                  <template #default="scope">¥{{ scope.row.commission_amount.toLocaleString() }}</template>
-                </el-table-column>
-                <el-table-column label="发货状态" width="120">
-                  <template #default="scope">
-                    <el-tag
-                      :type="scope.row.shipping_status === 'refunded' ? 'danger' : 'success'"
-                      size="small"
-                    >{{ scope.row.shipping_status === 'refunded' ? '已退货/退款' : (scope.row.shipping_status === 'virtual' ? '虚拟发货' : '已发货') }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="shipping_time" label="发货时间" width="170" />
-                <el-table-column prop="refund_note" label="退款备注" min-width="160" show-overflow-tooltip />
-              </el-table>
-              <div v-if="orderDialogList.length === 0" class="empty-state">
-                <p>该统计范围内暂无相关订单</p>
-              </div>
-            </template>
-          </el-dialog>
         </template>
 
         <!-- 销售端统计 -->
@@ -345,7 +310,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/store/user';
-import { getOverviewStatistics, getTheoreticalCommission, getActualCommission, getSalesCommissionSummary, getCommissionOrders, getAvgShippingTime } from '@/api/statistics';
+import { getOverviewStatistics, getTheoreticalCommission, getActualCommission, getCommissionByUser, getAvgShippingTime } from '@/api/statistics';
 import { ElMessage } from 'element-plus';
 import { formatDate } from '@/utils/format';
 import { Money, ShoppingCart, CircleCheck, Clock, Wallet, InfoFilled, Box, PieChart, Loading, User, Timer } from '@element-plus/icons-vue';
@@ -374,21 +339,13 @@ const commissionStats = reactive({
   actualOrders: 0
 });
 
-const commissionList = ref([]);
-const commissionSummary = reactive({
-  total_sales: 0,
-  refund_amount: 0,
-  shipped_count: 0,
-  refunded_count: 0,
-  due_commission: 0,
-  paid_commission: 0
+const commissionByUserList = ref([]);
+const commissionByUserSummary = reactive({
+  total_commission: 0,
+  total_orders: 0,
+  total_sales: 0
 });
 const selectedUserId = ref(null);
-// 提成订单明细弹窗
-const orderDialogVisible = ref(false);
-const orderDialogLoading = ref(false);
-const orderDialogTitle = ref('');
-const orderDialogList = ref([]);
 const salesUserList = ref([]);
 const commissionDateRange = ref([]);
 const theoreticalMonth = ref('');
@@ -416,7 +373,22 @@ const fetchStatistics = async () => {
     }
 
     if (isBoss.value) {
-      await fetchCommissionSummary();
+      const params = {};
+      if (commissionDateRange.value && commissionDateRange.value.length === 2) {
+        params.start_date = commissionDateRange.value[0];
+        params.end_date = commissionDateRange.value[1];
+      }
+      const commissionByUser = await getCommissionByUser(params);
+      commissionByUserList.value = commissionByUser.data.map(item => ({
+        ...item,
+        avg_commission: item.order_count > 0
+          ? (item.total_commission / item.order_count).toFixed(2)
+          : '0.00'
+      }));
+      commissionByUserSummary.total_commission = commissionByUser.summary?.total_commission || 0;
+      commissionByUserSummary.total_orders = commissionByUser.summary?.total_orders || 0;
+      commissionByUserSummary.total_sales = commissionByUser.summary?.total_sales || 0;
+      salesUserList.value = commissionByUser.data;
     }
 
     // 获取平均发货时长（所有角色都可以查看）
@@ -494,7 +466,7 @@ const fetchActualCommission = async () => {
   }
 };
 
-const fetchCommissionSummary = async () => {
+const fetchCommissionByUser = async () => {
   try {
     const params = {};
     if (commissionDateRange.value && commissionDateRange.value.length === 2) {
@@ -504,45 +476,32 @@ const fetchCommissionSummary = async () => {
     if (selectedUserId.value) {
       params.user_id = selectedUserId.value;
     }
-    const result = await getSalesCommissionSummary(params);
-    commissionList.value = result.data || [];
-    commissionSummary.total_sales = result.summary?.total_sales || 0;
-    commissionSummary.refund_amount = result.summary?.refund_amount || 0;
-    commissionSummary.shipped_count = result.summary?.shipped_count || 0;
-    commissionSummary.refunded_count = result.summary?.refunded_count || 0;
-    commissionSummary.due_commission = result.summary?.due_commission || 0;
-    commissionSummary.paid_commission = result.summary?.paid_commission || 0;
-    salesUserList.value = result.data || [];
+    const result = await getCommissionByUser(params);
+    if (selectedUserId.value) {
+      const filteredData = result.data.filter(item => item.user_id === selectedUserId.value);
+      commissionByUserList.value = filteredData.map(item => ({
+        ...item,
+        avg_commission: item.order_count > 0
+          ? (item.total_commission / item.order_count).toFixed(2)
+          : '0.00'
+      }));
+      commissionByUserSummary.total_commission = filteredData.reduce((sum, item) => sum + item.total_commission, 0);
+      commissionByUserSummary.total_orders = filteredData.reduce((sum, item) => sum + item.order_count, 0);
+      commissionByUserSummary.total_sales = filteredData.reduce((sum, item) => sum + item.total_sales, 0);
+    } else {
+      commissionByUserList.value = result.data.map(item => ({
+        ...item,
+        avg_commission: item.order_count > 0
+          ? (item.total_commission / item.order_count).toFixed(2)
+          : '0.00'
+      }));
+      commissionByUserSummary.total_commission = result.summary?.total_commission || 0;
+      commissionByUserSummary.total_orders = result.summary?.total_orders || 0;
+      commissionByUserSummary.total_sales = result.summary?.total_sales || 0;
+    }
   } catch (error) {
     console.error('获取提成数据失败:', error);
     ElMessage.error('获取提成数据失败');
-  }
-};
-
-// 点击"总发货订单数"或"退货订单数"弹出对应订单列表窗口
-const openOrderDialog = async (row, type) => {
-  orderDialogVisible.value = true;
-  orderDialogLoading.value = true;
-  orderDialogTitle.value = type === 'refunded'
-    ? `${row.real_name || row.username} - 退货订单列表（已退货/退款）`
-    : `${row.real_name || row.username} - 总发货订单列表（已发货 + 已退货/退款）`;
-  orderDialogList.value = [];
-  try {
-    const params = {
-      type,
-      user_id: row.user_id
-    };
-    if (commissionDateRange.value && commissionDateRange.value.length === 2) {
-      params.start_date = commissionDateRange.value[0];
-      params.end_date = commissionDateRange.value[1];
-    }
-    const result = await getCommissionOrders(params);
-    orderDialogList.value = result.data || [];
-  } catch (error) {
-    console.error('获取订单明细失败:', error);
-    ElMessage.error('获取订单明细失败');
-  } finally {
-    orderDialogLoading.value = false;
   }
 };
 
@@ -761,21 +720,6 @@ onMounted(() => {
 .commission-highlight {
   color: #fa709a;
   font-weight: bold;
-}
-
-.clickable-cell {
-  color: #409EFF;
-  cursor: pointer;
-  font-weight: bold;
-  text-decoration: underline;
-}
-
-.clickable-cell:hover {
-  opacity: 0.8;
-}
-
-.clickable-cell.danger {
-  color: #f56c6c;
 }
 
 .empty-state {

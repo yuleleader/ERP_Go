@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Date, Numeric, Float
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Date, Numeric
 from sqlalchemy.sql import func
 from sqlalchemy import event
 from datetime import datetime as dt, timezone, timedelta
@@ -33,9 +33,8 @@ class Shop(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     shop_id = Column(String(100), unique=True, index=True, nullable=False)
-    # 网店账号一般是邮箱，不同平台可能使用同一邮箱注册：唯一性改为"网店名称+账号"组合（由应用层校验），数据库不再做全局唯一
-    shop_name = Column(String(100), nullable=False)
-    shop_account = Column(String(100), nullable=False)
+    shop_name = Column(String(100), unique=True, nullable=False)
+    shop_account = Column(String(100), unique=True, nullable=False)
     status = Column(String(20), default="normal")
     creator = Column(String(50), nullable=False)
     create_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
@@ -49,24 +48,22 @@ class Order(Base):
     shop_id = Column(String(100), nullable=True)
     product_name = Column(String(255), nullable=True)
     platform_order_no = Column(String(100), unique=True, nullable=False)
-    sales_amount = Column(Float, nullable=True)  # 销售金额：数字类型（REAL），不再用文本存储
+    sales_amount = Column(String(20), nullable=True)
     shipping_status = Column(String(20), default="pending")
     logistics_company = Column(String(100), nullable=True)
     logistics_no = Column(String(100), nullable=True)
-    logistics_no_2 = Column(String(100), nullable=True)  # 运单号2（选填，发货端维护）
-    freight = Column(Float, nullable=True)  # 运费：仅老板端可编辑、发货端可填写，销售端/工厂端只读（数字类型）
+    freight = Column(String(20), nullable=True)  # 运费：仅老板端可编辑、发货端可填写，销售端/工厂端只读
     shipping_operator = Column(String(50), nullable=True)
     shipping_time = Column(DateTime, nullable=True)
     receiver_address = Column(Text, nullable=True)
     detected_country = Column(String(100), nullable=True, index=True)  # 离线/翻译/搜索识别出的国家中文名；NULL=未计算, ""=识别不到
     remark = Column(Text, nullable=True)
     commission_rate = Column(Integer, nullable=True)
-    commission_amount = Column(Float, nullable=True)  # 提成金额：数字类型（REAL）
+    commission_amount = Column(String(20), nullable=True)
     created_by = Column(String(50), nullable=True)
     created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     order_days = Column(Integer, default=0, nullable=True)
     commission_paid = Column(Boolean, default=False, nullable=False)
-    refund_note = Column(Text, nullable=True)  # 退货/退款备注：状态为"已退货/退款"时必填
     produce_status = Column(String(20), default="unproduce", nullable=False)
     produce_status_update_at = Column(DateTime, nullable=True)
     produce_status_update_user = Column(String(50), nullable=True)
@@ -179,7 +176,7 @@ class ShopWithdrawRecord(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     shop_id = Column(String(64), nullable=False, index=True)
     withdraw_date = Column(String(20), nullable=False, index=True)
-    withdraw_amount = Column(Float, nullable=False, default=0.0)  # 提现金额：数字类型（REAL）
+    withdraw_amount = Column(String(20), nullable=False)
     remark = Column(String(500), nullable=True)
     create_operator_name = Column(String(50), nullable=False)
     create_operator_id = Column(Integer, nullable=False)

@@ -66,7 +66,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="120" :formatter="(row) => formatDate(row.created_at)" />
+            <el-table-column prop="created_at" label="创建时间" width="180" />
           </el-table>
         </el-card>
       </el-col>
@@ -78,8 +78,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { getOrders } from '@/api/order'
-import { getTheoreticalCommission, getTotalSales } from '@/api/statistics'
-import { formatDate } from '@/utils/format'
 import { ShoppingCart, Clock, Money, Wallet } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
@@ -97,8 +95,7 @@ function getStatusType(status) {
   const types = {
     pending: 'warning',
     shipped: 'success',
-    virtual: 'info',
-    refunded: 'danger'
+    virtual: 'info'
   }
   return types[status] || ''
 }
@@ -107,31 +104,23 @@ function getStatusText(status) {
   const texts = {
     pending: '待发货',
     shipped: '已发货',
-    virtual: '虚拟发货',
-    refunded: '已退货/退款'
+    virtual: '虚拟发货'
   }
   return texts[status] || status
 }
 
 onMounted(async () => {
   try {
-    // 我的提成/销售额：直接调用后端统计接口（按当前销售账号自动过滤，避免前端仅累加前 N 条导致失真）
-    const [commissionRes, salesRes, ordersRes] = await Promise.all([
-      getTheoreticalCommission(),
-      getTotalSales(),
-      getOrders({ limit: 100 })
-    ])
-    const commissionData = commissionRes.data || commissionRes
-    const salesData = salesRes.data || salesRes
-    const orders = (ordersRes.data || ordersRes) || []
+    const response = await getOrders({ limit: 15 })
+    const orders = response.data || response
     const username = userStore.userInfo?.username
-
+    
     myOrders.value = orders.filter(o => String(o.created_by) === String(username))
 
     stats.myOrders = myOrders.value.length
     stats.pendingOrders = myOrders.value.filter(o => o.shipping_status === 'pending').length
-    stats.mySales = Number(salesData.total_amount || 0)
-    stats.myCommission = Number(commissionData.total_commission || 0)
+    stats.mySales = myOrders.value.reduce((sum, o) => sum + (parseFloat(o.sales_amount) || 0), 0)
+    stats.myCommission = myOrders.value.reduce((sum, o) => sum + (parseFloat(o.commission_amount) || 0), 0)
   } catch (error) {
     console.error('获取数据失败:', error)
   }

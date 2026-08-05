@@ -5,18 +5,14 @@
 
 const env = process.env.NODE_ENV || 'development'
 
-// 支持通过 Vite 构建环境变量 VITE_API_BASE_URL 覆盖默认同源地址
-// 注意：必须用 import.meta.env（Vite 构建时静态替换），浏览器运行时不支持 process.env
-const envBaseURL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL) || ''
-
 // 环境配置映射
 const ENV_CONFIG = {
   development: {
-    baseURL: envBaseURL || '/api',
+    baseURL: '/api',
     timeout: 30000
   },
   production: {
-    baseURL: envBaseURL || '/api',
+    baseURL: '/api',
     timeout: 30000
   }
 }

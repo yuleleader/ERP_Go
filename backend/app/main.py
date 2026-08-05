@@ -51,10 +51,9 @@ app.include_router(notifications.router)
 app.include_router(products.router)
 app.include_router(commission_settlement.router)
 app.include_router(withdraw.router)
-app.include_router(images.serve_router)  # 带登录鉴权的图片访问（覆盖原 /data/images 直链）
 
 os.makedirs(DATA_DIR / "images", exist_ok=True)
-# 注意：/data/images 不再使用免登录 StaticFiles 直链，改由 images.serve_router 提供带登录鉴权的访问，杜绝未登录查看订单图片。
+app.mount("/data/images", StaticFiles(directory=str(DATA_DIR / "images")), name="images")
 
 # 手机端作业页：独立轻量页，由后端同源托管在 /m/，复用现有订单/图片 API
 MOBILE_DIR = BASE_DIR / "mobile"

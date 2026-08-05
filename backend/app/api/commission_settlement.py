@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, cast, Float
@@ -21,34 +20,20 @@ def _safe_float(value):
 
 router = APIRouter(prefix="/api/commission-settlement", tags=["commission-settlement"])
 
-# 提成发放串行锁：防止并发发放重复计入
-_pay_lock = asyncio.Lock()
-
-
-def _parse_date_range(start_date: str, end_date: str):
-    """解析结算日期区间（YYYY-MM-DD，结束日含当天）。返回 (开始datetime, 结束datetime+1天)。"""
-    try:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD 格式")
-    if end_dt < start_dt:
-        raise HTTPException(status_code=400, detail="结束日期不能早于开始日期")
-    return start_dt, end_dt + timedelta(days=1)
-
 
 @router.get("/unpaid")
 async def get_unpaid_commission(
-    start_date: str = Query(..., description="结算开始日期，格式 YYYY-MM-DD"),
-    end_date: str = Query(..., description="结算结束日期，格式 YYYY-MM-DD（含当天）"),
+    month: str = Query(..., description="查询月份，格式 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
 ):
-    if current_user.role not in ("boss", "sales"):
-        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
-
     try:
-        start_datetime, end_datetime = _parse_date_range(start_date, end_date)
+        year, month_num = map(int, month.split("-"))
+        start_datetime = datetime(year, month_num, 1)
+        if month_num == 12:
+            end_datetime = datetime(year + 1, 1, 1)
+        else:
+            end_datetime = datetime(year, month_num + 1, 1)
 
         query = select(
             User.username,
@@ -60,18 +45,15 @@ async def get_unpaid_commission(
             Order.shipping_time >= start_datetime,
             Order.shipping_time < end_datetime,
             Order.shipping_status == "shipped",
+            Order.commission_paid == False,
             User.role == "sales"
-        )
-        if current_user.role == "sales":
-            query = query.filter(Order.created_by == current_user.username)
-        query = query.group_by(User.username, User.real_name)
+        ).group_by(User.username, User.real_name)
 
         result = await db.execute(query)
         rows = result.all()
 
         summary = {
-            "start_date": start_date,
-            "end_date": end_date,
+            "month": month,
             "total_amount": sum(row.total_commission or 0 for row in rows),
             "total_orders": sum(row.order_count or 0 for row in rows),
             "total_sales": sum(row.total_sales or 0 for row in rows),
@@ -88,35 +70,35 @@ async def get_unpaid_commission(
         }
 
         return {"code": 200, "message": "success", "data": summary}
-    except HTTPException:
-        raise
+    except ValueError:
+        raise HTTPException(status_code=400, detail="月份格式错误，请使用 YYYY-MM 格式")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/unpaid/orders")
 async def get_unpaid_orders(
-    start_date: str = Query(..., description="结算开始日期，格式 YYYY-MM-DD"),
-    end_date: str = Query(..., description="结算结束日期，格式 YYYY-MM-DD（含当天）"),
+    month: str = Query(..., description="查询月份，格式 YYYY-MM"),
     username: str = Query(None, description="销售用户名，不传则查询所有销售"),
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
 ):
-    if current_user.role not in ("boss", "sales"):
-        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
-
     try:
-        start_datetime, end_datetime = _parse_date_range(start_date, end_date)
+        year, month_num = map(int, month.split("-"))
+        start_datetime = datetime(year, month_num, 1)
+        if month_num == 12:
+            end_datetime = datetime(year + 1, 1, 1)
+        else:
+            end_datetime = datetime(year, month_num + 1, 1)
 
         query = select(Order).filter(
             Order.shipping_time >= start_datetime,
             Order.shipping_time < end_datetime,
-            Order.shipping_status == "shipped"
+            Order.shipping_status == "shipped",
+            Order.commission_paid == False
         )
 
-        if current_user.role == "sales":
-            query = query.filter(Order.created_by == current_user.username)
-        elif username:
+        if username:
             query = query.filter(Order.created_by == username)
 
         result = await db.execute(query)
@@ -135,16 +117,15 @@ async def get_unpaid_orders(
             })
 
         return {"code": 200, "message": "success", "data": order_list}
-    except HTTPException:
-        raise
+    except ValueError:
+        raise HTTPException(status_code=400, detail="月份格式错误，请使用 YYYY-MM 格式")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/pay")
 async def pay_commission(
-    start_date: str = Query(..., description="结算开始日期，格式 YYYY-MM-DD"),
-    end_date: str = Query(..., description="结算结束日期，格式 YYYY-MM-DD（含当天）"),
+    month: str = Query(..., description="发放月份，格式 YYYY-MM"),
     username: str = Query(None, description="销售用户名，不传则发放所有销售"),
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
@@ -152,50 +133,54 @@ async def pay_commission(
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="只有老板端可以发放提成")
 
-    # 并发保护：同一进程内串行发放，避免两次并发请求读到同一批未发订单、重复计入提成
-    async with _pay_lock:
-        try:
-            start_datetime, end_datetime = _parse_date_range(start_date, end_date)
+    try:
+        year, month_num = map(int, month.split("-"))
+        start_datetime = datetime(year, month_num, 1)
+        if month_num == 12:
+            end_datetime = datetime(year + 1, 1, 1)
+        else:
+            end_datetime = datetime(year, month_num + 1, 1)
 
-            query = select(Order).filter(
-                Order.shipping_time >= start_datetime,
-                Order.shipping_time < end_datetime,
-                Order.shipping_status == "shipped",
-                Order.commission_paid == False
-            )
+        query = select(Order).filter(
+            Order.shipping_time >= start_datetime,
+            Order.shipping_time < end_datetime,
+            Order.shipping_status == "shipped",
+            Order.commission_paid == False
+        )
 
-            if username:
-                query = query.filter(Order.created_by == username)
+        if username:
+            query = query.filter(Order.created_by == username)
 
-            result = await db.execute(query)
-            orders = result.scalars().all()
+        result = await db.execute(query)
+        orders = result.scalars().all()
 
-            if not orders:
-                raise HTTPException(status_code=400, detail=f"{start_date} 至 {end_date} 期间没有未发放的提成")
+        if not orders:
+            raise HTTPException(status_code=400, detail=f"{month}月份没有未发放的提成")
 
-            total_amount = 0.0
-            total_count = 0
+        total_amount = 0
+        total_count = 0
 
-            for order in orders:
-                order.commission_paid = True
-                total_amount += _safe_float(order.commission_amount)
-                total_count += 1
+        for order in orders:
+            order.commission_paid = True
+            total_amount += order.commission_amount or 0
+            total_count += 1
 
-            await db.commit()
+        await db.commit()
 
-            return {
-                "code": 200,
-                "message": "success",
-                "data": {
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "username": username,
-                    "paid_count": total_count,
-                    "paid_amount": round(total_amount, 2)
-                }
+        return {
+            "code": 200,
+            "message": "success",
+            "data": {
+                "month": month,
+                "username": username,
+                "paid_count": total_count,
+                "paid_amount": round(total_amount, 2)
             }
-        except HTTPException:
-            raise
-        except Exception as e:
-            await db.rollback()
-            raise HTTPException(status_code=500, detail=str(e))
+        }
+    except ValueError:
+        raise HTTPException(status_code=400, detail="月份格式错误，请使用 YYYY-MM 格式")
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

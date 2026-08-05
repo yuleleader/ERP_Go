@@ -21,7 +21,6 @@
             <el-option label="待发货" value="pending" />
             <el-option label="已发货" value="shipped" />
             <el-option label="虚拟发货" value="virtual" />
-            <el-option label="已退货/退款" value="refunded" />
           </el-select>
         </el-form-item>
         <el-form-item label="生产状态">
@@ -65,7 +64,7 @@
             <div class="cell-center">
               <el-image
                 v-if="row.product_image_url"
-                :src="authImageUrl(row.product_image_url)"
+                :src="row.product_image_url"
                 style="width: 60px; height: 60px; border-radius: 4px; cursor: pointer;"
                 fit="cover"
                 @click="previewProductImage(row)"
@@ -238,7 +237,6 @@
                   <el-option label="未发货" value="pending" />
                   <el-option label="已发货" value="shipped" />
                   <el-option label="虚拟发货" value="virtual" />
-                  <el-option label="已退货/退款" value="refunded" v-if="!isShipping" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -283,20 +281,6 @@
             <el-col :span="24">
               <el-form-item label="备注">
                 <el-input v-model="orderForm.remark" type="textarea" :rows="2" placeholder="请输入备注信息" class="w-full" :disabled="isFieldReadonly('remark')" />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="24">
-              <el-form-item label="退款备注" :required="orderForm.shipping_status === 'refunded'">
-                <el-input
-                  v-model="orderForm.refund_note"
-                  type="textarea"
-                  :rows="2"
-                  :placeholder="orderForm.shipping_status === 'refunded' ? '请填写退货/退款原因（必填）' : '仅“已退货/退款”状态需要填写'"
-                  class="w-full"
-                  :disabled="isFieldReadonly('refund_note') || orderForm.shipping_status !== 'refunded'"
-                />
               </el-form-item>
             </el-col>
           </el-row>
@@ -362,18 +346,14 @@
               </el-select>
             </div>
             <div class="compact-item" style="flex: 1;">
-              <span class="compact-label">运费：</span>
-              <el-input v-model="orderForm.freight" placeholder="请输入运费" style="width: 200px;" size="small" type="number" :min="0" step="0.01" :disabled="isFieldReadonly('freight')" />
+              <span class="compact-label">运单号：</span>
+              <el-input v-model="orderForm.logistics_no" placeholder="请输入运单号" style="width: 200px;" size="small" />
             </div>
           </div>
           <div class="compact-row" style="margin-top: 10px;">
             <div class="compact-item" style="flex: 1;">
-              <span class="compact-label">运单号1：</span>
-              <el-input v-model="orderForm.logistics_no" placeholder="请输入运单号1（选填）" style="width: 200px;" size="small" />
-            </div>
-            <div class="compact-item" style="flex: 1;">
-              <span class="compact-label">运单号2：</span>
-              <el-input v-model="orderForm.logistics_no_2" placeholder="请输入运单号2（选填）" style="width: 200px;" size="small" />
+              <span class="compact-label">运费：</span>
+              <el-input v-model="orderForm.freight" placeholder="请输入运费" style="width: 200px;" size="small" type="number" :min="0" step="0.01" :disabled="isFieldReadonly('freight')" />
             </div>
           </div>
         </div>
@@ -534,12 +514,8 @@
             <span style="color: #333;">{{ currentOrder.logistics_company || '——' }}</span>
           </div>
           <div style="display: flex; align-items: center; margin-bottom: 16px;">
-            <span style="width: 100px; color: #666; font-weight: 500;">运单号1：</span>
+            <span style="width: 100px; color: #666; font-weight: 500;">物流单号：</span>
             <span style="color: #333;">{{ currentOrder.logistics_no || '——' }}</span>
-          </div>
-          <div style="display: flex; align-items: center; margin-bottom: 16px;">
-            <span style="width: 100px; color: #666; font-weight: 500;">运单号2：</span>
-            <span style="color: #333;">{{ currentOrder.logistics_no_2 || '——' }}</span>
           </div>
           <div style="display: flex; align-items: flex-start;" v-if="isFullFieldRole">
             <span style="width: 100px; color: #666; font-weight: 500; flex-shrink: 0;">备注：</span>
@@ -584,14 +560,15 @@
         <!-- 图片展示区 -->
         <div style="padding: 20px;">
           <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-            <!-- 显示前3张图片：点击走自制预览弹窗（内置查看器的屏幕按钮会被遮挡，自制弹窗按钮/关闭/键盘均可用） -->
+            <!-- 显示前3张图片 -->
             <el-image
               v-for="(img, index) in currentTabImages.slice(0, 3)"
               :key="index"
               :src="img.url"
-              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee; cursor: zoom-in;"
+              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee;"
               fit="cover"
-              @click="openImagePreview(index)"
+              :preview-src-list="currentTabImages.map(i => i.url)"
+              :preview-index="index"
             />
 
             <!-- 更多图片提示 -->
@@ -645,7 +622,7 @@
     <el-dialog v-model="imagePreviewVisible" title="商品图片预览" width="85%" top="5vh" :close-on-click-modal="true">
       <div 
         class="image-preview-container" 
-        style="max-height: 68vh; overflow: auto; display: flex; justify-content: center; position: relative;"
+        style="max-height: 75vh; overflow: auto; display: flex; justify-content: center; position: relative;"
         tabindex="0"
         @keydown.left="prevImage"
         @keydown.right="nextImage"
@@ -653,14 +630,13 @@
         <img
           v-if="previewImageList.length > 0"
           :src="previewImageList[previewImageIndex]"
-          :style="[previewImgStyle, { maxWidth: '100%', maxHeight: '62vh', objectFit: 'contain' }]"
+          style="max-width: 100%; max-height: 75vh; object-fit: contain;"
           alt="商品图片"
         />
         <el-button
           v-if="previewImageList.length > 1"
           class="image-prev-btn"
           icon="ArrowLeft"
-          style="z-index: 5;"
           @click="prevImage"
           circle
         />
@@ -668,21 +644,12 @@
           v-if="previewImageList.length > 1"
           class="image-next-btn"
           icon="ArrowRight"
-          style="z-index: 5;"
           @click="nextImage"
           circle
         />
-        <div v-if="previewImageList.length > 1" class="image-counter" style="z-index: 5;">
+        <div v-if="previewImageList.length > 1" class="image-counter">
           {{ previewImageIndex + 1 }} / {{ previewImageList.length }}
         </div>
-      </div>
-      <!-- 缩放/旋转控制条：位于滚动区域之外，旋转后依然固定可见 -->
-      <div style="margin-top: 12px; display: flex; justify-content: center; align-items: center; gap: 10px;">
-        <el-button size="small" @click="zoomOut">缩小</el-button>
-        <span style="min-width: 64px; text-align: center; font-size: 13px; color: #666;">{{ Math.round(previewScale * 100) }}%</span>
-        <el-button size="small" @click="zoomIn">放大</el-button>
-        <el-button size="small" @click="rotatePreview">旋转</el-button>
-        <el-button size="small" @click="resetPreview">重置</el-button>
       </div>
     </el-dialog>
 
@@ -731,13 +698,12 @@ import { formatDate, formatDateTime } from '@/utils/format'
  * - 工厂端：查看全部订单、不可编辑订单基础信息、仅可上传/删除生产进度图片
  */
 
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getOrders, createOrder, updateOrder, deleteOrder, getOrder } from '@/api/order'
 import { getShops } from '@/api/shop'
 import { migrateImage, getOrderImages, deleteImage } from '@/api/image'
-import { authImageUrl } from '@/utils/request'
 import { getLogisticsCompanies } from '@/api/logistics'
 import { getProducts } from '@/api/product'
 import { ElMessage } from 'element-plus'
@@ -765,18 +731,6 @@ const qrPreviewVisible = ref(false)
 const imagePreviewVisible = ref(false)
 const previewImageList = ref([])
 const previewImageIndex = ref(0)
-// 预览缩放与旋转
-const previewScale = ref(1)
-const previewRotate = ref(0)
-const previewImgStyle = computed(() => ({
-  transform: `rotate(${previewRotate.value}deg) scale(${previewScale.value})`,
-  transition: 'transform .2s ease'
-}))
-
-function zoomIn() { previewScale.value = Math.min(5, +(previewScale.value + 0.25).toFixed(2)) }
-function zoomOut() { previewScale.value = Math.max(0.2, +(previewScale.value - 0.25).toFixed(2)) }
-function rotatePreview() { previewRotate.value = (previewRotate.value + 90) % 360 }
-function resetPreview() { previewScale.value = 1; previewRotate.value = 0 }
 
 const dialogMode = ref('create')
 const submitting = ref(false)
@@ -892,10 +846,8 @@ const orderForm = reactive({
   freight: '',
   receiver_address: '',
   remark: '',
-  refund_note: '',
   logistics_company: '',
   logistics_no: '',
-  logistics_no_2: '',
   shipping_status: 'pending',
   shipping_time: '',
   created_at: '',
@@ -946,7 +898,7 @@ const deleteFormRef = ref(null)
  * @returns {string} 状态类型
  */
 function getStatusType(status) {
-  return { pending: 'warning', shipped: 'success', virtual: 'info', refunded: 'danger' }[status] || ''
+  return { pending: 'warning', shipped: 'success', virtual: 'info' }[status] || ''
 }
 
 /**
@@ -955,7 +907,7 @@ function getStatusType(status) {
  * @returns {string} 状态文本
  */
 function getStatusText(status) {
-  return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货', refunded: '已退货/退款' }[status] || status
+  return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货' }[status] || status
 }
 
 /**
@@ -1016,11 +968,7 @@ function isFieldReadonly(fieldName) {
     return false
   }
   if (role === 'shipping') {
-    const editableFields = ['logistics_company', 'logistics_no', 'logistics_no_2', 'shipping_status', 'freight', 'remark']
-    return !editableFields.includes(fieldName)
-  }
-  if (role === 'factory') {
-    const editableFields = ['produce_status', 'remark']
+    const editableFields = ['logistics_company', 'logistics_no', 'shipping_status', 'freight']
     return !editableFields.includes(fieldName)
   }
   return true
@@ -1098,8 +1046,8 @@ async function fetchOrders() {
             if (result.code === 200 && result.data) {
               const salesImages = result.data.filter(item => item.layer === 'sales')
               if (salesImages.length > 0) {
-                order.product_image_url = authImageUrl(salesImages[0].image_url)
-                order.product_image_urls = salesImages.map(item => authImageUrl(item.image_url))
+                order.product_image_url = salesImages[0].image_url
+                order.product_image_urls = salesImages.map(item => item.image_url)
               }
             }
           })
@@ -1305,7 +1253,7 @@ async function viewOrder(row) {
         .map(item => ({
           id: item.id,
           name: `sales_${item.id}`,
-          url: authImageUrl(item.image_url),
+          url: item.image_url,
           temp_id: null
         }))
 
@@ -1314,7 +1262,7 @@ async function viewOrder(row) {
         .map(item => ({
           id: item.id,
           name: `factory_${item.id}`,
-          url: authImageUrl(item.image_url),
+          url: item.image_url,
           temp_id: null
         }))
 
@@ -1323,7 +1271,7 @@ async function viewOrder(row) {
         .map(item => ({
           id: item.id,
           name: `shipping_${item.id}`,
-          url: authImageUrl(item.image_url),
+          url: item.image_url,
           temp_id: null
         }))
     }
@@ -1358,8 +1306,6 @@ async function editOrder(row) {
   orderForm.remark = row.remark
   orderForm.logistics_company = row.logistics_company || ''
   orderForm.logistics_no = row.logistics_no || ''
-  orderForm.logistics_no_2 = row.logistics_no_2 || ''
-  orderForm.refund_note = row.refund_note || ''
   orderForm.shipping_status = row.shipping_status || 'pending'
   // 设置发货时间（从ISO格式转换为日期格式）
   if (row.shipping_time) {
@@ -1401,7 +1347,7 @@ async function loadOrderImagesForEdit(orderId) {
         .map(item => ({
           id: item.id,
           name: `sales_${item.id}`,
-          url: authImageUrl(item.image_url),
+          url: item.image_url,
           temp_id: null
         }))
 
@@ -1410,7 +1356,7 @@ async function loadOrderImagesForEdit(orderId) {
         .map(item => ({
           id: item.id,
           name: `factory_${item.id}`,
-          url: authImageUrl(item.image_url),
+          url: item.image_url,
           temp_id: null
         }))
 
@@ -1419,7 +1365,7 @@ async function loadOrderImagesForEdit(orderId) {
         .map(item => ({
           id: item.id,
           name: `shipping_${item.id}`,
-          url: authImageUrl(item.image_url),
+          url: item.image_url,
           temp_id: null
         }))
     }
@@ -1491,19 +1437,19 @@ function createImageUploadHandler(imageType, layer) {
       if (layer === 'sales') {
         salesProductImages.value.push({
           name: uploadFile.name,
-          url: authImageUrl(response.image_url),
+          url: response.image_url,
           temp_id: tempId
         })
       } else if (layer === 'factory') {
         factoryProductionImages.value.push({
           name: uploadFile.name,
-          url: authImageUrl(response.image_url),
+          url: response.image_url,
           temp_id: tempId
         })
       } else if (layer === 'shipping') {
         shippingDeliveryImages.value.push({
           name: uploadFile.name,
-          url: authImageUrl(response.image_url),
+          url: response.image_url,
           temp_id: tempId
         })
       }
@@ -1557,24 +1503,16 @@ async function submitOrder() {
 
   try {
     await orderFormRef.value.validate()
-    // “已退货/退款”状态必须填写退款备注
-    if (orderForm.shipping_status === 'refunded' && !(orderForm.refund_note || '').trim()) {
-      ElMessage.warning('“已退货/退款”状态必须填写退款备注')
-      submitting.value = false
-      return
-    }
-    // 运单号1/运单号2 均维持原有规则：选填，不强制必填
     submitting.value = true
     try {
       const isShippingRole = userStore.role === 'shipping'
 
-      // 发货端仅允许编辑发货状态、物流公司、运单号1、运单号2，禁止发送其他字段
+      // 发货端仅允许编辑发货状态、物流公司、物流单号，禁止发送其他字段
       const data = isShippingRole
         ? {
             shipping_status: orderForm.shipping_status,
             logistics_company: orderForm.logistics_company,
             logistics_no: orderForm.logistics_no,
-            logistics_no_2: orderForm.logistics_no_2,
             freight: orderForm.freight ?? ''
           }
         : {
@@ -1585,10 +1523,8 @@ async function submitOrder() {
             freight: orderForm.freight,
             receiver_address: orderForm.receiver_address,
             remark: orderForm.remark,
-            refund_note: orderForm.refund_note || '',
             logistics_company: orderForm.logistics_company,
             logistics_no: orderForm.logistics_no,
-            logistics_no_2: orderForm.logistics_no_2,
             shipping_status: orderForm.shipping_status,
             shipping_time: orderForm.shipping_time || null,
             created_at: orderForm.created_at
@@ -1639,7 +1575,6 @@ function resetForm() {
   orderForm.remark = ''
   orderForm.logistics_company = ''
   orderForm.logistics_no = ''
-  orderForm.logistics_no_2 = ''
   orderForm.shipping_status = 'pending'
   orderForm.shipping_time = ''
   orderForm.created_at = ''
@@ -1700,10 +1635,6 @@ function printOrder() {
   const order = currentOrder.value
   const firstProductImage = getFirstProductImageUrl()
 
-  // 打印时间：中文年月日 + 时分秒
-  const now = new Date()
-  const printTimeStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-
   const printContent = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1737,20 +1668,9 @@ function printOrder() {
 
   /* ===== 标题区 ===== */
   .sheet-title {
-    position: relative;
     text-align: center; font-size: 20pt; font-weight: bold;
     letter-spacing: 4pt; margin-bottom: 8mm;
     padding-bottom: 5mm; border-bottom: 2pt solid #222;
-  }
-  .print-time {
-    position: absolute;
-    right: 0;
-    bottom: 5mm;
-    font-size: 10pt;
-    font-weight: normal;
-    letter-spacing: 0;
-    color: #333;
-    white-space: nowrap;
   }
 
   /* ===== 核心信息区（左文右码） ===== */
@@ -1829,10 +1749,7 @@ function printOrder() {
 <div class="a4-sheet">
 
   <!-- 标题 -->
-  <div class="sheet-title">
-    订 货 单 据
-    <div class="print-time">打印时间：${printTimeStr}</div>
-  </div>
+  <div class="sheet-title">订 货 单 据</div>
 
   <!-- 主信息区 -->
   <div class="main-section">
@@ -1922,25 +1839,16 @@ function getFirstProductImageUrl() {
 }
 
 /**
- * 打开图片预览（自制弹窗：屏幕按钮/关闭/键盘左右键与 Esc 均可用，
- * 替代 Element Plus 内置查看器——内置查看器在全屏预览时屏幕按钮可能被遮挡无法点击）
- * @param {number} index 从第几张开始
- */
-function openImagePreview(index = 0) {
-  const images = currentTabImages.value
-  if (!images.length) return
-  previewImageList.value = images.map(i => i.url)
-  previewImageIndex.value = Math.min(index, images.length - 1)
-  previewScale.value = 1
-  previewRotate.value = 0
-  imagePreviewVisible.value = true
-}
-
-/**
  * 预览所有图片
  */
 function previewAllImages() {
-  openImagePreview(0)
+  const images = currentTabImages.value
+  if (images.length > 0) {
+    const img = document.querySelector('.el-image')
+    if (img) {
+      img.click()
+    }
+  }
 }
 
 /**
@@ -1969,18 +1877,6 @@ function nextImage() {
   const len = previewImageList.value.length
   previewImageIndex.value = (previewImageIndex.value + 1) % len
 }
-
-// 预览弹窗的全局键盘支持：左右切换、Esc 关闭（绑定在 document 上，不依赖焦点，确保始终可用）
-function handleImagePreviewKeydown(e) {
-  if (!imagePreviewVisible.value) return
-  if (e.key === 'ArrowLeft') { e.preventDefault(); prevImage() }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); nextImage() }
-  else if (e.key === 'Escape') { imagePreviewVisible.value = false }
-}
-watch(imagePreviewVisible, (visible) => {
-  if (visible) document.addEventListener('keydown', handleImagePreviewKeydown)
-  else document.removeEventListener('keydown', handleImagePreviewKeydown)
-})
 
 /**
  * 预览二维码
@@ -2026,11 +1922,9 @@ function exportOrders() {
       '发货时间': formatDate(row.shipping_time) || '',
       '创建人': row.creator_real_name || '',
       '物流平台': row.logistics_company || '',
-      '运单号1': row.logistics_no || '',
-      '运单号2': row.logistics_no_2 || '',
+      '运单号': row.logistics_no || '',
       '收货地址': row.receiver_address || '',
-      '备注': row.remark || '',
-      '退款备注': row.refund_note || ''
+      '备注': row.remark || ''
     }))
 
     const worksheet = XLSX.utils.json_to_sheet(exportData)

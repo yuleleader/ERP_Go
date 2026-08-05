@@ -53,12 +53,8 @@
             <span class="detail-value">{{ order.logistics_company || '——' }}</span>
           </div>
           <div class="detail-info-row">
-            <span class="detail-label">运单号1</span>
+            <span class="detail-label">物流单号</span>
             <span class="detail-value">{{ order.logistics_no || '——' }}</span>
-          </div>
-          <div class="detail-info-row">
-            <span class="detail-label">运单号2</span>
-            <span class="detail-value">{{ order.logistics_no_2 || '——' }}</span>
           </div>
           <div class="detail-info-row">
             <span class="detail-label">运费</span>
@@ -132,14 +128,15 @@
         <!-- 图片展示区 -->
         <div style="padding: 20px;">
           <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-            <!-- 显示前3张图片：点击走自制预览弹窗（内置查看器屏幕按钮会被遮挡，自制弹窗按钮/关闭/键盘均可用） -->
+            <!-- 显示前3张图片 -->
             <el-image
               v-for="(img, index) in currentTabImages.slice(0, 3)"
               :key="index"
               :src="img.url"
-              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee; cursor: zoom-in;"
+              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee;"
               fit="cover"
-              @click="openImagePreview(index)"
+              :preview-src-list="currentTabImages.map(i => i.url)"
+              :preview-index="index"
             />
 
             <!-- 更多图片提示 -->
@@ -164,46 +161,6 @@
       </div>
     </div>
   </el-dialog>
-
-  <!-- 图片预览对话框（自制：屏幕按钮/关闭/键盘左右键与 Esc 均可用） -->
-  <el-dialog v-model="imagePreviewVisible" title="图片预览" width="85%" top="5vh" :close-on-click-modal="true">
-    <div style="max-height: 68vh; overflow: auto; display: flex; justify-content: center; position: relative;">
-      <img
-        v-if="previewImageList.length > 0"
-        :src="previewImageList[previewImageIndex]"
-        :style="[previewImgStyle, { maxWidth: '100%', maxHeight: '62vh', objectFit: 'contain' }]"
-        alt="图片预览"
-      />
-      <el-button
-        v-if="previewImageList.length > 1"
-        style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); z-index: 5;"
-        icon="ArrowLeft"
-        circle
-        @click="prevImage"
-      />
-      <el-button
-        v-if="previewImageList.length > 1"
-        style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 5;"
-        icon="ArrowRight"
-        circle
-        @click="nextImage"
-      />
-      <div
-        v-if="previewImageList.length > 1"
-        style="position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); color: #fff; padding: 2px 14px; border-radius: 12px; font-size: 13px; z-index: 5;"
-      >
-        {{ previewImageIndex + 1 }} / {{ previewImageList.length }}
-      </div>
-    </div>
-    <!-- 缩放/旋转控制条：位于滚动区域之外，旋转后依然固定可见 -->
-    <div style="margin-top: 12px; display: flex; justify-content: center; align-items: center; gap: 10px;">
-      <el-button size="small" @click="zoomOut">缩小</el-button>
-      <span style="min-width: 64px; text-align: center; font-size: 13px; color: #666;">{{ Math.round(previewScale * 100) }}%</span>
-      <el-button size="small" @click="zoomIn">放大</el-button>
-      <el-button size="small" @click="rotatePreview">旋转</el-button>
-      <el-button size="small" @click="resetPreview">重置</el-button>
-    </div>
-  </el-dialog>
 </template>
 
 <script setup>
@@ -211,7 +168,6 @@ import { formatDate, formatDateTime } from '@/utils/format'
 import { ref, computed, watch } from 'vue'
 import { getOrder, updateOrder } from '@/api/order'
 import { getOrderImages } from '@/api/image'
-import { authImageUrl } from '@/utils/request'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -270,59 +226,16 @@ function getProduceStatusText(status) {
 }
 
 
-// 图片预览（自制弹窗：屏幕按钮/关闭/键盘均可用，替代内置查看器）
-const imagePreviewVisible = ref(false)
-const previewImageList = ref([])
-const previewImageIndex = ref(0)
-// 预览缩放与旋转
-const previewScale = ref(1)
-const previewRotate = ref(0)
-const previewImgStyle = computed(() => ({
-  transform: `rotate(${previewRotate.value}deg) scale(${previewScale.value})`,
-  transition: 'transform .2s ease'
-}))
-
-function zoomIn() { previewScale.value = Math.min(5, +(previewScale.value + 0.25).toFixed(2)) }
-function zoomOut() { previewScale.value = Math.max(0.2, +(previewScale.value - 0.25).toFixed(2)) }
-function rotatePreview() { previewRotate.value = (previewRotate.value + 90) % 360 }
-function resetPreview() { previewScale.value = 1; previewRotate.value = 0 }
-
-function openImagePreview(index = 0) {
-  const images = currentTabImages.value
-  if (!images.length) return
-  previewImageList.value = images.map(i => i.url)
-  previewImageIndex.value = Math.min(index, images.length - 1)
-  previewScale.value = 1
-  previewRotate.value = 0
-  imagePreviewVisible.value = true
-}
-
 // 预览所有图片
 function previewAllImages() {
-  openImagePreview(0)
+  const images = currentTabImages.value
+  if (images.length > 0) {
+    const img = document.querySelector('.el-image')
+    if (img) {
+      img.click()
+    }
+  }
 }
-
-function prevImage() {
-  const len = previewImageList.value.length
-  previewImageIndex.value = (previewImageIndex.value - 1 + len) % len
-}
-
-function nextImage() {
-  const len = previewImageList.value.length
-  previewImageIndex.value = (previewImageIndex.value + 1) % len
-}
-
-// 预览弹窗全局键盘支持：左右切换、Esc 关闭（绑定 document，不依赖焦点）
-function handleImagePreviewKeydown(e) {
-  if (!imagePreviewVisible.value) return
-  if (e.key === 'ArrowLeft') { e.preventDefault(); prevImage() }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); nextImage() }
-  else if (e.key === 'Escape') { imagePreviewVisible.value = false }
-}
-watch(imagePreviewVisible, (visible) => {
-  if (visible) document.addEventListener('keydown', handleImagePreviewKeydown)
-  else document.removeEventListener('keydown', handleImagePreviewKeydown)
-})
 
 // 修改生产进度
 async function handleUpdateProduceStatus(newStatus) {
@@ -369,13 +282,13 @@ async function loadDetail(id) {
       if (result && result.code === 200 && result.data) {
         salesProductImages.value = result.data
           .filter(item => item.layer === 'sales')
-          .map(item => ({ id: item.id, name: `sales_${item.id}`, url: authImageUrl(item.image_url), temp_id: null }))
+          .map(item => ({ id: item.id, name: `sales_${item.id}`, url: item.image_url, temp_id: null }))
         factoryProductionImages.value = result.data
           .filter(item => item.layer === 'factory')
-          .map(item => ({ id: item.id, name: `factory_${item.id}`, url: authImageUrl(item.image_url), temp_id: null }))
+          .map(item => ({ id: item.id, name: `factory_${item.id}`, url: item.image_url, temp_id: null }))
         shippingDeliveryImages.value = result.data
           .filter(item => item.layer === 'shipping')
-          .map(item => ({ id: item.id, name: `shipping_${item.id}`, url: authImageUrl(item.image_url), temp_id: null }))
+          .map(item => ({ id: item.id, name: `shipping_${item.id}`, url: item.image_url, temp_id: null }))
       }
     } catch (error) {
       console.error('加载订单图片失败:', error)

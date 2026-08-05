@@ -149,8 +149,7 @@
     ["produce_status","生产状态","produce"],
     ["shipping_status","发货状态","ship"],
     ["logistics_company","物流公司"],
-    ["logistics_no","运单号1"],
-    ["logistics_no_2","运单号2"],
+    ["logistics_no","物流单号"],
     ["freight","运费"],
     ["receiver_address","收货地址"],
     ["remark","备注"],
@@ -187,8 +186,8 @@
 
   function editableFields(role){
     if(role==="factory") return ["produce_status","remark"];
-    if(role==="shipping") return ["shipping_status","logistics_company","logistics_no","logistics_no_2","freight","remark"];
-    return ["produce_status","shipping_status","logistics_company","logistics_no","logistics_no_2","freight","remark"];
+    if(role==="shipping") return ["shipping_status","logistics_company","logistics_no","freight","remark"];
+    return ["produce_status","shipping_status","logistics_company","logistics_no","freight","remark"];
   }
   function uploadModule(){
     if(state.user.role==="shipping") return "shipping";
@@ -388,9 +387,7 @@
         const opts = (state.logisticsCompanies||[]).map(c=>'<option value="'+esc(c.company_name)+'"'+(c.company_name===val?" selected":"")+'>'+esc(c.company_name)+'</option>').join("");
         html+='<label>物流公司</label><select id="edit-logistics_company">'+opts+'</select>';
       } else if(f==="logistics_no"){
-        html+='<label>运单号1</label><input id="edit-logistics_no" value="'+esc(val)+'">';
-      } else if(f==="logistics_no_2"){
-        html+='<label>运单号2（选填）</label><input id="edit-logistics_no_2" value="'+esc(val)+'">';
+        html+='<label>物流单号</label><input id="edit-logistics_no" value="'+esc(val)+'">';
       } else if(f==="freight"){
         html+='<label>运费</label><input id="edit-freight" value="'+esc(val)+'" inputmode="decimal">';
       } else if(f==="remark"){
@@ -417,13 +414,7 @@
       let html="";
       (list||[]).forEach(img=>{
         const tag = img.layer ? (LAYER_LABEL[img.layer]||img.layer) : "";
-        let url = img.image_url || "";
-        // 后端 /data/images 已改为必须登录访问，<img> 无法带请求头，故把令牌放在 URL 参数上
-        if(url){
-          const tk = state.token || localStorage.getItem("m_token") || "";
-          const sep = url.indexOf("?")>=0 ? "&" : "?";
-          url = url + sep + "token=" + encodeURIComponent(tk);
-        }
+        const url = img.image_url || "";
         html+='<div class="img-card"><img src="'+esc(url)+'" alt=""><span class="tag">'+esc(tag)+'</span></div>';
       });
       $("images").innerHTML = html || '<div class="muted">暂无图片</div>';

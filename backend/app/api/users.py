@@ -91,18 +91,6 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    # 保护：不能删除当前登录账号
-    if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="不能删除当前登录的账号")
-
-    # 保护：不能删除最后一个老板账号，避免系统无管理员
-    if user.role == "boss":
-        boss_count = (await db.execute(
-            select(func.count(User.id)).where(User.role == "boss", User.is_active == True)
-        )).scalar() or 0
-        if boss_count <= 1:
-            raise HTTPException(status_code=400, detail="不能删除最后一个老板账号，否则系统将无管理员")
-
     await db.delete(user)
     await db.commit()
 

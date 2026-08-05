@@ -106,15 +106,15 @@ async def create_shop(
     if current_user.role not in ["boss", "sales"]:
         raise HTTPException(status_code=403, detail="您没有权限创建网店")
 
-    # 唯一性：网店账号一般是邮箱，不同平台可用同一邮箱；仅"网店名称+账号"组合重复才拦截
-    result = await db.execute(
-        select(Shop).where(
-            Shop.shop_name == shop_data.shop_name,
-            Shop.shop_account == shop_data.shop_account
-        )
-    )
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="相同网店（名称+账号）已存在，请修改")
+    result = await db.execute(select(Shop).where(Shop.shop_name == shop_data.shop_name))
+    existing_shop = result.scalar_one_or_none()
+    if existing_shop:
+        raise HTTPException(status_code=400, detail="店铺名称已存在，请修改")
+
+    result = await db.execute(select(Shop).where(Shop.shop_account == shop_data.shop_account))
+    existing_account = result.scalar_one_or_none()
+    if existing_account:
+        raise HTTPException(status_code=400, detail="网店账号已存在，请修改")
 
     # 生成shop_id：店铺名称 + 网店账号
     shop_id = shop_data.shop_name + shop_data.shop_account
@@ -171,18 +171,15 @@ async def update_shop(
     if current_user.role != "boss" and shop.creator != current_user.username:
         raise HTTPException(status_code=403, detail="您没有权限修改此网店")
 
-    # 唯一性：改为"网店名称+账号"组合判断（同一邮箱可注册不同平台、同一名称也可换邮箱），排除自身
-    new_name = shop_data.shop_name if shop_data.shop_name is not None else shop.shop_name
-    new_account = shop_data.shop_account if shop_data.shop_account is not None else shop.shop_account
-    existing = await db.execute(
-        select(Shop).where(
-            Shop.shop_name == new_name,
-            Shop.shop_account == new_account,
-            Shop.shop_id != shop_id
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="相同网店（名称+账号）已存在")
+    if shop_data.shop_name and shop_data.shop_name != shop.shop_name:
+        existing = await db.execute(select(Shop).where(Shop.shop_name == shop_data.shop_name))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="店铺名称已存在")
+
+    if shop_data.shop_account and shop_data.shop_account != shop.shop_account:
+        existing = await db.execute(select(Shop).where(Shop.shop_account == shop_data.shop_account))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="网店账号已存在")
 
     update_data = shop_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():

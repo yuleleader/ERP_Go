@@ -24,7 +24,6 @@ EVENT_TYPES = {
     'order_shipped': '订单已发货',
     'order_created': '新订单提醒',
     'produce_status_changed': '生产状态变更',
-    'order_refunded': '订单已退货/退款',
 }
 
 class NotificationService:
@@ -129,7 +128,7 @@ class NotificationService:
             return False
 
     @staticmethod
-    async def send_order_shipped_notification(db: AsyncSession, order_id: str, logistics_company: str = None, logistics_no: str = None, logistics_no_2: str = None) -> bool:
+    async def send_order_shipped_notification(db: AsyncSession, order_id: str, logistics_company: str = None, logistics_no: str = None) -> bool:
         """
         发送订单已发货通知
         
@@ -137,8 +136,7 @@ class NotificationService:
             db: 数据库会话
             order_id: 订单ID
             logistics_company: 物流公司
-            logistics_no: 物流单号（运单号1）
-            logistics_no_2: 运单号2（选填）
+            logistics_no: 物流单号
         
         Returns:
             是否发送成功
@@ -161,9 +159,7 @@ class NotificationService:
             if logistics_company:
                 content += f"物流公司: {logistics_company}\n"
             if logistics_no:
-                content += f"运单号1: {logistics_no}\n"
-            if logistics_no_2:
-                content += f"运单号2: {logistics_no_2}\n"
+                content += f"物流单号: {logistics_no}\n"
             content += f"时间: {beijing_now().strftime('%Y-%m-%d %H:%M:%S')}"
             
             return await NotificationService.send_notification(
@@ -180,75 +176,7 @@ class NotificationService:
             return False
 
     @staticmethod
-    async def send_order_refunded_notification(
-        db: AsyncSession,
-        order: Order,
-        refund_note: str = None,
-        operator: str = None
-    ) -> bool:
-        """
-        订单已退货/退款时，向老板端、销售端、发货端全部用户群发站内信。
-        
-        Args:
-            db: 数据库会话
-            order: 订单对象
-            refund_note: 退款备注
-            operator: 操作人（触发退货/退款的用户名）
-        
-        Returns:
-            是否至少成功发送一条
-        """
-        try:
-            event_type = 'order_refunded'
-            title = EVENT_TYPES[event_type]
-            operator_name = operator or order.created_by or "系统"
-            refund_note = (refund_note or order.refund_note or "无")
-
-            content = (
-                f"订单【{order.order_id}】已被标记为「已退货/退款」。\n"
-                f"商品: {order.product_name or '无'}\n"
-                f"销售金额: {order.sales_amount or '0'}\n"
-                f"操作人: {operator_name}\n"
-                f"退款备注: {refund_note}\n"
-                f"时间: {beijing_now().strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-
-            # 接收范围：老板端、销售端、发货端 全部用户
-            recipients = set()
-            for role in ("boss", "sales", "shipping"):
-                result = await db.execute(select(User.username).where(User.role == role))
-                recipients.update(result.scalars().all())
-
-            if not recipients:
-                logger.warning(f"未找到老板端/销售端/发货端用户，跳过退货通知，订单: {order.order_id}")
-                return False
-
-            success_count = 0
-            for recipient in recipients:
-                ok = await NotificationService.send_notification(
-                    db=db,
-                    recipient_username=recipient,
-                    order_id=order.order_id,
-                    event_type=event_type,
-                    title=title,
-                    content=content
-                )
-                if ok:
-                    success_count += 1
-
-            logger.info(f"退货/退款通知已群发，订单: {order.order_id}，接收人数: {success_count}")
-            return success_count > 0
-
-        except Exception as e:
-            logger.error(f"发送退货/退款通知失败: {e}")
-            return False
-
-    @staticmethod
-    async def send_order_created_notification(
-        db: AsyncSession,
-        order: Order,
-        creator_name: str
-    ) -> bool:
+    async def send_order_created_notification(db: AsyncSession, order: Order, creator_name: str) -> bool:
         """
         发送新订单创建通知给工厂端用户
         

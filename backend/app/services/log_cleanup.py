@@ -14,8 +14,7 @@ from ..models.models import (
     LoginLog,
     LogCleanupRecord,
     SystemSetting,
-    Notification,
-    beijing_now,
+    Notification
 )
 
 logger = logging.getLogger(__name__)
@@ -97,8 +96,7 @@ class LogCleanupService:
         """
         计算日志删除的截止日期
         """
-        # 使用北京时间（与日志 created_at 保持一致），避免服务器本地时区偏差导致早删/漏删
-        return beijing_now() - timedelta(days=retention_days)
+        return datetime.now() - timedelta(days=retention_days)
 
     @staticmethod
     async def count_old_logs(db: AsyncSession, cutoff_date: datetime) -> Dict[str, int]:
