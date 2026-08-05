@@ -438,8 +438,8 @@ class WindowsLauncherApp:
         }
 
         btn_row = tk.Frame(main, bg=root_bg)
-        btn_row.pack(fill=tk.X, padx=24, pady=(16, 24))
-        for _i in range(4):
+        btn_row.pack(fill=tk.X, padx=24, pady=(16, 4))
+        for _i in range(5):
             btn_row.grid_columnconfigure(_i, weight=1)
         btn_row.grid_rowconfigure(0, weight=1)
 
@@ -451,6 +451,19 @@ class WindowsLauncherApp:
                                             self._btn_spec['open'], self.open_browser, '_open_enabled', col=2)
         self.refresh_btn = self._make_func_btn(btn_row, "刷新状态", "refresh",
                                                self._btn_spec['refresh'], self.refresh_status, None, col=3)
+        self.restart_btn = self._make_func_btn(btn_row, "重启后端", "refresh",
+                                               self._btn_spec['refresh'], self.restart_backend, None, col=4)
+
+        # 服务模式选项：生产模式基于已构建产物（frontend/dist）启动，速度快、稳定；开发模式启动 Vite dev
+        opt_row = tk.Frame(main, bg=root_bg)
+        opt_row.pack(fill=tk.X, padx=28, pady=(0, 16))
+        self.prod_mode_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(
+            opt_row, text="生产模式（基于已构建产物启动前端，更快更稳；需勾选时若没有构建产物会自动回退开发模式）",
+            variable=self.prod_mode_var, bg=root_bg, fg=self.colors['text_secondary'],
+            activebackground=root_bg, activeforeground=self.colors['text_primary'],
+            selectcolor='#374151', font=('微软雅黑', 9)
+        ).pack(side=tk.LEFT)
 
     # ─────────────────────────────────────────
     # Service tile / toggle / wave helpers
@@ -1206,10 +1219,32 @@ class WindowsLauncherApp:
         if os.path.exists(db_path):
             db_size = os.path.getsize(db_path) / 1024
             self.add_log(f"数据库已存在 ({db_size:.1f} KB)", 'success')
-        else:
-            self.add_log("警告: 数据库文件不存在!", 'warning')
-            self.add_log("请先运行 '数据库初始化.py' 创建数据库", 'warning')
-            self.add_log("运行方式: python 数据库初始化.py --force", 'warning')
+            return True
+
+        # 数据库不存在：自动调用后端 init_db 幂等建表（不覆盖任何已有数据）
+        self.add_log("数据库不存在，正在自动初始化（建表，幂等）...", 'system')
+        try:
+            code = (
+                "import asyncio;"
+                "from app.core.database import init_db;"
+                "asyncio.run(init_db());"
+                "print('DB_INIT_OK')"
+            )
+            result = subprocess.run(
+                [sys.executable, '-c', code],
+                cwd=backend_dir,
+                capture_output=True, text=True,
+                timeout=180
+            )
+            if result.returncode == 0 and 'DB_INIT_OK' in result.stdout:
+                self.add_log("数据库自动初始化成功", 'success')
+                return True
+            self.add_log("数据库自动初始化失败，请手动运行: python 数据库初始化.py --force", 'error')
+            self.add_log((result.stderr or result.stdout or '')[-400:], 'error')
+            return False
+        except Exception as e:
+            self.add_log(f"数据库自动初始化异常: {e}", 'error')
+            return False
 
     def wait_for_port(self, port, timeout=60):
         import socket
@@ -1392,7 +1427,7 @@ class WindowsLauncherApp:
                 else:
                     self._update_progress(self.backend_progress_canvas, 180, self.colors['orange'])
                     self.add_log("后端服务启动超时，可能仍在启动中...", 'warning')
-                    self._ui_set_service('backend', "运行中", self.colors['green'])
+                    self._ui_set_service('backend', "异常", self.colors['orange'])
 
             # 若 5173 已被外部健康进程占用，则复用而非重复启动（避免端口冲突与误杀）
             external_frontend_healthy = is_port_open(5173) and is_service_healthy('http://localhost:5173', timeout=3)
@@ -1408,8 +1443,19 @@ class WindowsLauncherApp:
                 self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
 
                 frontend_dir = os.path.join(os.path.dirname(__file__), 'frontend')
+                dist_index = os.path.join(frontend_dir, 'dist', 'index.html')
+                use_prod = self.prod_mode_var.get() and os.path.exists(dist_index)
+                if use_prod:
+                    self.add_log("生产模式：基于已构建产物启动预览服务 (端口:5173)，启动更快", 'system')
+                    frontend_cmd = ['cmd', '/c', 'npx', 'vite', 'preview', '--port', '5173', '--strictPort']
+                else:
+                    if self.prod_mode_var.get():
+                        self.add_log("生产模式已勾选但未找到构建产物 (frontend/dist)，自动回退开发模式", 'warning')
+                    else:
+                        self.add_log("开发模式：启动 Vite 开发服务器 (端口:5173)", 'system')
+                    frontend_cmd = ['cmd', '/c', 'npm', 'run', 'dev']
                 self.frontend_process = subprocess.Popen(
-                    ['cmd', '/c', 'npm', 'run', 'dev'],
+                    frontend_cmd,
                     cwd=frontend_dir,
                     creationflags=CREATE_NO_WINDOW,
                     stdout=subprocess.PIPE,
@@ -1441,7 +1487,7 @@ class WindowsLauncherApp:
                 else:
                     self._update_progress(self.frontend_progress_canvas, 180, self.colors['orange'])
                     self.add_log("前端服务启动超时，可能仍在启动中...", 'warning')
-                    self._ui_set_service('frontend', "运行中", self.colors['green'])
+                    self._ui_set_service('frontend', "异常", self.colors['orange'])
 
             self.add_log("所有服务启动完成", 'success')
 
@@ -1455,24 +1501,20 @@ class WindowsLauncherApp:
     def stop_services(self):
         self.add_log("正在停止服务...", 'system')
 
-        # 统一通过端口杀进程，覆盖本启动器启动的及外部残留的
-        if is_port_open(8000):
-            self.add_log("停止后端服务 (端口 8000)...", 'warning')
-            kill_process_on_port(8000)
-            time.sleep(1.5)
-            if not is_port_open(8000):
-                self.add_log("后端服务已停止", 'success')
-            else:
-                self.add_log("后端端口 8000 释放失败，请手动检查", 'error')
+        # 只终止本启动器自己拉起的进程树（含其子进程），绝不无差别杀端口、误伤外部实例
+        self.kill_own_process(getattr(self, 'backend_process', None))
+        self.kill_own_process(getattr(self, 'frontend_process', None))
+        time.sleep(1.0)
 
+        # 兜底检查：若端口仍被占用，仅提示不强制杀（可能是外部启动的实例）
+        if is_port_open(8000):
+            self.add_log("后端端口 8000 仍被占用（可能为外部实例），未自动结束外部进程，请手动处理", 'warning')
+        else:
+            self.add_log("后端服务已停止", 'success')
         if is_port_open(5173):
-            self.add_log("停止前端服务 (端口 5173)...", 'warning')
-            kill_process_on_port(5173)
-            time.sleep(1.5)
-            if not is_port_open(5173):
-                self.add_log("前端服务已停止", 'success')
-            else:
-                self.add_log("前端端口 5173 释放失败，请手动检查", 'error')
+            self.add_log("前端端口 5173 仍被占用（可能为外部实例），未自动结束外部进程，请手动处理", 'warning')
+        else:
+            self.add_log("前端服务已停止", 'success')
 
         # 更新状态显示
         if not is_port_open(8000):
@@ -1491,6 +1533,38 @@ class WindowsLauncherApp:
     def open_browser(self):
         self.add_log("正在打开浏览器...", 'system')
         webbrowser.open('http://localhost:5173')
+
+    def restart_backend(self):
+        """手动重启后端：仅结束本启动器自己拉起的后端进程并重新启动，绝不误伤外部实例。"""
+        def run_restart():
+            self.add_log("正在重启后端...", 'system')
+            self.kill_own_process(getattr(self, 'backend_process', None))
+            time.sleep(1)
+
+            # 外部健康后端：直接复用，不重复启动
+            if is_port_open(8000) and is_service_healthy('http://localhost:8000/health', timeout=3):
+                self.add_log("检测到外部健康后端，直接复用 (端口:8000)", 'success')
+                self._ui_set_service('backend', '运行中', self.colors['green'])
+                self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
+                return
+            if is_port_open(8000):
+                self.add_log("8000 端口被外部非健康进程占用，无法重启，请先手动处理该进程", 'error')
+                self._ui_set_service('backend', '异常', self.colors['orange'])
+                return
+
+            self.backend_process = self._start_backend()
+            if self.wait_for_port(8000):
+                if is_service_healthy('http://localhost:8000/health', timeout=5):
+                    self.add_log("后端重启成功 (端口:8000)", 'success')
+                    self._ui_set_service('backend', '运行中', self.colors['green'])
+                    self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
+                else:
+                    self.add_log("后端端口已开放但服务未就绪，请稍后点「刷新状态」查看", 'warning')
+                    self._ui_set_service('backend', '异常', self.colors['orange'])
+            else:
+                self.add_log("后端重启超时，请检查后端控制台日志", 'error')
+                self._ui_set_service('backend', '异常', self.colors['orange'])
+        threading.Thread(target=run_restart, daemon=True).start()
 
     # ═══════════════════════════════════════
     # Settings / Backup & Restore
@@ -1626,7 +1700,9 @@ class WindowsLauncherApp:
             backup_path = os.path.join(backup_dir, f"order_system_backup_{timestamp}.db")
 
             conn = sqlite3.connect(db_path)
-            conn.execute(f"VACUUM INTO '{backup_path}'")
+            # 备份路径可能含单引号（用户选择的目录），SQL 字符串中需转义
+            safe_path = backup_path.replace("'", "''")
+            conn.execute(f"VACUUM INTO '{safe_path}'")
             conn.close()
 
             size = os.path.getsize(backup_path)
@@ -2016,7 +2092,33 @@ class WindowsLauncherApp:
             self.root.destroy()
 
 
+# 单实例锁：固定本地端口，绑定成功=本实例，失败=已有实例在运行
+_SINGLETON_PORT = 18731
+
+
+def _acquire_singleton_lock():
+    """单实例保护：绑定固定本地端口。成功返回 socket（须保持引用防 GC 关闭），失败返回 None。"""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        # 注意：Windows 上不能设 SO_REUSEADDR，否则同一端口可被二次绑定、单实例锁失效
+        s.bind(('127.0.0.1', _SINGLETON_PORT))
+        s.listen(1)
+        return s
+    except OSError:
+        s.close()
+        return None
+
+
 def main():
+    lock_sock = _acquire_singleton_lock()
+    if lock_sock is None:
+        try:
+            messagebox.showwarning("已在运行", "启动器已有一个实例在运行，请勿重复打开。")
+        except Exception:
+            pass
+        return
+
     root = tk.Tk()
 
     try:
@@ -2026,6 +2128,8 @@ def main():
         pass
 
     root.configure(bg='#2c3138')
+    # 保持单实例锁引用，避免 socket 被垃圾回收导致锁失效
+    root._singleton_lock = lock_sock
 
     app = WindowsLauncherApp(root)
 

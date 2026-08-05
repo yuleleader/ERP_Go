@@ -78,3 +78,21 @@ export function getDashboardSalesRanking(limit = 10) {
     params: { limit }
   })
 }
+
+// 销售提成统计（按发货时间统计）- 仅老板端
+export function getSalesCommissionSummary(params) {
+  return request({
+    url: '/statistics/commission/sales-summary',
+    method: 'get',
+    params
+  })
+}
+
+// 提成统计弹窗订单列表（按发货时间 + 用户 + 类型）- 仅老板端
+export function getCommissionOrders(params) {
+  return request({
+    url: '/statistics/commission/orders',
+    method: 'get',
+    params
+  })
+}

@@ -33,12 +33,12 @@
         <el-menu-item index="/statistics">
           <span>数据统计</span>
         </el-menu-item>
-        <el-sub-menu index="finance" v-if="userStore.isBoss || userStore.isSales">
+        <el-sub-menu index="finance" v-if="userStore.isBoss">
           <template #title>
             <span>财务模块</span>
           </template>
           <el-menu-item index="/salary-settlement" v-if="userStore.isBoss">工资结算</el-menu-item>
-          <el-menu-item index="/account-withdrawal">账户提现</el-menu-item>
+          <el-menu-item index="/account-withdrawal" v-if="userStore.isBoss">账户提现</el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/settings" v-if="userStore.isBoss">
           <span>系统设置</span>

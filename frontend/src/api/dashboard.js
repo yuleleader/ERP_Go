@@ -3,24 +3,6 @@ import request from '@/utils/request'
 // ==================== 智慧大屏专用API接口 ====================
 
 /**
- * 测试API连接
- * @returns {Object} 测试结果
- */
-export async function testApiConnection() {
-  try {
-    const response = await request({
-      url: '/dashboard/test',
-      method: 'get'
-    })
-    console.log('✅ API连接测试成功:', response)
-    return response
-  } catch (error) {
-    console.error('❌ API连接测试失败:', error)
-    throw error
-  }
-}
-
-/**
  * 获取订单总览数据
  * @returns {Object} 订单统计数据
  */

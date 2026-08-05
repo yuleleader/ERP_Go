@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import logging
 import hashlib 
 import uuid 
 from datetime import datetime, timedelta 
@@ -9,9 +10,13 @@ import asyncio
 
 from aiofiles import open as aio_open 
 from aiofiles.os import rename, makedirs, listdir, stat, remove as aio_remove
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException 
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession 
-from sqlalchemy import select, update, func 
+from sqlalchemy import select, update, func
+from jose import jwt, JWTError
+from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.config import TEMP_IMAGE_RETENTION_HOURS
 
 from app.core.database import get_db 
 from app.core.security import get_current_active_user 
@@ -36,7 +41,7 @@ WEB_PREFIX = "/data/images"
 # ====================== 系统规则（我们约定的配置）====================== 
 MAX_SIZE = 5 * 1024 * 1024  # 5MB 
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png"} 
-EXPIRE_HOURS = 48  # 临时图48小时过期 
+EXPIRE_HOURS = TEMP_IMAGE_RETENTION_HOURS  # 临时图保留小时数（统一取配置值，默认24） 
 
 
 # ====================== 工具函数 ====================== 
@@ -271,7 +276,9 @@ async def clean_temp_files(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ): 
-    now = datetime.now() 
+    if current_user.role != "boss":
+        raise HTTPException(status_code=403, detail="仅老板端可清理临时图片")
+    now = beijing_now() 
     expire_time = now - timedelta(hours=EXPIRE_HOURS) 
 
     try:
@@ -296,7 +303,7 @@ async def clean_temp_files(
                     continue 
         await db.commit() 
     except Exception as e:
-        pass
+        logging.getLogger(__name__).warning(f"清理临时图片失败: {e}", exc_info=True)
     
     return {"code": 200, "msg": "清理完成"}
 
@@ -308,6 +315,12 @@ async def get_order_image_list(
     current_user: User = Depends(get_current_active_user), 
     db: AsyncSession = Depends(get_db) 
 ): 
+    # 归属校验：销售仅可查看自己创建的订单图片；老板/发货/工厂可查看全部
+    if current_user.role == "sales":
+        _ord = (await db.execute(select(Order).filter(Order.order_id == order_id))).scalar_one_or_none()
+        if _ord and _ord.created_by != current_user.username:
+            raise HTTPException(status_code=403, detail="无权查看该订单图片")
+
     # 查询该订单下所有已迁移正式图片 
     result = await db.execute(
         select(Image).filter(Image.order_id == order_id).order_by(Image.created_at.desc())
@@ -406,3 +419,62 @@ async def get_image_stats(
     count = result.scalar() or 0
     
     return {"code": 200, "count": count}
+
+
+# ====================== 图片鉴权服务（替代免登录 StaticFiles 直链）======================
+# 用带登录鉴权的路由覆盖 /data/images/*，彻底关闭“未登录即可查看订单图片”的直链漏洞。
+# 鉴权支持两种方式：Authorization: Bearer <token>（接口调用），或 URL 上的 ?token=<token>
+# （前端 <img> 标签无法携带请求头，故用 URL 参数传递登录态）。
+serve_router = APIRouter()
+
+async def _image_auth(request: Request, token: str = Query(None), db: AsyncSession = Depends(get_db)) -> User:
+    """从 URL 参数或 Authorization 头中提取令牌并校验用户。"""
+    tok = token or request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not tok:
+        raise HTTPException(status_code=401, detail="未登录，无法访问图片")
+    try:
+        payload = jwt.decode(tok, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="令牌无效或已过期")
+    user = (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="用户不可用")
+    return user
+
+@serve_router.get("/data/images/{full_path:path}")
+async def serve_image_file(
+    full_path: str,
+    request: Request,
+    token: str = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """带登录鉴权的图片访问：覆盖原 /data/images 静态直链，杜绝未登录查看。"""
+    current_user = await _image_auth(request, token, db)
+    target = (IMAGE_ROOT / full_path).resolve()
+    # 路径穿越防护：解析后的真实路径必须仍在图片根目录内
+    try:
+        target.relative_to(IMAGE_ROOT.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="非法路径")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="图片不存在")
+
+    # 归属校验：
+    # - 正式图 official/<order_id>/<layer>/...：销售仅可查看自己创建的订单图片
+    # - 临时图 temp/<file>：非老板仅可查看自己上传的图片（找不到归属记录同样拒绝）
+    parts = Path(full_path).parts
+    if len(parts) >= 2 and parts[0] == "official":
+        order_id = parts[1]
+        if current_user.role == "sales":
+            _ord = (await db.execute(select(Order).filter(Order.order_id == order_id))).scalar_one_or_none()
+            if _ord and _ord.created_by != current_user.username:
+                raise HTTPException(status_code=403, detail="无权查看该图片")
+    elif len(parts) >= 2 and parts[0] == "temp" and current_user.role != "boss":
+        # 临时图：按图片记录归属校验（uploaded_by）
+        _img = (await db.execute(
+            select(Image).filter(Image.image_url == f"{WEB_PREFIX}/{full_path}")
+        )).scalar_one_or_none()
+        if not _img or _img.uploaded_by != current_user.username:
+            raise HTTPException(status_code=403, detail="无权查看该图片")
+    return FileResponse(str(target))

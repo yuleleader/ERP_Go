@@ -102,7 +102,7 @@ import {
   ArrowRight,
   Close
 } from '@element-plus/icons-vue'
-import { getExchangeRate, getSpecificRate } from '@/api/exchange'
+import { getSpecificRate } from '@/api/exchange'
 
 // 货币列表
 const currencyMap = {
@@ -138,14 +138,6 @@ const currentRate = computed(() => {
     return rates.value[toCurrency.value]
   }
   return 0
-})
-
-// 美元汇率（用于收起状态显示）
-const usdRate = computed(() => {
-  if (rates.value && rates.value['USD']) {
-    return rates.value['USD']
-  }
-  return 0.14 // 默认值
 })
 
 // 格式化时间（统一走 @/utils/format，按北京时间显示）

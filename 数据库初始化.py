@@ -70,11 +70,12 @@ def create_tables(conn: sqlite3.Connection):
         )""",
 
         # 网店表
+        # 网店账号一般是邮箱，不同平台可能使用同一邮箱注册：唯一性为"网店名称+账号"组合（应用层校验），此处不设全局 UNIQUE
         """CREATE TABLE IF NOT EXISTS shops (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             shop_id      VARCHAR(100) NOT NULL UNIQUE,
-            shop_name    VARCHAR(100) NOT NULL UNIQUE,
-            shop_account VARCHAR(100) NOT NULL UNIQUE,
+            shop_name    VARCHAR(100) NOT NULL,
+            shop_account VARCHAR(100) NOT NULL,
             status       VARCHAR(20)  DEFAULT 'normal',
             creator      VARCHAR(50)  NOT NULL,
             create_time  TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
@@ -304,6 +305,9 @@ def ensure_columns(conn: sqlite3.Connection):
             ("produce_status", "VARCHAR(20) DEFAULT 'unproduce'"),
             ("produce_status_update_at", "TIMESTAMP"),
             ("produce_status_update_user", "VARCHAR(50)"),
+            ("freight", "VARCHAR(20)"),
+            ("refund_note", "TEXT"),
+            ("detected_country", "VARCHAR(100)"),
         ],
         "users": [
             ("commission_rate", "INTEGER"),

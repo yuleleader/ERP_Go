@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -64,13 +64,23 @@ class ShopResponse(ShopBase):
 class OrderBase(BaseModel):
     product_name: Optional[str] = None
     platform_order_no: Optional[str] = None
-    sales_amount: Optional[str] = None
-    freight: Optional[str] = None
+    sales_amount: Optional[float] = None
+    freight: Optional[float] = None
     shipping_status: str = "pending"
     logistics_company: Optional[str] = None
     logistics_no: Optional[str] = None
+    logistics_no_2: Optional[str] = None  # 运单号2（选填）
     receiver_address: Optional[str] = None
     remark: Optional[str] = None
+    refund_note: Optional[str] = None
+
+    @field_validator("sales_amount", "freight", mode="before")
+    @classmethod
+    def _blank_amount_to_none(cls, v):
+        # 前端金额留空时提交的是空字符串 ""，统一按"未填"处理（金额为数字类型）
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 class OrderCreate(OrderBase):
     shop_id: str
@@ -80,16 +90,26 @@ class OrderUpdate(BaseModel):
     shop_id: Optional[str] = None
     platform_order_no: Optional[str] = None
     product_name: Optional[str] = None
-    sales_amount: Optional[str] = None
+    sales_amount: Optional[float] = None
     shipping_status: Optional[str] = None
     logistics_company: Optional[str] = None
     logistics_no: Optional[str] = None
-    freight: Optional[str] = None
+    logistics_no_2: Optional[str] = None  # 运单号2（选填）
+    freight: Optional[float] = None
     receiver_address: Optional[str] = None
     remark: Optional[str] = None
+    refund_note: Optional[str] = None
     created_at: Optional[datetime] = None
     shipping_time: Optional[datetime] = None
     produce_status: Optional[str] = None
+
+    @field_validator("sales_amount", "freight", mode="before")
+    @classmethod
+    def _blank_amount_to_none(cls, v):
+        # 前端金额留空时提交的是空字符串 ""，统一按"未填"处理
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 class OrderResponse(OrderBase):
     id: int
@@ -98,7 +118,7 @@ class OrderResponse(OrderBase):
     shipping_operator: Optional[str] = None
     shipping_time: Optional[datetime] = None
     commission_rate: Optional[int] = None
-    commission_amount: Optional[str] = None
+    commission_amount: Optional[float] = None
     created_by: Optional[str] = None
     creator_real_name: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -192,3 +212,18 @@ class ProductResponse(ProductBase):
 
     class Config:
         from_attributes = True
+
+# ==================== 网店提现记录 Schema ====================
+
+class WithdrawRecordCreate(BaseModel):
+    """新增提现记录：金额必须为正数，由 Pydantic 统一校验类型/范围"""
+    shop_id: str = Field(..., min_length=1, description="网店ID")
+    withdraw_date: str = Field(..., min_length=1, description="提现日期 YYYY-MM-DD")
+    withdraw_amount: float = Field(..., gt=0, description="提现金额，必须大于0")
+    remark: Optional[str] = Field(None, max_length=500, description="备注")
+
+class WithdrawRecordUpdate(BaseModel):
+    """编辑提现记录：仅更新传入的字段"""
+    withdraw_date: Optional[str] = None
+    withdraw_amount: Optional[float] = Field(None, gt=0, description="提现金额，必须大于0")
+    remark: Optional[str] = Field(None, max_length=500, description="备注")

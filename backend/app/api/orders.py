@@ -22,6 +22,15 @@ from ..services.notification_service import NotificationService
 
 router = APIRouter(prefix="/api/orders", tags=["订单管理"])
 
+def _to_amount(value):
+    """将输入（数字或字符串）转换为 float 金额；空/非法返回 None。金额字段现已为数字类型(REAL)。"""
+    if value is None or value == "":
+        return None
+    try:
+        return round(float(value), 2)
+    except (ValueError, TypeError):
+        return None
+
 # 定义删除订单的请求体模型
 class DeleteOrderRequest(BaseModel):
     password: str
@@ -35,7 +44,7 @@ def calculate_order_days(order_date: datetime) -> int:
     if not order_date:
         return 0
     # 获取当前时间的自然日（归零时分秒）
-    now = datetime.now()
+    now = beijing_now()
     today_start = datetime(now.year, now.month, now.day)
     # 获取订单时间的自然日（归零时分秒）
     order_date_start = datetime(order_date.year, order_date.month, order_date.day)
@@ -117,14 +126,29 @@ async def create_order(
         if existing_order:
             raise HTTPException(status_code=400, detail="该平台订单号已存在")
 
+        if not (order_data.platform_order_no or "").strip():
+            raise HTTPException(status_code=400, detail="平台订单号不能为空")
+
+        if order_data.shipping_status == "refunded" and not (order_data.refund_note or "").strip():
+            raise HTTPException(status_code=400, detail="已退货/退款状态必须填写退款备注")
+
         order_id = await generate_order_id(current_user.username, shop.shop_account, order_data.platform_order_no)
+
+        # 金额字段写入前校验为合法数字，避免脏数据导致统计静默丢钱
+        for _f in ("sales_amount", "freight"):
+            _v = getattr(order_data, _f)
+            if _v not in (None, ""):
+                try:
+                    round(float(_v), 2)
+                except (ValueError, TypeError):
+                    raise HTTPException(status_code=400, detail=f"字段 {_f} 必须是数字")
 
         commission_amount = None
         if order_data.sales_amount and current_user.commission_rate:
             try:
                 sales = float(order_data.sales_amount)
                 rate = current_user.commission_rate
-                commission_amount = str(round(sales * rate / 100, 2))
+                commission_amount = round(sales * rate / 100, 2)
             except ValueError:
                 pass
 
@@ -145,8 +169,8 @@ async def create_order(
             shop_id=order_data.shop_id,
             product_name=order_data.product_name,
             platform_order_no=order_data.platform_order_no,
-            sales_amount=order_data.sales_amount,
-            freight=order_data.freight,
+            sales_amount=_to_amount(order_data.sales_amount),
+            freight=_to_amount(order_data.freight),
             shipping_status=order_data.shipping_status,
             receiver_address=order_data.receiver_address,
             remark=order_data.remark,
@@ -154,7 +178,8 @@ async def create_order(
             commission_amount=commission_amount,
             created_by=current_user.username,
             created_at=created_at_value,
-            order_days=order_days_value
+            order_days=order_days_value,
+            refund_note=order_data.refund_note
         )
         db.add(new_order)
         await db.commit()
@@ -182,6 +207,7 @@ async def create_order(
             "shipping_status": new_order.shipping_status,
             "logistics_company": new_order.logistics_company,
             "logistics_no": new_order.logistics_no,
+            "logistics_no_2": new_order.logistics_no_2,
             "freight": new_order.freight,
             "shipping_operator": new_order.shipping_operator,
             "shipping_time": new_order.shipping_time,
@@ -271,6 +297,7 @@ async def get_orders(
             "shipping_status": order.shipping_status,
             "logistics_company": order.logistics_company,
             "logistics_no": order.logistics_no,
+            "logistics_no_2": order.logistics_no_2,
             "freight": order.freight,
             "shipping_operator": order.shipping_operator,
             "shipping_time": order.shipping_time,
@@ -283,7 +310,8 @@ async def get_orders(
             "order_days": order.order_days,
             "produce_status": order.produce_status,
             "produce_status_update_at": order.produce_status_update_at,
-            "produce_status_update_user": order.produce_status_update_user
+            "produce_status_update_user": order.produce_status_update_user,
+            "refund_note": order.refund_note
         }
 
         if order.created_by:
@@ -322,6 +350,7 @@ async def get_order(
         "shipping_status": order.shipping_status,
         "logistics_company": order.logistics_company,
         "logistics_no": order.logistics_no,
+        "logistics_no_2": order.logistics_no_2,
         "freight": order.freight,
         "shipping_operator": order.shipping_operator,
         "shipping_time": order.shipping_time,
@@ -419,16 +448,17 @@ async def update_order(
     if "created_at" in update_data and isinstance(update_data["created_at"], str):
         from datetime import datetime as dt
         update_data["created_at"] = dt.fromisoformat(update_data["created_at"].split('T')[0])
-        print(f"[DEBUG] converted created_at to datetime: {update_data['created_at']}")
 
     if current_user.role == "shipping":
-        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "freight", "remark"}
+        allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "logistics_no_2", "freight", "remark"}
         forbidden_fields = set(update_data.keys()) - allowed_fields
         if forbidden_fields:
             raise HTTPException(
                 status_code=403,
-                detail=f"发货端仅允许编辑发货状态、物流公司、物流单号、运费、备注，禁止修改: {', '.join(forbidden_fields)}"
+                detail=f"发货端仅允许编辑发货状态、物流公司、运单号1、运单号2、运费、备注，禁止修改: {', '.join(forbidden_fields)}"
             )
+
+    # 运单号1/运单号2 均维持原有规则：选填（不强制必填）
 
     if current_user.role == "factory":
         allowed_fields = {"produce_status", "remark"}
@@ -467,15 +497,34 @@ async def update_order(
 
     if "shipping_status" in update_data:
         new_status = update_data["shipping_status"]
-        if order.shipping_status == "shipped" and new_status != "shipped":
-            raise HTTPException(status_code=403, detail="已发货的订单不允许修改为其他状态")
-        if new_status == "shipped" and order.shipping_status != "shipped":
+        old_status = order.shipping_status
+
+        # 终态保护：已退货/退款为终态，不允许再变更为其他状态（防止洗单重算提成）
+        if old_status == "refunded" and new_status != "refunded":
+            raise HTTPException(status_code=403, detail="已退货/退款为终态，不允许再修改发货状态")
+
+        # 退货/退款只能从「已发货」进入（防止待发货直接退货导致漏算提成）
+        if new_status == "refunded" and old_status != "shipped":
+            raise HTTPException(status_code=403, detail="仅「已发货」状态的订单可修改为「已退货/退款」")
+
+        # 已发货订单不允许改为其他发货状态（退货/退款除外）
+        if old_status == "shipped" and new_status not in ("shipped", "refunded"):
+            raise HTTPException(status_code=403, detail="已发货的订单不允许修改为其他状态（退货/退款除外）")
+
+        # 退货/退款必须填写退款备注
+        if new_status == "refunded":
+            effective_refund_note = update_data.get("refund_note", order.refund_note)
+            if not (effective_refund_note or "").strip():
+                raise HTTPException(status_code=400, detail="已退货/退款状态必须填写退款备注")
+
+        # 变为已发货时记录发货时间（仅首次）
+        if new_status == "shipped" and old_status != "shipped":
             if "shipping_time" not in update_data or not update_data["shipping_time"]:
                 update_data["shipping_time"] = beijing_now()
             update_data["shipping_operator"] = current_user.username
             changes.append(f"发货时间: 记录为 {update_data['shipping_time']}")
             changes.append(f"发货操作员: {current_user.username}")
-            
+
             if order.produce_status != "produced":
                 await update_produce_status(
                     db=db,
@@ -495,10 +544,11 @@ async def update_order(
     if "sales_amount" in update_data and update_data["sales_amount"] != order.sales_amount:
         if order.commission_rate:
             try:
-                new_sales = float(update_data["sales_amount"])
+                new_sales = round(float(update_data["sales_amount"]), 2)
                 new_commission = round(new_sales * order.commission_rate / 100, 2)
-                update_data["commission_amount"] = str(new_commission)
-                changes.append(f"销售金额: {order.sales_amount} -> {update_data['sales_amount']}")
+                update_data["sales_amount"] = new_sales
+                update_data["commission_amount"] = new_commission
+                changes.append(f"销售金额: {order.sales_amount} -> {new_sales}")
             except ValueError:
                 pass
     
@@ -530,12 +580,26 @@ async def update_order(
                 db=db,
                 order_id=order_id,
                 logistics_company=update_data.get("logistics_company") or order.logistics_company,
-                logistics_no=update_data.get("logistics_no") or order.logistics_no
+                logistics_no=update_data.get("logistics_no") or order.logistics_no,
+                logistics_no_2=update_data.get("logistics_no_2") or order.logistics_no_2
             )
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"发送站内信失败，但不影响订单更新: {e}")
+
+    if "shipping_status" in update_data and old_shipping_status != "refunded" and update_data["shipping_status"] == "refunded":
+        try:
+            await NotificationService.send_order_refunded_notification(
+                db=db,
+                order=order,
+                refund_note=update_data.get("refund_note") or order.refund_note,
+                operator=current_user.username
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"发送退货/退款站内信失败，但不影响订单更新: {e}")
 
     if changes:
         log = OperationLog(
@@ -556,6 +620,7 @@ async def update_order(
         "shipping_status": order.shipping_status,
         "logistics_company": order.logistics_company,
         "logistics_no": order.logistics_no,
+        "logistics_no_2": order.logistics_no_2,
         "freight": order.freight,
         "shipping_operator": order.shipping_operator,
         "shipping_time": order.shipping_time,

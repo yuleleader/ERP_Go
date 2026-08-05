@@ -5,7 +5,6 @@
 """
 import logging
 from typing import Optional
-from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -115,14 +114,3 @@ def get_scheduler() -> Optional[AsyncIOScheduler]:
     获取调度器实例
     """
     return _scheduler
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    FastAPI生命周期管理器
-    在应用启动时启动调度器，关闭时停止
-    """
-    setup_scheduler(app)
-    yield
-    shutdown_scheduler()

@@ -32,10 +32,10 @@
         <el-table-column label="缩略图" width="100">
           <template #default="{ row }">
             <el-image
-              :src="row.image_url"
+              :src="authImageUrl(row.image_url)"
               style="width: 60px; height: 60px;"
               fit="cover"
-              :preview-src-list="[row.image_url]"
+              :preview-src-list="[authImageUrl(row.image_url)]"
               preview-teleported
             />
           </template>
@@ -64,7 +64,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import request from '@/utils/request'
+import request, { authImageUrl } from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const loading = ref(false)

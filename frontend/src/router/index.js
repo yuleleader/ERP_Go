@@ -98,7 +98,7 @@ const routes = [
         path: 'account-withdrawal',
         name: 'AccountWithdrawal',
         component: () => import('@/modules/Finance/views/AccountWithdrawal.vue'),
-        meta: { title: '账户提现', roles: ['boss', 'sales'] }
+        meta: { title: '账户提现', roles: ['boss'] }
       }
     ]
   }
@@ -109,15 +109,23 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
 
   if (to.meta.requiresAuth && !userStore.token) {
     next('/login')
   } else if (to.path === '/login' && userStore.token) {
     next('/')
-  } else if (to.meta.roles && !to.meta.roles.includes(userStore.role)) {
-    next('/dashboard')
+  } else if (to.meta.roles) {
+    // 首次刷新/深链进入受限页面时，角色信息可能尚未加载；先补拉用户信息再判断权限
+    if (userStore.token && !userStore.userInfo) {
+      await userStore.fetchUserInfo()
+    }
+    if (!to.meta.roles.includes(userStore.role)) {
+      next('/dashboard')
+    } else {
+      next()
+    }
   } else {
     next()
   }

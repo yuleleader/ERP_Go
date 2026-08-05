@@ -10,12 +10,6 @@ from ..models.models import Order, User, Product
 
 router = APIRouter(prefix="/api/statistics", tags=["数据统计"])
 
-# ==================== 测试接口 ====================
-@router.get("/test")
-async def test_statistics_api():
-    """测试接口 - 用于验证statistics模块是否正确加载"""
-    return {"status": "success", "message": "Statistics API is working", "timestamp": beijing_now().isoformat()}
-
 # ==================== 智慧大屏专用接口 ====================
 
 @router.get("/dashboard/overview")
@@ -50,8 +44,8 @@ async def get_dashboard_overview(
     pending_result = await db.execute(pending_query)
     pending_orders = pending_result.scalar() or 0
     
-    # 获取虚拟发货订单数
-    virtual_query = select(func.count(Order.id)).filter(Order.shipping_status == "virtual_shipped")
+    # 获取虚拟发货订单数（历史数据可能混用 virtual / virtual_shipped，两者都计入）
+    virtual_query = select(func.count(Order.id)).filter(Order.shipping_status.in_(["virtual", "virtual_shipped"]))
     virtual_result = await db.execute(virtual_query)
     virtual_orders = virtual_result.scalar() or 0
     
@@ -162,8 +156,7 @@ async def get_dashboard_product_ranking(
         product_ranking.append({
             "product_name": row.product_name,
             "sales_count": row.sales_count or 0,
-            "total_revenue": round(row.total_revenue or 0, 2),
-            "profit_rate": round(20 + (row.sales_count or 0) % 15, 1)  # 模拟利润率
+            "total_revenue": round(row.total_revenue or 0, 2)
         })
     
     return {
@@ -188,7 +181,7 @@ async def get_dashboard_finance_summary(
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
     
     # 根据周期设置时间范围
-    end_date = datetime.now()
+    end_date = beijing_now()
     if period == "week":
         start_date = end_date - timedelta(weeks=1)
     elif period == "month":
@@ -214,23 +207,8 @@ async def get_dashboard_finance_summary(
     order_count = row.order_count or 0
     avg_order_value = round(total_revenue / order_count, 2) if order_count > 0 else 0
     
-    # 生成趋势数据（最近12个周期）
+    # 趋势数据：移除原先的测试假数据，返回空列表（前端当前未使用；如需真实趋势请后续接入按月的真实销售额聚合）
     trend_data = []
-    if period == "month":
-        months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-        current_month = end_date.month - 1
-        for i in range(12):
-            month_index = (current_month - 11 + i) % 12
-            trend_data.append({
-                "period": months[month_index],
-                "revenue": round(800000 + (current_month - month_index) * 50000 + (i % 3) * 30000, 2)
-            })
-    else:
-        for i in range(12):
-            trend_data.append({
-                "period": f"周期{i+1}",
-                "revenue": round(800000 + i * 50000 + (i % 3) * 30000, 2)
-            })
     
     return {
         "total_revenue": round(total_revenue, 2),
@@ -310,6 +288,8 @@ async def get_total_sales(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    if current_user.role not in ("boss", "sales"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
     """
     获取销售总金额统计
     
@@ -324,7 +304,7 @@ async def get_total_sales(
     if not end_date:
         end_date = beijing_now().strftime("%Y-%m-%d")
     if not start_date:
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
     
     start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
     end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
@@ -357,13 +337,15 @@ async def get_theoretical_commission(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    if current_user.role not in ("boss", "sales"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
     """
     获取理论应得提成（按销售时间统计）
     """
     if not end_date:
         end_date = beijing_now().strftime("%Y-%m-%d")
     if not start_date:
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
     
     start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
     end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
@@ -396,13 +378,15 @@ async def get_actual_commission(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    if current_user.role not in ("boss", "sales"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
     """
     获取实际应得提成（按发货时间统计）
     """
     if not end_date:
         end_date = beijing_now().strftime("%Y-%m-%d")
     if not start_date:
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
     
     start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
     end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
@@ -447,7 +431,7 @@ async def get_commission_by_user(
     if not end_date:
         end_date = beijing_now().strftime("%Y-%m-%d")
     if not start_date:
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
     
     start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
     end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
@@ -509,6 +493,179 @@ async def get_commission_by_user(
         "end_date": end_date
     }
 
+@router.get("/commission/sales-summary")
+async def get_sales_commission_summary(
+    start_date: str = Query(None),
+    end_date: str = Query(None),
+    user_id: int = Query(None, description="筛选指定用户ID，不传则返回全部销售"),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """
+    销售提成统计（按发货时间统计）
+    字段：登录账号、真实姓名、提成比例、总销售金额、退货金额、
+          总发货订单数、退货订单数、应发提成、实发提成
+    仅老板端可用，支持按用户筛选与时间范围筛选。
+    """
+    if current_user.role != "boss":
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
+
+    if not end_date:
+        end_date = beijing_now().strftime("%Y-%m-%d")
+    if not start_date:
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
+    end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+
+    # 口径定义（按用户确认）：
+    #  “发货”= 仅“已发货”(shipped)，不含虚拟发货
+    #  应发提成 / 总发货订单数 / 总销售金额 = 已发货 + 已退货退款
+    #  实发提成 = 仅已发货（纯订单状态，不看已发放标记）
+    dispatched_filter = Order.shipping_status.in_(["shipped", "refunded"])  # 发货 + 退货
+    refunded_filter = Order.shipping_status == "refunded"
+    shipped_only_filter = Order.shipping_status == "shipped"                # 仅已发货
+
+    query = select(
+        User.id.label("user_id"),
+        User.username,
+        User.real_name,
+        User.commission_rate,
+        func.count(Order.id).filter(dispatched_filter).label("shipped_count"),
+        func.count(Order.id).filter(refunded_filter).label("refunded_count"),
+        func.sum(func.cast(Order.sales_amount, Float)).filter(dispatched_filter).label("total_sales"),
+        func.sum(func.cast(Order.sales_amount, Float)).filter(refunded_filter).label("refund_amount"),
+        func.sum(func.cast(Order.commission_amount, Float)).filter(dispatched_filter).label("due_commission"),
+        func.sum(func.cast(Order.commission_amount, Float)).filter(shipped_only_filter).label("paid_commission")
+    ).join(
+        Order, User.username == Order.created_by
+    ).filter(
+        Order.shipping_time >= start_datetime,
+        Order.shipping_time < end_datetime,
+        User.role == "sales",
+        User.is_active == True
+    )
+
+    if user_id:
+        query = query.filter(User.id == user_id)
+
+    query = query.group_by(
+        User.id, User.username, User.real_name, User.commission_rate
+    ).order_by(
+        func.sum(func.cast(Order.commission_amount, Float)).filter(dispatched_filter).desc()
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    data = []
+    for row in rows:
+        data.append({
+            "user_id": row.user_id,
+            "username": row.username,
+            "real_name": row.real_name or "",
+            "commission_rate": row.commission_rate or 0,
+            "total_sales": round(row.total_sales or 0, 2),
+            "refund_amount": round(row.refund_amount or 0, 2),
+            "shipped_count": row.shipped_count or 0,
+            "refunded_count": row.refunded_count or 0,
+            "due_commission": round(row.due_commission or 0, 2),
+            "paid_commission": round(row.paid_commission or 0, 2)
+        })
+
+    return {
+        "data": data,
+        "summary": {
+            "total_sales": round(sum(d["total_sales"] for d in data), 2),
+            "refund_amount": round(sum(d["refund_amount"] for d in data), 2),
+            "shipped_count": sum(d["shipped_count"] for d in data),
+            "refunded_count": sum(d["refunded_count"] for d in data),
+            "due_commission": round(sum(d["due_commission"] for d in data), 2),
+            "paid_commission": round(sum(d["paid_commission"] for d in data), 2)
+        },
+        "start_date": start_date,
+        "end_date": end_date
+    }
+
+
+@router.get("/commission/orders")
+async def get_commission_orders(
+    start_date: str = Query(None),
+    end_date: str = Query(None),
+    user_id: int = Query(None, description="筛选指定用户ID，不传则返回全部销售"),
+    type: str = Query("shipped", description="订单类型：shipped=总发货订单, refunded=退货订单"),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """
+    提成统计弹窗订单列表：按发货时间范围 + 用户 + 类型返回订单明细。
+    type=shipped 返回发货订单(shipped/refunded，对应“总发货订单数”)；type=refunded 返回退货订单。
+    仅老板端可用。
+    """
+    if current_user.role != "boss":
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
+
+    if not end_date:
+        end_date = beijing_now().strftime("%Y-%m-%d")
+    if not start_date:
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
+    end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+
+    if type == "refunded":
+        status_filter = Order.shipping_status == "refunded"
+    else:
+        status_filter = Order.shipping_status.in_(["shipped", "refunded"])
+
+    query = select(Order).join(
+        User, User.username == Order.created_by
+    ).filter(
+        Order.shipping_time >= start_datetime,
+        Order.shipping_time < end_datetime,
+        status_filter,
+        User.role == "sales",
+        User.is_active == True
+    )
+
+    if user_id:
+        query = query.filter(User.id == user_id)
+
+    query = query.order_by(Order.shipping_time.desc())
+
+    result = await db.execute(query)
+    orders = result.scalars().all()
+
+    def _sf(v):
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return 0.0
+
+    order_list = []
+    for order in orders:
+        order_list.append({
+            "id": order.id,
+            "order_id": order.order_id,
+            "platform_order_no": order.platform_order_no,
+            "product_name": order.product_name,
+            "sales_amount": round(_sf(order.sales_amount), 2),
+            "commission_amount": round(_sf(order.commission_amount), 2),
+            "shipping_status": order.shipping_status,
+            "shipping_time": order.shipping_time.isoformat() if order.shipping_time else None,
+            "refund_note": order.refund_note or "",
+            "created_by": order.created_by,
+            "real_name": order.creator_real_name if hasattr(order, "creator_real_name") else None
+        })
+
+    return {
+        "data": order_list,
+        "type": type,
+        "start_date": start_date,
+        "end_date": end_date
+    }
+
+
 @router.get("/avg-shipping-time")
 async def get_avg_shipping_time(
     start_date: str = Query(None),
@@ -516,13 +673,15 @@ async def get_avg_shipping_time(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    if current_user.role not in ("boss", "sales"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
     """
     获取平均发货时长统计（从订单创建到发货的平均时间）
     """
     if not end_date:
         end_date = beijing_now().strftime("%Y-%m-%d")
     if not start_date:
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
     
     start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
     end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
@@ -655,13 +814,15 @@ async def get_overview_statistics(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    if current_user.role not in ("boss", "sales"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端和销售端可访问")
     """
     获取综合统计概览
     """
     if not end_date:
         end_date = beijing_now().strftime("%Y-%m-%d")
     if not start_date:
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        start_date = (beijing_now() - timedelta(days=365)).strftime("%Y-%m-%d")
     
     start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
     end_datetime = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)

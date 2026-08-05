@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
 from ..core.security import get_current_active_user
 from ..models.models import Shop, ShopWithdrawRecord, OperationLog
-from ..schemas.schemas import UserResponse
+from ..schemas.schemas import UserResponse, WithdrawRecordCreate, WithdrawRecordUpdate
 
 CST = timezone(timedelta(hours=8))
 
@@ -149,25 +149,14 @@ async def get_withdraw_records(
 
 @router.post("/records")
 async def create_withdraw_record(
-    data: dict,
+    data: WithdrawRecordCreate,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
 ):
-    shop_id = data.get("shop_id")
-    withdraw_date = data.get("withdraw_date")
-    withdraw_amount = data.get("withdraw_amount")
-    remark = data.get("remark", "")
-
-    if not shop_id or not withdraw_date or withdraw_amount is None:
-        raise HTTPException(status_code=400, detail="网店ID、提现日期、提现金额为必填项")
-
-    try:
-        withdraw_amount_float = float(withdraw_amount)
-        if withdraw_amount_float <= 0:
-            raise HTTPException(status_code=400, detail="提现金额必须大于0")
-        withdraw_amount_str = f"{withdraw_amount_float:.2f}"
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="提现金额格式不正确")
+    shop_id = data.shop_id
+    withdraw_date = data.withdraw_date
+    withdraw_amount_float = data.withdraw_amount
+    remark = data.remark or ""
 
     if current_user.role != "boss":
         shop_result = await db.execute(
@@ -186,7 +175,7 @@ async def create_withdraw_record(
     new_record = ShopWithdrawRecord(
         shop_id=shop_id,
         withdraw_date=withdraw_date,
-        withdraw_amount=withdraw_amount_str,
+        withdraw_amount=withdraw_amount_float,
         remark=remark,
         create_operator_name=current_user.real_name or current_user.username,
         create_operator_id=current_user.id,
@@ -213,7 +202,7 @@ async def create_withdraw_record(
 @router.put("/records/{record_id}")
 async def update_withdraw_record(
     record_id: int,
-    data: dict,
+    data: WithdrawRecordUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
 ):
@@ -228,20 +217,14 @@ async def update_withdraw_record(
         if not shop_result.scalar_one_or_none():
             raise HTTPException(status_code=403, detail="无权限编辑此记录")
 
-    if data.get("withdraw_date"):
-        record.withdraw_date = data["withdraw_date"]
-
-    if data.get("withdraw_amount") is not None:
-        try:
-            amt = float(data["withdraw_amount"])
-            if amt <= 0:
-                raise HTTPException(status_code=400, detail="金额必须大于0")
-            record.withdraw_amount = f"{amt:.2f}"
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="金额格式不正确")
-
-    if "remark" in data:
-        record.remark = data["remark"]
+    # 仅更新请求中显式传入的字段（金额/备注由 Pydantic 校验类型与范围）
+    payload = data.model_dump(exclude_unset=True)
+    if "withdraw_date" in payload:
+        record.withdraw_date = payload["withdraw_date"]
+    if "withdraw_amount" in payload:
+        record.withdraw_amount = payload["withdraw_amount"]
+    if "remark" in payload:
+        record.remark = payload["remark"]
 
     record.update_operator_name = current_user.real_name or current_user.username
     record.update_operator_id = current_user.id
