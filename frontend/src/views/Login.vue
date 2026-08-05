@@ -5,11 +5,9 @@
     <div class="deco deco-2"></div>
     <div class="deco deco-3"></div>
 
-    <!-- 左侧：品牌 Logo（白色圆角卡片衬托，渐变底上更精致） -->
+    <!-- 左侧：品牌 Logo（直接悬浮在渐变背景上） -->
     <div class="login-brand">
-      <div class="brand-card">
-        <img :src="logoUrl" alt="ERP_GO" class="brand-logo" />
-      </div>
+      <img :src="logoUrl" alt="ERP_GO" class="brand-logo" />
       <p class="brand-slogan">电商产销协同管理系统</p>
     </div>
 
@@ -165,30 +163,22 @@ async function handleLogin() {
   padding: 40px;
 }
 
-.brand-card {
-  background: #ffffff;
-  border-radius: 28px;
-  padding: 52px 56px;
-  box-shadow: 0 25px 60px rgba(20, 30, 70, 0.28);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 640px;
-  width: 88%;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.brand-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 32px 70px rgba(20, 30, 70, 0.34);
-}
-
 .brand-logo {
-  width: 100%;
-  max-width: 500px;
+  width: 78%;
+  max-width: 520px;
   height: auto;
   user-select: none;
   -webkit-user-drag: none;
+  /* 双层投影：内圈柔和白光雾遮盖 logo 边缘轻微光晕残留，外圈主投影增强悬浮感 */
+  filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.35))
+          drop-shadow(0 20px 44px rgba(20, 30, 70, 0.32));
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.brand-logo:hover {
+  transform: translateY(-4px);
+  filter: drop-shadow(0 0 24px rgba(255, 255, 255, 0.45))
+          drop-shadow(0 26px 52px rgba(20, 30, 70, 0.38));
 }
 
 .brand-slogan {
@@ -270,10 +260,9 @@ async function handleLogin() {
     gap: 18px;
   }
 
-  .brand-card {
-    padding: 28px 32px;
-    width: 74%;
-    border-radius: 20px;
+  .brand-logo {
+    width: 64%;
+    max-width: 280px;
   }
 
   .brand-slogan {
