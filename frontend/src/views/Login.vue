@@ -1,13 +1,23 @@
 <template>
   <div class="login-container">
-    <!-- 左侧：Logo 展示区（白色底，隐藏透明图的轻微光晕残留） -->
+    <!-- 装饰性光斑（纯 CSS，不占布局） -->
+    <div class="deco deco-1"></div>
+    <div class="deco deco-2"></div>
+    <div class="deco deco-3"></div>
+
+    <!-- 左侧：品牌 Logo（白色圆角卡片衬托，渐变底上更精致） -->
     <div class="login-brand">
-      <img :src="logoUrl" alt="ERP_GO" class="brand-logo" />
+      <div class="brand-card">
+        <img :src="logoUrl" alt="ERP_GO" class="brand-logo" />
+      </div>
+      <p class="brand-slogan">电商产销协同管理系统</p>
     </div>
+
     <!-- 右侧：登录表单 -->
     <div class="login-panel">
       <div class="login-box">
-        <h1 class="title">电商产销协同管理系统</h1>
+        <h1 class="title">欢迎登录</h1>
+        <p class="subtitle">请输入您的账号信息以继续</p>
         <el-form ref="loginFormRef" :model="loginForm" :rules="rules" class="login-form">
           <el-form-item prop="username">
             <el-input
@@ -107,80 +117,178 @@ async function handleLogin() {
   width: 100%;
   height: 100vh;
   display: flex;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #5b7cfa 0%, #7c5ce7 50%, #9b59d0 100%);
 }
 
-/* 左侧 Logo 区：纯白底，与 Logo 原图底色一致，透明残留的轻微光晕不可见 */
+/* ── 装饰光斑 ── */
+.deco {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.deco-1 {
+  top: -18%;
+  left: -8%;
+  width: 42vw;
+  height: 42vw;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.16) 0%, transparent 62%);
+}
+
+.deco-2 {
+  bottom: -22%;
+  right: 12%;
+  width: 46vw;
+  height: 46vw;
+  background: radial-gradient(circle, rgba(64, 224, 208, 0.14) 0%, transparent 60%);
+}
+
+.deco-3 {
+  top: 22%;
+  right: -6%;
+  width: 26vw;
+  height: 26vw;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.10) 0%, transparent 60%);
+}
+
+/* ── 左侧品牌区 ── */
 .login-brand {
-  flex: 1;
-  background: #ffffff;
+  flex: 1.15;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
+  gap: 26px;
+  z-index: 1;
+  padding: 40px;
+}
+
+.brand-card {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 52px 56px;
+  box-shadow: 0 25px 60px rgba(20, 30, 70, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 640px;
+  width: 88%;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.brand-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 32px 70px rgba(20, 30, 70, 0.34);
 }
 
 .brand-logo {
-  width: 72%;
-  max-width: 560px;
+  width: 100%;
+  max-width: 500px;
   height: auto;
   user-select: none;
   -webkit-user-drag: none;
 }
 
-/* 右侧登录区：品牌渐变底 + 白色表单卡片 */
+.brand-slogan {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+/* ── 右侧登录区 ── */
 .login-panel {
-  width: 480px;
-  min-width: 420px;
+  flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 1;
+  padding: 40px;
 }
 
 .login-box {
-  width: 360px;
-  padding: 40px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  width: 380px;
+  padding: 44px 40px 36px;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 20px;
+  box-shadow: 0 18px 50px rgba(20, 30, 70, 0.30);
 }
 
 .title {
   text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-  font-size: 24px;
+  margin: 0 0 6px;
+  color: #2d3436;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.subtitle {
+  text-align: center;
+  margin: 0 0 30px;
+  color: #9aa5b1;
+  font-size: 14px;
 }
 
 .login-form {
   width: 100%;
 }
 
-.login-button {
-  width: 100%;
+.login-form :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  padding: 2px 14px;
 }
 
-/* 窄屏适配：上下排布，Logo 缩小 */
+.login-button {
+  width: 100%;
+  height: 46px;
+  font-size: 16px;
+  letter-spacing: 6px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #5b7cfa 0%, #7c5ce7 100%);
+  box-shadow: 0 8px 20px rgba(92, 107, 250, 0.35);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.login-button:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* ── 窄屏适配：上下排布 ── */
 @media (max-width: 768px) {
   .login-container {
     flex-direction: column;
   }
+
   .login-brand {
     flex: none;
-    padding: 24px 0;
+    padding: 36px 24px 8px;
+    gap: 18px;
   }
-  .brand-logo {
-    width: 45%;
-    max-width: 220px;
+
+  .brand-card {
+    padding: 28px 32px;
+    width: 74%;
+    border-radius: 20px;
   }
+
+  .brand-slogan {
+    font-size: 15px;
+  }
+
   .login-panel {
     width: 100%;
-    min-width: 0;
-    flex: 1;
+    padding: 16px 20px 40px;
   }
+
   .login-box {
-    width: 86%;
-    max-width: 360px;
+    width: 100%;
+    max-width: 380px;
+    padding: 32px 26px 26px;
   }
 }
 </style>
