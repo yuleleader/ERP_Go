@@ -21,6 +21,7 @@
             <el-option label="待发货" value="pending" />
             <el-option label="已发货" value="shipped" />
             <el-option label="虚拟发货" value="virtual" />
+            <el-option label="已退货/退款" value="refunded" />
           </el-select>
         </el-form-item>
         <el-form-item label="生产状态">
@@ -234,9 +235,11 @@
             <el-col :span="8">
               <el-form-item label="状态">
                 <el-select v-model="orderForm.shipping_status" placeholder="请选择状态" class="w-full" :disabled="isFieldReadonly('shipping_status')" @change="onStatusChange">
-                  <el-option label="未发货" value="pending" />
+                  <!-- 已发货/已虚拟发货后不允许改回未发货；已发货仅可改为已退货/退款 -->
+                  <el-option v-if="orderForm.shipping_status !== 'shipped' && orderForm.shipping_status !== 'virtual'" label="未发货" value="pending" />
                   <el-option label="已发货" value="shipped" />
-                  <el-option label="虚拟发货" value="virtual" />
+                  <el-option v-if="orderForm.shipping_status === 'pending' || orderForm.shipping_status === 'virtual'" label="虚拟发货" value="virtual" />
+                  <el-option label="已退货/退款" value="refunded" />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -907,7 +910,7 @@ const deleteFormRef = ref(null)
  * @returns {string} 状态类型
  */
 function getStatusType(status) {
-  return { pending: 'warning', shipped: 'success', virtual: 'info' }[status] || ''
+  return { pending: 'warning', shipped: 'success', virtual: 'info', refunded: 'danger' }[status] || ''
 }
 
 /**
@@ -916,7 +919,7 @@ function getStatusType(status) {
  * @returns {string} 状态文本
  */
 function getStatusText(status) {
-  return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货' }[status] || status
+  return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货', refunded: '已退货/退款' }[status] || status
 }
 
 /**
@@ -945,6 +948,10 @@ function getProduceStatusText(status) {
 function canChangeProduceStatus(row) {
   if (row.shipping_status === 'shipped' || row.shipping_status === 'virtual') {
     return false
+  }
+  // 销售端仅可修改自己创建的订单（他人订单不显示入口，与后端权限一致）
+  if (userStore.role === 'sales') {
+    return row.created_by === userStore.username
   }
   return ['boss', 'sales', 'factory', 'shipping'].includes(userStore.role)
 }
@@ -1921,25 +1928,32 @@ function exportOrders() {
   exporting.value = true
 
   try {
-    const exportData = orders.value.map(row => ({
-      '订单号': row.order_id || '',
-      '平台订单号': row.platform_order_no || '',
-      '网店': row.shop_id || '',
-      '商品名称': row.product_name || '',
-      '销售金额': row.sales_amount || '',
-      '提成金额': row.commission_amount || '',
-      '订单状态': getStatusText(row.shipping_status) || '',
-      '生产状态': getProduceStatusText(row.produce_status) || '',
-      '下单时间': formatDate(row.created_at) || '',
-      '已下单时长': row.order_days ? `${row.order_days}天` : '',
-      '发货时间': formatDate(row.shipping_time) || '',
-      '创建人': row.creator_real_name || '',
-      '物流平台': row.logistics_company || '',
-      '运单号1': row.logistics_no || '',
-      '运单号2': row.logistics_no_2 || '',
-      '收货地址': row.receiver_address || '',
-      '备注': row.remark || ''
-    }))
+    const canSeeFinance = userStore.role === 'boss' || userStore.role === 'sales'
+    const exportData = orders.value.map(row => {
+      const item = {
+        '订单号': row.order_id || '',
+        '平台订单号': row.platform_order_no || '',
+        '网店': row.shop_id || '',
+        '商品名称': row.product_name || '',
+        '订单状态': getStatusText(row.shipping_status) || '',
+        '生产状态': getProduceStatusText(row.produce_status) || '',
+        '下单时间': formatDate(row.created_at) || '',
+        '已下单时长': row.order_days ? `${row.order_days}天` : '',
+        '发货时间': formatDate(row.shipping_time) || '',
+        '物流平台': row.logistics_company || '',
+        '运单号1': row.logistics_no || '',
+        '运单号2': row.logistics_no_2 || '',
+        '收货地址': row.receiver_address || '',
+        '备注': row.remark || ''
+      }
+      // 金额/提成/创建人属财务敏感字段：仅老板端与销售端导出
+      if (canSeeFinance) {
+        item['销售金额'] = row.sales_amount || ''
+        item['提成金额'] = row.commission_amount || ''
+        item['创建人'] = row.creator_real_name || ''
+      }
+      return item
+    })
 
     const worksheet = XLSX.utils.json_to_sheet(exportData)
 

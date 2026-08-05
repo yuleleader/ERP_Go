@@ -51,7 +51,7 @@ async def get_dashboard_overview(
     pending_orders = pending_result.scalar() or 0
     
     # 获取虚拟发货订单数
-    virtual_query = select(func.count(Order.id)).filter(Order.shipping_status == "virtual_shipped")
+    virtual_query = select(func.count(Order.id)).filter(Order.shipping_status.in_(["virtual", "virtual_shipped"]))
     virtual_result = await db.execute(virtual_query)
     virtual_orders = virtual_result.scalar() or 0
     

@@ -71,3 +71,16 @@ async def init_db():
                 logger.info("已为 orders 表新增 logistics_no_2 列（运单号2）")
         except Exception as e:
             logger.warning(f"列迁移检查失败（可忽略，新建库已包含该列）: {e}")
+        # 一次性迁移：放开网店"名称/账号"的全局唯一约束（业务规则：同邮箱可在不同平台注册，
+        # 唯一性=名称+账号组合，组合唯一由接口层校验）。幂等：仅删除现存的两个单列唯一索引。
+        try:
+            from sqlalchemy import text
+            idxs = (await conn.execute(text("PRAGMA index_list('shops')"))).fetchall()
+            for idx in idxs:
+                if idx[2]:  # unique=1
+                    cols = [r[2] for r in (await conn.execute(text(f"PRAGMA index_info('{idx[1]}')"))).fetchall()]
+                    if sorted(cols) in (["shop_account"], ["shop_name"]):
+                        await conn.execute(text(f'DROP INDEX IF EXISTS "{idx[1]}"'))
+                        logger.info(f"已移除 shops 唯一索引 {idx[1]}（改为名称+账号组合唯一）")
+        except Exception as e:
+            logger.warning(f"shops 唯一约束迁移检查失败（可忽略，新建库已无该约束）: {e}")

@@ -73,8 +73,8 @@ def create_tables(conn: sqlite3.Connection):
         """CREATE TABLE IF NOT EXISTS shops (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             shop_id      VARCHAR(100) NOT NULL UNIQUE,
-            shop_name    VARCHAR(100) NOT NULL UNIQUE,
-            shop_account VARCHAR(100) NOT NULL UNIQUE,
+            shop_name    VARCHAR(100) NOT NULL,
+            shop_account VARCHAR(100) NOT NULL,
             status       VARCHAR(20)  DEFAULT 'normal',
             creator      VARCHAR(50)  NOT NULL,
             create_time  TIMESTAMP    DEFAULT (datetime('now', 'localtime')),

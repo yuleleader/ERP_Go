@@ -76,15 +76,17 @@ class NotificationService:
                 title=title,
                 content=content
             )
-            
-            db.add(notification)
-            await db.flush()
+
+            # 用嵌套事务（SAVEPOINT）包裹通知写入：即使通知失败也只回滚自身，
+            # 绝不连带回滚调用方已做的业务修改（如订单状态、操作日志等主事务）
+            async with db.begin_nested():
+                db.add(notification)
+                await db.flush()
             logger.info(f"站内信发送成功，接收者: {recipient_username}，订单: {order_id}，事件类型: {event_type}")
             return True
-            
+
         except Exception as e:
             logger.error(f"发送站内信失败: {e}")
-            await db.rollback()
             return False
 
     @staticmethod

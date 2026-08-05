@@ -33,8 +33,8 @@ class Shop(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     shop_id = Column(String(100), unique=True, index=True, nullable=False)
-    shop_name = Column(String(100), unique=True, nullable=False)
-    shop_account = Column(String(100), unique=True, nullable=False)
+    shop_name = Column(String(100), nullable=False)      # 业务规则：同邮箱可在不同平台注册，唯一性为"名称+账号"组合
+    shop_account = Column(String(100), nullable=False)   # 通常为邮箱；不再全局唯一
     status = Column(String(20), default="normal")
     creator = Column(String(50), nullable=False)
     create_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))

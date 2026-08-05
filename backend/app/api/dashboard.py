@@ -75,7 +75,7 @@ async def get_dashboard_overview(
     
     # 获取虚拟发货订单数
     virtual_query = select(func.count(Order.id)).filter(
-        Order.shipping_status == "virtual_shipped",
+        Order.shipping_status.in_(["virtual", "virtual_shipped"]),
         Order.created_at >= start_date
     )
     virtual_result = await db.execute(virtual_query)
@@ -331,7 +331,8 @@ async def get_dashboard_product_ranking(
             "product_name": row.product_name,
             "sales_count": row.sales_count or 0,
             "total_revenue": round(row.total_revenue or 0, 2),
-            "profit_rate": round(20 + (row.sales_count or 0) % 15, 1)
+            # 真实可算指标：客单价（该商品总销售额 ÷ 订单数），替代原伪随机利润率
+            "avg_order_value": round((row.total_revenue or 0) / row.sales_count, 2) if row.sales_count else 0
         })
     
     return {
@@ -486,7 +487,7 @@ async def get_dashboard_overdue_orders(
         Order.product_name,
         Order.sales_amount
     ).filter(
-        Order.shipping_status.in_(["pending", "virtual_shipped"])
+        Order.shipping_status.in_(["pending", "virtual", "virtual_shipped"])
     ).order_by(
         # 下单越早 = 超期越久，升序取最超期的前 N 条
         asc(Order.created_at)

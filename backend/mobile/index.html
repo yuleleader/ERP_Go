@@ -139,7 +139,7 @@
   "use strict";
   const API = "";
   const PRODUCE_MAP = { unproduce:"未生产", producing:"生产中", produced:"生产完成" };
-  const SHIP_MAP = { pending:"待发货", shipped:"已发货", virtual_shipped:"虚拟发货" };
+  const SHIP_MAP = { pending:"待发货", shipped:"已发货", virtual:"虚拟发货", virtual_shipped:"虚拟发货" };
   const ROLE_LABEL = { sales:"销售", factory:"工厂", shipping:"发货", boss:"管理员" };
   const LAYER_LABEL = { sales:"商品图", factory:"生产实拍", shipping:"发货凭证" };
   const DISPLAY = [
@@ -418,7 +418,10 @@
       (list||[]).forEach(img=>{
         const tag = img.layer ? (LAYER_LABEL[img.layer]||img.layer) : "";
         const url = img.image_url || "";
-        html+='<div class="img-card"><img src="'+esc(url)+'" alt=""><span class="tag">'+esc(tag)+'</span></div>';
+        // 图片接口需登录鉴权（?token=），img 标签无法带请求头，故在 URL 上附带登录令牌
+        const t = localStorage.getItem("m_token");
+        const imgUrl = url && t ? url + (url.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(t) : url;
+        html+='<div class="img-card"><img src="'+esc(imgUrl)+'" alt=""><span class="tag">'+esc(tag)+'</span></div>';
       });
       $("images").innerHTML = html || '<div class="muted">暂无图片</div>';
     }catch(err){ $("images").innerHTML='<div class="muted">图片加载失败</div>'; }

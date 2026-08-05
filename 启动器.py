@@ -1296,6 +1296,10 @@ class WindowsLauncherApp:
         DEADLOCK_THRESHOLD = 12
         while True:
             _time.sleep(15)
+            # 用户点了"停止"：停止自愈，绝不自动重启（保持循环以便下次"启动"重置标志后恢复）
+            if getattr(self, '_stop_requested', False):
+                fail_count = 0
+                continue
             try:
                 if not is_port_open(8000):
                     # 端口彻底不通 = 后端进程已退出 → 明确需要重启
@@ -1355,6 +1359,8 @@ class WindowsLauncherApp:
             time.sleep(1)
 
             # 启动自愈看门狗（仅一次）：仅重启本启动器自己管理的后端，绝不误杀外部进程
+            # 同时重置停止标志：允许看门狗在本次启动后恢复自愈能力
+            self._stop_requested = False
             if not getattr(self, '_watchdog_started', False):
                 threading.Thread(target=self._health_watchdog, daemon=True).start()
                 self._watchdog_started = True
@@ -1455,31 +1461,27 @@ class WindowsLauncherApp:
     def stop_services(self):
         self.add_log("正在停止服务...", 'system')
 
-        # 统一通过端口杀进程，覆盖本启动器启动的及外部残留的
+        # 置位停止标志：看门狗收到后不再自动重启（避免"点了停止又被拉起来"）
+        self._stop_requested = True
+
+        # 只停止本启动器自己拉起的进程树，绝不无差别杀端口（避免误杀外部/其他环境进程）
+        self.kill_own_process(getattr(self, 'backend_process', None))
+        self.kill_own_process(getattr(self, 'frontend_process', None))
+        time.sleep(1.5)
+
+        # 状态展示：自己管理的进程已停；若端口仍被占用说明是外部进程，仅提示不处理
         if is_port_open(8000):
-            self.add_log("停止后端服务 (端口 8000)...", 'warning')
-            kill_process_on_port(8000)
-            time.sleep(1.5)
-            if not is_port_open(8000):
-                self.add_log("后端服务已停止", 'success')
-            else:
-                self.add_log("后端端口 8000 释放失败，请手动检查", 'error')
-
-        if is_port_open(5173):
-            self.add_log("停止前端服务 (端口 5173)...", 'warning')
-            kill_process_on_port(5173)
-            time.sleep(1.5)
-            if not is_port_open(5173):
-                self.add_log("前端服务已停止", 'success')
-            else:
-                self.add_log("前端端口 5173 释放失败，请手动检查", 'error')
-
-        # 更新状态显示
-        if not is_port_open(8000):
+            self.add_log("后端端口 8000 仍被占用（外部进程？），为避免误杀未做处理", 'warning')
+        else:
+            self.add_log("后端服务已停止", 'success')
             self.backend_status.set("未启动")
             self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
             self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
-        if not is_port_open(5173):
+
+        if is_port_open(5173):
+            self.add_log("前端端口 5173 仍被占用（外部进程？），为避免误杀未做处理", 'warning')
+        else:
+            self.add_log("前端服务已停止", 'success')
             self.frontend_status.set("未启动")
             self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
             self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])

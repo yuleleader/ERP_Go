@@ -109,18 +109,26 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
 
   if (to.meta.requiresAuth && !userStore.token) {
     next('/login')
-  } else if (to.path === '/login' && userStore.token) {
-    next('/')
-  } else if (to.meta.roles && !to.meta.roles.includes(userStore.role)) {
-    next('/dashboard')
-  } else {
-    next()
+    return
   }
+  if (to.path === '/login' && userStore.token) {
+    next('/')
+    return
+  }
+  // 刷新等场景下 token 在但角色信息未加载：先拉取用户信息再判断，避免被误踢回工作台
+  if (to.meta.roles && !userStore.role && userStore.token) {
+    await userStore.fetchUserInfo()
+  }
+  if (to.meta.roles && !to.meta.roles.includes(userStore.role)) {
+    next('/dashboard')
+    return
+  }
+  next()
 })
 
 export default router

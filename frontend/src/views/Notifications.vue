@@ -226,6 +226,7 @@
                 <span v-if="orderDetailData.produce_status_update_user"> · {{ orderDetailData.produce_status_update_user }}</span>
               </div>
               <el-select
+                v-if="canNotifChangeProduceStatus"
                 v-model="notifSelectedProduceStatus"
                 placeholder="修改状态"
                 size="small"
@@ -286,11 +287,13 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Picture, Van, Bell, Box, Search, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getNotifications, markAsRead, markAllAsRead, deleteNotification } from '@/api/notification'
+import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification } from '@/api/notification'
 import { getOrder, updateOrder } from '@/api/order'
 import { getOrderImages } from '@/api/image'
+import { useUserStore } from '@/store/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 筛选条件
 const filters = reactive({
@@ -317,6 +320,19 @@ const orderDetailVisible = ref(false)
 const orderDetailData = ref(null)
 const orderQrCodeUrl = ref('')
 const notifSelectedProduceStatus = ref('')
+
+// 通知详情弹窗内"修改生产状态"是否可用：已发货/已虚拟发货不可改；销售仅可改自己创建的订单
+const canNotifChangeProduceStatus = computed(() => {
+  const d = orderDetailData.value
+  if (!d) return false
+  if (d.shipping_status === 'shipped' || d.shipping_status === 'virtual' || d.shipping_status === 'virtual_shipped') {
+    return false
+  }
+  if (userStore.role === 'sales') {
+    return d.created_by === userStore.username
+  }
+  return ['boss', 'factory', 'shipping'].includes(userStore.role)
+})
 
 // 订单图片相关
 const orderSalesImages = ref([])
@@ -350,7 +366,8 @@ async function fetchNotifications() {
     }
     if (filters.keyword) params.keyword = filters.keyword
     if (filters.eventType) params.event_type = filters.eventType
-    if (filters.isRead !== '') params.is_read = filters.isRead === 'true'
+    // 下拉选项值是布尔（true/false），直接传给后端（后端 is_read 为 Optional[bool]）
+    if (filters.isRead !== '') params.is_read = filters.isRead
 
     const response = await getNotifications(params)
     notifications.value = response.items || []
@@ -753,6 +770,10 @@ function printOrderDetail() {
 
 onMounted(() => {
   fetchNotifications()
+  // 加载未读数量（"全部已读"按钮依赖此数 > 0 才显示）
+  getUnreadCount()
+    .then(res => { unreadCount.value = res.unread_count || 0 })
+    .catch(() => { unreadCount.value = 0 })
 })
 </script>
 

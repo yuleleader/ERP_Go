@@ -296,6 +296,13 @@ async def get_orders(
         else:
             order_dict["creator_real_name"] = None
 
+        # 金额/提成/创建人属财务敏感字段：仅老板端与销售端可见，工厂端/发货端置空
+        if current_user.role not in ("boss", "sales"):
+            order_dict["sales_amount"] = None
+            order_dict["commission_amount"] = None
+            order_dict["commission_rate"] = None
+            order_dict["creator_real_name"] = None
+
         order_responses.append(order_dict)
 
     return {"data": order_responses, "total": total}
@@ -346,6 +353,13 @@ async def get_order(
         )
         order_dict["creator_real_name"] = creator_result.scalar() or str(order.created_by)
     else:
+        order_dict["creator_real_name"] = None
+
+    # 金额/提成/创建人属财务敏感字段：仅老板端与销售端可见，工厂端/发货端置空
+    if current_user.role not in ("boss", "sales"):
+        order_dict["sales_amount"] = None
+        order_dict["commission_amount"] = None
+        order_dict["commission_rate"] = None
         order_dict["creator_real_name"] = None
 
     return OrderResponse(**order_dict)
@@ -470,8 +484,16 @@ async def update_order(
 
     if "shipping_status" in update_data:
         new_status = update_data["shipping_status"]
-        if order.shipping_status == "shipped" and new_status != "shipped":
-            raise HTTPException(status_code=403, detail="已发货的订单不允许修改为其他状态")
+        if order.shipping_status == "shipped" and new_status not in ("shipped", "refunded"):
+            raise HTTPException(
+                status_code=403,
+                detail="已发货的订单仅允许改为【已退货/退款】，不允许改为其他状态"
+            )
+        if order.shipping_status == "virtual" and new_status not in ("virtual", "shipped", "refunded"):
+            raise HTTPException(
+                status_code=403,
+                detail="已虚拟发货的订单仅允许改为【已发货】或【已退货/退款】"
+            )
         if new_status == "shipped" and order.shipping_status != "shipped":
             if "shipping_time" not in update_data or not update_data["shipping_time"]:
                 update_data["shipping_time"] = beijing_now()
