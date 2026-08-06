@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import List
 from ..core.database import get_db
 from ..core.security import get_current_active_user
@@ -29,14 +29,17 @@ async def create_brand(
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="您没有权限创建品牌")
 
-    brand = Brand(brand_name=data.brand_name, created_by=current_user.username)
+    # 三位数字编码自增（=当前最大编码 +1），在构造时即赋值以满足 NOT NULL 约束
+    result = await db.execute(select(func.max(Brand.brand_code)))
+    max_code = result.scalar() or 0
+    next_code = max_code + 1
+
+    brand = Brand(brand_code=next_code, brand_name=data.brand_name, created_by=current_user.username)
     db.add(brand)
-    await db.flush()                 # 先拿到自增 id
-    brand.brand_code = brand.id      # 三位数字编码 = 自增主键（展示时补零）
     db.add(OperationLog(
         username=current_user.username,
         operation_type="创建品牌",
-        operation_content=f"创建品牌 {data.brand_name}"
+        operation_content=f"创建品牌 {next_code} {data.brand_name}"
     ))
     await db.commit()
     await db.refresh(brand)
