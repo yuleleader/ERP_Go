@@ -288,87 +288,91 @@
       </template>
     </el-dialog>
 
-    <!-- 商品详情对话框 -->
-    <el-dialog v-model="viewDialogVisible" title="商品详情" width="600px">
-      <div class="product-detail">
-        <div class="detail-item">
-          <span class="label">商品编码：</span>
-          <span class="value">{{ currentProduct.product_code }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">商品名称：</span>
-          <span class="value">{{ currentProduct.product_name }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">类别：</span>
-          <span class="value">{{ categoryName(currentProduct.category_id) || '未设置' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">品牌：</span>
-          <span class="value">{{ brandName(currentProduct.brand_id) || '未设置' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">成本价：</span>
-          <span class="value">¥{{ Number(currentProduct.cost_price || 0).toFixed(2) }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">零售价：</span>
-          <span class="value">¥{{ Number(currentProduct.retail_price || 0).toFixed(2) }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">最低售价：</span>
-          <span class="value">¥{{ Number(currentProduct.min_price || 0).toFixed(2) }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">商品状态：</span>
-          <el-tag :type="currentProduct.status === 'active' ? 'success' : 'info'">
-            {{ currentProduct.status === 'active' ? '启用' : '停用' }}
-          </el-tag>
-        </div>
-        <div class="detail-item">
-          <span class="label">商品备注：</span>
-          <div class="remark-content">
-            {{ currentProduct.product_remark || '暂无备注' }}
-          </div>
-        </div>
-        <div class="detail-item">
-          <span class="label">备注1：</span>
-          <span class="value">{{ currentProduct.remark1 || '—' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">备注2：</span>
-          <span class="value">{{ currentProduct.remark2 || '—' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">备注3：</span>
-          <span class="value">{{ currentProduct.remark3 || '—' }}</span>
-        </div>
-        <div class="detail-item" v-if="currentProductImages.length">
-          <span class="label">商品图片：</span>
-          <div class="image-list">
-            <el-image
-              v-for="img in currentProductImages"
-              :key="img.id"
-              :src="imageUrlWithToken(img.image_url)"
-              :preview-src-list="previewableImageUrls(currentProductImages)"
-              :preview-teleported="true"
-              fit="cover"
-              style="width: 80px; height: 80px; border-radius: 4px;"
-            />
-          </div>
-        </div>
-        <div class="detail-item">
-          <span class="label">创建人：</span>
-          <span class="value">{{ currentProduct.created_by }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">创建时间：</span>
-          <span class="value">{{ formatDateTime(currentProduct.created_at) }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">更新时间：</span>
-          <span class="value">{{ formatDateTime(currentProduct.updated_at) }}</span>
-        </div>
+    <!-- 商品详情对话框（表格风格） -->
+    <el-dialog v-model="viewDialogVisible" title="查看商品档案" width="900px">
+      <div class="product-view-table">
+        <table class="form-table" cellspacing="0" cellpadding="0">
+          <tbody>
+            <tr>
+              <th class="th-label">商品编码</th>
+              <td class="td-value">{{ currentProduct.product_code }}</td>
+              <th class="th-label">商品名称</th>
+              <td class="td-value">{{ currentProduct.product_name }}</td>
+              <td class="td-image-cell" rowspan="5">
+                <div class="image-upload-area">
+                  <div class="image-upload-title">商品图片</div>
+                  <div class="image-grid">
+                    <div
+                      v-for="idx in 5"
+                      :key="idx"
+                      class="image-slot"
+                    >
+                      <el-image
+                        v-if="currentProductImages[idx - 1]"
+                        :src="imageUrlWithToken(currentProductImages[idx - 1].image_url)"
+                        :preview-src-list="previewableImageUrls(currentProductImages)"
+                        :preview-teleported="true"
+                        fit="cover"
+                      />
+                      <span v-else class="empty-slot">空位 {{ idx }}</span>
+                    </div>
+                  </div>
+                  <div class="image-upload-tip">最多 5 张，点击可预览</div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <th class="th-label">类别</th>
+              <td class="td-value">{{ categoryName(currentProduct.category_id) || '未设置' }}</td>
+              <th class="th-label">品牌</th>
+              <td class="td-value">{{ brandName(currentProduct.brand_id) || '未设置' }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">成本价</th>
+              <td class="td-value">¥{{ Number(currentProduct.cost_price || 0).toFixed(2) }}</td>
+              <th class="th-label">零售价</th>
+              <td class="td-value">¥{{ Number(currentProduct.retail_price || 0).toFixed(2) }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">最低售价</th>
+              <td class="td-value" colspan="3">¥{{ Number(currentProduct.min_price || 0).toFixed(2) }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">备注1</th>
+              <td class="td-value" colspan="3">{{ currentProduct.remark1 || '—' }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">备注2</th>
+              <td class="td-value" colspan="3">{{ currentProduct.remark2 || '—' }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">备注3</th>
+              <td class="td-value" colspan="3">{{ currentProduct.remark3 || '—' }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">商品备注</th>
+              <td class="td-value" colspan="3">
+                <div class="remark-content">{{ currentProduct.product_remark || '暂无备注' }}</div>
+              </td>
+            </tr>
+            <tr>
+              <th class="th-label">创建时间</th>
+              <td class="td-value" colspan="3">{{ formatDateTime(currentProduct.created_at) }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">修改时间</th>
+              <td class="td-value" colspan="3">{{ formatDateTime(currentProduct.updated_at) }}</td>
+            </tr>
+            <tr>
+              <th class="th-label">商品状态</th>
+              <td class="td-value" colspan="3">
+                <el-tag :type="currentProduct.status === 'active' ? 'success' : 'info'">
+                  {{ currentProduct.status === 'active' ? '启用' : '停用' }}
+                </el-tag>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </el-dialog>
   </div>
@@ -948,6 +952,42 @@ onMounted(() => {
   line-height: 1.6;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* ===== 查看商品档案：图片预览网格 ===== */
+.product-view-table {
+  padding: 4px 8px;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.image-slot {
+  width: 100%;
+  height: 80px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.image-slot .el-image {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-slot {
+  font-size: 11px;
+  color: #c0c4cc;
 }
 
 /* ===== 表格风格表单 ===== */
