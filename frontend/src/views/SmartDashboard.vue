@@ -601,6 +601,11 @@ onUnmounted(() => {
   min-height: 0;
 }
 
+/* 左侧面板：垂直三等分（卡片 / 图表 / 排行），防止下块被遮挡 */
+.panel-left {
+  overflow: hidden;
+}
+
 /* 通用块样式 */
 .block-title {
   font-size: 16px;
@@ -622,18 +627,26 @@ onUnmounted(() => {
   border-radius: 2px;
 }
 
-/* 统计卡片 */
+/* 统计卡片（三等分中的第一段：等高） */
 .stats-cards {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-auto-rows: 1fr;
+  gap: 10px;
 }
 
 .stat-card {
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(0, 212, 255, 0.15);
   border-radius: 8px;
-  padding: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
   transition: all 0.3s ease;
 }
 
@@ -644,16 +657,20 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 12px;
   color: #94a3b8;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-value {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
   color: #fff;
   font-family: 'Courier New', monospace;
+  white-space: nowrap;
 }
 
 /* 退款订单卡片（暖色调区分） */
@@ -680,33 +697,35 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 
-/* 图表块 */
+/* 图表块（三等分中的第二段：等高） */
 .chart-block {
   flex: 1;
-  min-height: 240px;
+  min-height: 0;
   background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.15);
   border-radius: 8px;
   padding: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .chart-container {
   flex: 1;
-  min-height: 180px;
+  min-height: 0;
 }
 
-/* 排行块 */
+/* 排行块（三等分中的第三段：等高） */
 .rank-block {
   flex: 1;
-  min-height: 240px;
+  min-height: 0;
   background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.15);
   border-radius: 8px;
   padding: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .rank-list {
