@@ -1061,7 +1061,10 @@ class WindowsLauncherApp:
         except:
             pass
 
-        self.root.after(800, self.pulse_animation)
+        try:
+            self.root.after(800, self.pulse_animation)
+        except Exception:
+            pass
 
     def apply_styles(self):
         c = self.colors
@@ -1157,10 +1160,17 @@ class WindowsLauncherApp:
         """主线程定时轮询：消费日志队列写入日志区，并执行 UI 任务队列中的 Tk 操作。
 
         仅主线程操作 Tkinter，绝对安全。每 300ms 递归调度一次。
+
+        关键：本方法自身是 after 回调，任何未捕获异常都会导致 mainloop 退出（闪退），
+        因此日志写入与 UI 任务执行都必须逐条 try/except 兜底。
         """
-        try:
-            while True:
+        # 消费日志队列（逐条兜底：单条日志异常不影响后续，更不让主循环退出）
+        while True:
+            try:
                 source, text = self.log_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
                 if source == 'backend':
                     self.add_backend_log(text)
                 elif source == 'backend_err':
@@ -1171,8 +1181,8 @@ class WindowsLauncherApp:
                     self.add_frontend_log(text, 'error')
                 else:
                     self.add_backend_log(text)
-        except queue.Empty:
-            pass
+            except Exception:
+                pass
 
         # 执行子线程入队的 UI 任务（此时必在主线程，可安全操作 Tk）
         try:
@@ -2333,6 +2343,21 @@ def main():
     root.configure(bg='#c9c9cf')
 
     app = WindowsLauncherApp(root)
+
+    # 兜底：任何 Tk 回调（after/按钮/绑定事件）抛出的未捕获异常，
+    # 默认会让 mainloop 退出导致"闪退"。这里统一拦截并记录，不让程序退出。
+    def _safe_callback(exc, val, tb):
+        try:
+            import traceback
+            tb_text = "".join(traceback.format_exception(exc, val, tb))
+            print("[启动器回调异常] " + tb_text)
+            try:
+                app.log_queue.put(("system", f"[界面回调异常，已拦截] {val}"))
+            except Exception:
+                pass
+        except Exception:
+            pass
+    root.report_callback_exception = _safe_callback
 
     def on_closing():
         app._on_close()
