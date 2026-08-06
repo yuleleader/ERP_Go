@@ -2237,7 +2237,21 @@ class WindowsLauncherApp:
         self._my = e.y_root
 
     def _on_minimize(self):
-        self.root.iconify()
+        # 无边框窗口(overrideredirect)不支持 Tk 的 iconify()，会抛
+        # "can't iconify: override-redirect flag is set"；
+        # 改用 Win32 ShowWindow(SW_MINIMIZE) 最小化（窗口已在任务栏有按钮，可从任务栏恢复）。
+        try:
+            self.root.iconify()
+            return
+        except Exception:
+            pass
+        try:
+            from ctypes import windll
+            SW_MINIMIZE = 6
+            hwnd = self.root.winfo_id()
+            windll.user32.ShowWindow(hwnd, SW_MINIMIZE)
+        except Exception:
+            pass
 
     def _on_zoom(self):
         try:
