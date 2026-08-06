@@ -735,7 +735,8 @@ class WindowsLauncherApp:
             w = c.winfo_width()
             h = c.winfo_height()
             if w < 20 or h < 20:
-                w, h = 200, 100
+                # 布局尚未完成，跳过绘制，等 Configure/after_idle 再画，避免用错误尺寸画出被截断的内容
+                return
             enabled = (enabled_attr is None) or getattr(self, enabled_attr, True)
             if not enabled:
                 color = spec['off']
@@ -784,8 +785,8 @@ class WindowsLauncherApp:
         c.bind('<ButtonPress-1>', on_press)
         c.bind('<ButtonRelease-1>', on_release)
         c.bind('<Configure>', redraw)
-        c.update_idletasks()
-        redraw()
+        # 延迟到布局完成后再首次绘制，避免初始尺寸为 1x1 导致图标/文字被截断
+        c.after_idle(redraw)
         c.after(100, redraw)
         return c
 
