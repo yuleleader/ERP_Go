@@ -657,20 +657,22 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #94a3b8;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .stat-value {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: bold;
   color: #fff;
-  font-family: 'Courier New', monospace;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 /* 退款订单卡片（暖色调区分） */
@@ -692,9 +694,12 @@ onUnmounted(() => {
 }
 
 .stat-sub {
-  font-size: 11px;
+  font-size: 10px;
   color: #94a3b8;
-  margin-top: 4px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 图表块（三等分中的第二段：等高） */
