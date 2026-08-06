@@ -142,6 +142,9 @@ class WindowsLauncherApp:
 
         # 日志队列：子线程只 queue.put，主线程轮询消费，彻底避免子线程触碰 Tkinter/Tcl 死锁
         self.log_queue = queue.Queue()
+        # UI 任务队列：子线程把「要执行的 Tk 操作」入队，主线程 _poll_log_queue 轮询时统一执行。
+        # 子线程绝不直接调用任何 Tkinter 方法（包括 root.after），避免 Tcl 跨线程竞争导致随机闪退。
+        self.ui_queue = queue.Queue()
         self.root.after(300, self._poll_log_queue)
 
         self.backend_status = tk.StringVar(value="未启动")
@@ -920,7 +923,7 @@ class WindowsLauncherApp:
     def _update_progress(self, canvas, width, color):
         # 子线程调用时切回主线程执行，避免跨线程访问 Tk 导致闪退
         if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self._update_progress, canvas, width, color)
+            self._to_ui(self._update_progress, canvas, width, color)
             return
         max_w = 180
         width = max(0, min(width, max_w))
@@ -977,7 +980,7 @@ class WindowsLauncherApp:
     def _set_button_state(self, start='normal', stop='disabled', open='disabled'):
         # 子线程调用时切回主线程执行，避免跨线程访问 Tk 导致闪退
         if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self._set_button_state, start, stop, open)
+            self._to_ui(self._set_button_state, start, stop, open)
             return
         """Update button visual state WITHOUT using tk.DISABLED (which applies gray stipple mask)."""
         # ── Start button ──
@@ -996,12 +999,16 @@ class WindowsLauncherApp:
         self.open_btn.config(cursor='hand2' if self._open_enabled else 'arrow')
 
     def _to_ui(self, fn, *args):
-        """线程安全地执行 Tk 操作：非主线程时通过 after 切回主线程，
-        避免跨线程访问 Tcl 导致解释器崩溃/闪退。"""
+        """线程安全地执行 Tk 操作。
+
+        主线程：直接执行。
+        子线程：仅把 (fn, args) 放入 ui_queue，由主线程 _poll_log_queue 轮询时执行。
+        子线程绝不直接调用任何 Tkinter 方法（包括 root.after），避免 Tcl 跨线程竞争导致闪退。
+        """
         if threading.current_thread() is self._main_thread:
             fn(*args)
         else:
-            self.root.after(0, fn, *args)
+            self.ui_queue.put((fn, args))
 
     def _ui_set_service(self, which, word, fg):
         """线程安全地设置某服务的状态文字与指示灯（供子线程调用）。"""
@@ -1076,7 +1083,7 @@ class WindowsLauncherApp:
     def add_log(self, text, source='system', level='info', channel=None):
         # 子线程调用时切回主线程执行，避免跨线程访问 Text 控件导致闪退
         if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self.add_log, text, source, level, channel)
+            self._to_ui(self.add_log, text, source, level, channel)
             return
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -1144,7 +1151,7 @@ class WindowsLauncherApp:
             pass
 
     def _poll_log_queue(self):
-        """主线程定时轮询日志队列，消费并写入对应日志区。
+        """主线程定时轮询：消费日志队列写入日志区，并执行 UI 任务队列中的 Tk 操作。
 
         仅主线程操作 Tkinter，绝对安全。每 300ms 递归调度一次。
         """
@@ -1163,8 +1170,23 @@ class WindowsLauncherApp:
                     self.add_backend_log(text)
         except queue.Empty:
             pass
+
+        # 执行子线程入队的 UI 任务（此时必在主线程，可安全操作 Tk）
+        try:
+            while True:
+                fn, args = self.ui_queue.get_nowait()
+                try:
+                    fn(*args)
+                except Exception:
+                    # 单个 UI 任务失败不阻断后续任务，更不让 mainloop 因异常退出
+                    pass
+        except queue.Empty:
+            pass
         finally:
-            self.root.after(300, self._poll_log_queue)
+            try:
+                self.root.after(300, self._poll_log_queue)
+            except Exception:
+                pass
 
     def check_python_version(self):
         version = sys.version_info
@@ -1554,16 +1576,20 @@ class WindowsLauncherApp:
             self.add_log("后端端口 8000 仍被占用（可能有进程拒绝终止），请手动检查", 'warning')
         else:
             self.add_log("后端服务已停止", 'success')
-            self.backend_status.set("未启动")
-            self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
+            self._to_ui(lambda: (
+                self.backend_status.set("未启动"),
+                self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
+            ))
             self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
 
         if is_port_open(5173):
             self.add_log("前端端口 5173 仍被占用（可能有进程拒绝终止），请手动检查", 'warning')
         else:
             self.add_log("前端服务已停止", 'success')
-            self.frontend_status.set("未启动")
-            self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
+            self._to_ui(lambda: (
+                self.frontend_status.set("未启动"),
+                self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
+            ))
             self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
 
         self.backend_process = None
@@ -1949,7 +1975,7 @@ class WindowsLauncherApp:
     def _log_to_settings(self, text, level='info'):
         # 子线程调用时切回主线程，避免跨线程操作 Text 控件导致闪退
         if threading.current_thread() is not self._main_thread:
-            self.root.after(0, self._log_to_settings, text, level)
+            self._to_ui(self._log_to_settings, text, level)
             return
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
         tag = level if level in ('info', 'success', 'warning', 'error', 'system') else 'info'
@@ -1985,7 +2011,7 @@ class WindowsLauncherApp:
         def run():
             self._log_to_settings("开始手动备份...", 'system')
             self._run_backup_task()
-            self.root.after(0, self._refresh_backup_list)
+            self._to_ui(self._refresh_backup_list)
         threading.Thread(target=run, daemon=True).start()
 
     def _refresh_backup_list(self):
