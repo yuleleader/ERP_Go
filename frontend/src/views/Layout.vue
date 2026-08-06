@@ -25,8 +25,9 @@
           <span>基础信息</span>
           <el-icon class="group-arrow"><ArrowRight /></el-icon>
         </el-menu-item>
-        <el-menu-item index="/statistics">
+        <el-menu-item v-if="menuGroups['statistics'].groups.some((g) => g.items.length)" index="group:statistics">
           <span>数据统计</span>
+          <el-icon class="group-arrow"><ArrowRight /></el-icon>
         </el-menu-item>
         <el-menu-item v-if="menuGroups['finance'].groups.some((g) => g.items.length)" index="group:finance">
           <span>财务模块</span>
@@ -192,6 +193,18 @@ const menuGroups = computed(() => {
           items: pick([
             { label: '网店信息', path: '/shops', desc: '管理店铺账号与归属', show: isBoss || isSales },
             { label: '物流管理', path: '/logistics', desc: '维护物流商与运费信息', show: isBoss }
+          ])
+        }
+      ].filter((g) => g.items.length)
+    },
+    statistics: {
+      title: '数据统计',
+      groups: [
+        {
+          title: '统计报表',
+          items: pick([
+            { label: '数据统计', path: '/statistics', desc: '销售、订单与发货综合统计', show: true },
+            { label: '销售提成统计（按发货时间统计）', path: '/commission-statistics', desc: '按发货时间核算销售提成', show: true }
           ])
         }
       ].filter((g) => g.items.length)

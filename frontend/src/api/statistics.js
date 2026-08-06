@@ -86,3 +86,11 @@ export function getProcessFlow() {
     method: 'get'
   })
 }
+
+// 获取超期订单统计（老板端工作台经营概览卡片）
+export function getOverdueOrders() {
+  return request({
+    url: '/statistics/overdue',
+    method: 'get'
+  })
+}

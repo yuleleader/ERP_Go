@@ -95,6 +95,12 @@ const routes = [
         meta: { title: '数据统计' }
       },
       {
+        path: 'commission-statistics',
+        name: 'CommissionStatistics',
+        component: () => import('@/views/CommissionStatistics.vue'),
+        meta: { title: '销售提成统计' }
+      },
+      {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('@/views/Notifications.vue'),

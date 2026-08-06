@@ -167,6 +167,8 @@ class Product(Base):
     product_name = Column(String(100), nullable=False)
     product_remark = Column(Text, nullable=True)
     status = Column(String(20), default="active")
+    category_id = Column(Integer, nullable=True, index=True)   # 关联类别表 id
+    brand_id = Column(Integer, nullable=True, index=True)       # 关联品牌表 id
     created_by = Column(String(50), nullable=True)
     created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))

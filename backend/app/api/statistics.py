@@ -7,6 +7,7 @@ from sqlalchemy import select, func, Float, desc
 from ..core.database import get_db
 from ..core.security import get_current_active_user
 from ..models.models import Order, User, Product
+from ..api.settings import read_setting
 
 router = APIRouter(prefix="/api/statistics", tags=["数据统计"])
 
@@ -776,4 +777,54 @@ async def get_overview_statistics(
         "total_sales": round(sales_result.scalar() or 0, 2),
         "start_date": start_date,
         "end_date": end_date
+    }
+
+
+@router.get("/overdue")
+async def get_overdue_orders(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """
+    超期订单统计（老板端工作台经营概览卡片）
+    下单时间距当前超过「系统参数-超期订单天数」且尚未发货完成的订单视为超期。
+    """
+    if current_user.role != "boss":
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
+
+    # 读取系统参数：超期订单天数（默认 7 天）
+    days_str = await read_setting(db, "overdue_order_days", "7")
+    try:
+        overdue_days = int(float(days_str))
+    except (TypeError, ValueError):
+        overdue_days = 7
+    if overdue_days < 0:
+        overdue_days = 0
+
+    threshold = beijing_now() - timedelta(days=overdue_days)
+
+    # 超期判定：下单时间早于阈值，且尚未发货完成（shipping_status 不为 shipped/refunded）
+    async def count(*filters):
+        stmt = select(func.count(Order.id))
+        for f in filters:
+            stmt = stmt.filter(f)
+        result = await db.execute(stmt)
+        return result.scalar() or 0
+
+    unfinished = (Order.shipping_status.notin_(["shipped", "refunded"]))
+    total = await count(Order.created_at < threshold, unfinished)
+    pending = await count(Order.created_at < threshold, unfinished, Order.shipping_status == "pending")
+    producing = await count(
+        Order.created_at < threshold,
+        unfinished,
+        Order.shipping_status.in_(["pending", "virtual"]),
+        Order.produce_status.in_(["unproduce", "producing"])
+    )
+
+    return {
+        "overdue_days": overdue_days,
+        "total_overdue": total,
+        "pending_overdue": pending,
+        "producing_overdue": producing,
+        "update_time": beijing_now().isoformat()
     }

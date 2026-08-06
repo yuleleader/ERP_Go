@@ -45,6 +45,11 @@
         <el-form-item label="关键词">
           <el-input v-model="filters.keyword" placeholder="追溯码/商品名称" clearable @change="fetchOrders" />
         </el-form-item>
+        <el-form-item v-if="filters.overdue">
+          <el-tag type="warning" closable @close="clearOverdueFilter">
+            超期订单（未在超期天数内发货）
+          </el-tag>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="fetchOrders">搜索</el-button>
         </el-form-item>
@@ -890,7 +895,8 @@ const filters = reactive({
   shippingStatus: '',
   produceStatus: '',
   keyword: '',
-  createdBy: ''
+  createdBy: '',
+  overdue: false
 })
 
 // 创建人下拉选项（仅老板端可见，列出全部用户）
@@ -1073,6 +1079,7 @@ async function fetchOrders() {
     if (filters.produceStatus) params.produce_status = filters.produceStatus
     if (filters.keyword) params.keyword = filters.keyword
     if (filters.createdBy) params.created_by = filters.createdBy
+    if (filters.overdue) params.overdue = true
 
     const response = await getOrders(params)
     orders.value = response.data || response
@@ -1106,6 +1113,13 @@ async function fetchOrders() {
   } finally {
     loading.value = false
   }
+}
+
+// 清除超期筛选（点击超期标签关闭按钮）
+function clearOverdueFilter() {
+  filters.overdue = false
+  pagination.page = 1
+  fetchOrders()
 }
 
 /**
@@ -2043,6 +2057,9 @@ onMounted(async () => {
   }
   if (route.query.keyword) {
     filters.keyword = String(route.query.keyword)
+  }
+  if (route.query.overdue) {
+    filters.overdue = true
   }
 
   loadUserOptions()

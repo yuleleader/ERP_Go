@@ -4,7 +4,7 @@ import os
 import uuid
 import qrcode
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..models.models import beijing_now
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
@@ -19,6 +19,7 @@ from ..models.models import Order, Shop, User, Image as ImageModel, OperationLog
 from ..schemas.schemas import OrderCreate, OrderUpdate, OrderResponse
 from ..utils.order_id_generator import order_id_generator
 from ..services.notification_service import NotificationService
+from ..api.settings import read_setting
 
 router = APIRouter(prefix="/api/orders", tags=["订单管理"])
 
@@ -219,6 +220,7 @@ async def get_orders(
     shop_id: Optional[str] = None,
     keyword: Optional[str] = None,
     created_by: Optional[str] = None,
+    overdue: Optional[bool] = None,
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
@@ -234,6 +236,22 @@ async def get_orders(
         count_query = count_query.where(
             cast(Order.created_by, String) == str(current_user.username)
         )
+
+    # 超期订单筛选：下单时间早于「超期订单天数」阈值且尚未发货完成
+    if overdue:
+        days_str = await read_setting(db, "overdue_order_days", "7")
+        try:
+            overdue_days = int(float(days_str))
+        except (TypeError, ValueError):
+            overdue_days = 7
+        if overdue_days < 0:
+            overdue_days = 0
+        threshold = beijing_now() - timedelta(days=overdue_days)
+        overdue_filter = (Order.created_at < threshold) & (
+            Order.shipping_status.notin_(["shipped", "refunded"])
+        )
+        query = query.where(overdue_filter)
+        count_query = count_query.where(overdue_filter)
 
     if shipping_status:
         query = query.where(Order.shipping_status == shipping_status)

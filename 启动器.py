@@ -1537,14 +1537,21 @@ class WindowsLauncherApp:
         # 置位停止标志：看门狗收到后不再自动重启（避免"点了停止又被拉起来"）
         self._stop_requested = True
 
-        # 只停止本启动器自己拉起的进程树，绝不无差别杀端口（避免误杀外部/其他环境进程）
+        # 1) 先终止本启动器自己拉起的进程树
         self.kill_own_process(getattr(self, 'backend_process', None))
         self.kill_own_process(getattr(self, 'frontend_process', None))
+        time.sleep(1.2)
+
+        # 2) 再按端口兜底清理：即使前后端是外部/旧进程启动的，也能一并终止，
+        #    避免"点了停止系统，前后端却还活着"。
+        #    8000/5173 是本系统的固定端口，停止系统时按端口清理符合用户预期。
+        kill_process_on_port(8000)
+        kill_process_on_port(5173)
         time.sleep(1.5)
 
-        # 状态展示：自己管理的进程已停；若端口仍被占用说明是外部进程，仅提示不处理
+        # 状态展示
         if is_port_open(8000):
-            self.add_log("后端端口 8000 仍被占用（外部进程？），为避免误杀未做处理", 'warning')
+            self.add_log("后端端口 8000 仍被占用（可能有进程拒绝终止），请手动检查", 'warning')
         else:
             self.add_log("后端服务已停止", 'success')
             self.backend_status.set("未启动")
@@ -1552,7 +1559,7 @@ class WindowsLauncherApp:
             self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
 
         if is_port_open(5173):
-            self.add_log("前端端口 5173 仍被占用（外部进程？），为避免误杀未做处理", 'warning')
+            self.add_log("前端端口 5173 仍被占用（可能有进程拒绝终止），请手动检查", 'warning')
         else:
             self.add_log("前端服务已停止", 'success')
             self.frontend_status.set("未启动")

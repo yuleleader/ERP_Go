@@ -27,6 +27,22 @@
       </el-col>
     </el-row>
 
+    <!-- 第二行：超期订单预警卡片 -->
+    <el-row :gutter="20" style="margin-top: 20px;">
+      <el-col :span="24">
+        <el-card class="stat-card clickable compact overdue-card" @click="goOrders({ overdue: true })">
+          <div class="stat-icon overdue">
+            <el-icon><AlarmClock /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value danger">{{ stats.overdueOrders }}</div>
+            <div class="stat-label">超期订单（超过 {{ stats.overdueDays }} 天未发货）</div>
+          </div>
+          <div class="overdue-tip">点击查看全部超期订单 →</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 订单流程全景：销售 -> 生产 -> 发货 -->
     <div class="section-title">订单流程全景</div>
     <div class="flow">
@@ -98,12 +114,14 @@
 import { reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { getOverviewStatistics, getCommissionByUser, getProcessFlow } from '@/api/statistics'
-import { Money, Wallet, Right } from '@element-plus/icons-vue'
+import { getOverviewStatistics, getCommissionByUser, getProcessFlow, getOverdueOrders } from '@/api/statistics'
+import { Money, Wallet, Right, AlarmClock } from '@element-plus/icons-vue'
 
 const stats = reactive({
   totalSales: 0,
-  totalCommission: 0
+  totalCommission: 0,
+  overdueOrders: 0,
+  overdueDays: 7
 })
 
 const flow = reactive({
@@ -139,10 +157,11 @@ onMounted(async () => {
   }
 
   try {
-    const [overviewRes, commissionRes, flowRes] = await Promise.all([
+    const [overviewRes, commissionRes, flowRes, overdueRes] = await Promise.all([
       getOverviewStatistics(),
       getCommissionByUser(),
-      getProcessFlow()
+      getProcessFlow(),
+      getOverdueOrders()
     ])
 
     const overview = overviewRes || {}
@@ -150,6 +169,10 @@ onMounted(async () => {
 
     const commissionSummary = (commissionRes && commissionRes.summary) || {}
     stats.totalCommission = parseFloat((commissionSummary.total_commission || 0).toFixed(2)).toLocaleString('zh-CN')
+
+    const o = overdueRes || {}
+    stats.overdueOrders = o.total_overdue || 0
+    stats.overdueDays = o.overdue_days || 7
 
     const f = (flowRes && flowRes.data) || flowRes || {}
     if (f.sales) {
@@ -237,6 +260,20 @@ onMounted(async () => {
 
 .stat-icon.amount { background: linear-gradient(135deg, #4facfe, #00f2fe); }
 .stat-icon.commission { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+.stat-icon.overdue { background: linear-gradient(135deg, #ff9a9e, #fad0c4); }
+
+.stat-value.danger { color: #f56c6c; }
+
+.overdue-card {
+  border: 1px solid #fde2e2;
+}
+
+.overdue-tip {
+  font-size: 12px;
+  color: #c45656;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
 
 .stat-content {
   flex: 1;

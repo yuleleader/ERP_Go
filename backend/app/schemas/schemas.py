@@ -191,19 +191,24 @@ class ProductBase(BaseModel):
 
 class ProductCreate(ProductBase):
     """商品创建模型"""
-    pass
+    category_id: Optional[int] = Field(None, description="关联类别表 id")
+    brand_id: Optional[int] = Field(None, description="关联品牌表 id")
 
 class ProductUpdate(BaseModel):
     """商品更新模型"""
     product_name: Optional[str] = Field(None, min_length=2, max_length=100, description="商品名称，2-100字符")
     product_remark: Optional[str] = Field(None, max_length=500, description="商品备注，最大500字符")
     status: Optional[str] = Field(None, description="商品状态：active/inactive")
+    category_id: Optional[int] = Field(None, description="关联类别表 id")
+    brand_id: Optional[int] = Field(None, description="关联品牌表 id")
 
 class ProductResponse(ProductBase):
     """商品响应模型"""
     id: int
     product_code: str
     status: str = "active"
+    category_id: Optional[int] = None
+    brand_id: Optional[int] = None
     created_by: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

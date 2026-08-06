@@ -51,6 +51,8 @@ async def create_product(
         product_name=product_data.product_name,
         product_remark=product_data.product_remark,
         status="active",
+        category_id=product_data.category_id,
+        brand_id=product_data.brand_id,
         created_by=current_user.username
     )
     db.add(new_product)
@@ -74,6 +76,8 @@ async def create_product(
         product_name=new_product.product_name,
         product_remark=new_product.product_remark,
         status=new_product.status,
+        category_id=new_product.category_id,
+        brand_id=new_product.brand_id,
         created_by=new_product.created_by,
         created_at=new_product.created_at,
         updated_at=new_product.updated_at
@@ -84,6 +88,8 @@ async def create_product(
 async def get_products(
     keyword: Optional[str] = None,
     status: Optional[str] = None,
+    category_id: Optional[int] = None,
+    brand_id: Optional[int] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -91,7 +97,7 @@ async def get_products(
 ):
     """
     获取商品列表
-    支持分页、关键词搜索、状态筛选
+    支持分页、关键词搜索、状态筛选、按类别/品牌筛选
     权限要求：所有角色可查看
     """
     query = select(Product)
@@ -109,6 +115,14 @@ async def get_products(
     if status:
         query = query.where(Product.status == status)
 
+    # 按类别筛选
+    if category_id is not None:
+        query = query.where(Product.category_id == category_id)
+
+    # 按品牌筛选
+    if brand_id is not None:
+        query = query.where(Product.brand_id == brand_id)
+
     # 排序：按创建时间倒序
     query = query.order_by(Product.created_at.desc()).offset(skip).limit(limit)
     
@@ -121,6 +135,8 @@ async def get_products(
         product_name=p.product_name,
         product_remark=p.product_remark,
         status=p.status,
+        category_id=p.category_id,
+        brand_id=p.brand_id,
         created_by=p.created_by,
         created_at=p.created_at,
         updated_at=p.updated_at
@@ -151,6 +167,8 @@ async def get_product(
         product_name=product.product_name,
         product_remark=product.product_remark,
         status=product.status,
+        category_id=product.category_id,
+        brand_id=product.brand_id,
         created_by=product.created_by,
         created_at=product.created_at,
         updated_at=product.updated_at
@@ -209,6 +227,8 @@ async def update_product(
         product_name=product.product_name,
         product_remark=product.product_remark,
         status=product.status,
+        category_id=product.category_id,
+        brand_id=product.brand_id,
         created_by=product.created_by,
         created_at=product.created_at,
         updated_at=product.updated_at
