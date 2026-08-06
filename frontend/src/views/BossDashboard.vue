@@ -152,24 +152,27 @@ onMounted(async () => {
   }
 
   try {
-    const [overviewRes, commissionRes, flowRes, overdueRes] = await Promise.all([
+    // 各接口独立容错：单个接口失败不影响其他卡片的数据展示
+    const [overviewRes, commissionRes, flowRes, overdueRes] = await Promise.allSettled([
       getOverviewStatistics(),
       getCommissionByUser(),
       getProcessFlow(),
       getOverdueOrders()
     ])
 
-    const overview = overviewRes || {}
+    const overview = (overviewRes.status === 'fulfilled' && overviewRes.value) || {}
     stats.totalSales = parseFloat((overview.total_sales || 0).toFixed(2)).toLocaleString('zh-CN')
 
-    const commissionSummary = (commissionRes && commissionRes.summary) || {}
+    const commissionSummary =
+      (commissionRes.status === 'fulfilled' && commissionRes.value && commissionRes.value.summary) || {}
     stats.totalCommission = parseFloat((commissionSummary.total_commission || 0).toFixed(2)).toLocaleString('zh-CN')
 
-    const o = overdueRes || {}
+    const o = (overdueRes.status === 'fulfilled' && overdueRes.value) || {}
     stats.overdueOrders = o.total_overdue || 0
     stats.overdueDays = o.overdue_days || 7
 
-    const f = (flowRes && flowRes.data) || flowRes || {}
+    const f =
+      (flowRes.status === 'fulfilled' && ((flowRes.value && flowRes.value.data) || flowRes.value)) || {}
     if (f.sales) {
       flow.sales.totalOrders = f.sales.total_orders || 0
       flow.sales.pendingOrders = f.sales.pending_orders || 0

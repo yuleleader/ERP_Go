@@ -683,19 +683,19 @@ async def get_process_flow_stats(
         return result.scalar() or 0
 
     # 销售段
-    total_orders = count(True)
-    sales_pending = count(Order.shipping_status == "pending")
-    sales_virtual = count(Order.shipping_status == "virtual")
-    sales_refunded = count(Order.shipping_status == "refunded")
+    total_orders = await count(True)
+    sales_pending = await count(Order.shipping_status == "pending")
+    sales_virtual = await count(Order.shipping_status == "virtual")
+    sales_refunded = await count(Order.shipping_status == "refunded")
 
     # 生产段
-    produce_unproduce = count(Order.produce_status == "unproduce")
-    produce_producing = count(Order.produce_status == "producing")
-    produce_produced = count(Order.produce_status == "produced")
+    produce_unproduce = await count(Order.produce_status == "unproduce")
+    produce_producing = await count(Order.produce_status == "producing")
+    produce_produced = await count(Order.produce_status == "produced")
 
     # 发货段
-    shipping_pending = count(Order.shipping_status == "pending")
-    shipping_shipped = count(Order.shipping_status == "shipped")
+    shipping_pending = await count(Order.shipping_status == "pending")
+    shipping_shipped = await count(Order.shipping_status == "shipped")
 
     return {
         "sales": {
