@@ -1096,6 +1096,7 @@ class WindowsLauncherApp:
 
         self.all_log_text.config(state=tk.NORMAL)
         self.all_log_text.insert(tk.END, log_line, tag)
+        self._trim_log_text(self.all_log_text)
         self.all_log_text.config(state=tk.DISABLED)
         self.all_log_text.see(tk.END)
 
@@ -1109,6 +1110,7 @@ class WindowsLauncherApp:
         if tw:
             tw.config(state=tk.NORMAL)
             tw.insert(tk.END, log_line, tag)
+            self._trim_log_text(tw)
             tw.config(state=tk.DISABLED)
             tw.see(tk.END)
 
@@ -1117,8 +1119,18 @@ class WindowsLauncherApp:
             bt = self.backup_log_text
             bt.config(state=tk.NORMAL)
             bt.insert(tk.END, log_line, tag)
+            self._trim_log_text(bt)
             bt.config(state=tk.DISABLED)
             bt.see(tk.END)
+
+    def _trim_log_text(self, tw, max_lines=1500):
+        """限制 Text 日志行数，防止长期运行后行数无限增长拖慢界面。"""
+        try:
+            line_count = int(tw.index('end-1c').split('.')[0])
+            if line_count > max_lines:
+                tw.delete('1.0', f'{line_count - max_lines}.0')
+        except Exception:
+            pass
 
     def add_backend_log(self, text, level='info'):
         self.add_log(text, 'backend')
@@ -1164,12 +1176,15 @@ class WindowsLauncherApp:
         关键：本方法自身是 after 回调，任何未捕获异常都会导致 mainloop 退出（闪退），
         因此日志写入与 UI 任务执行都必须逐条 try/except 兜底。
         """
-        # 消费日志队列（逐条兜底：单条日志异常不影响后续，更不让主循环退出）
-        while True:
+        # 消费日志队列（逐条兜底；每轮最多处理 MAX_BATCH 条，防止单轮堆积卡死主线程）
+        MAX_BATCH = 600
+        _cnt = 0
+        while _cnt < MAX_BATCH:
             try:
                 source, text = self.log_queue.get_nowait()
             except queue.Empty:
                 break
+            _cnt += 1
             try:
                 if source == 'backend':
                     self.add_backend_log(text)
@@ -1184,10 +1199,12 @@ class WindowsLauncherApp:
             except Exception:
                 pass
 
-        # 执行子线程入队的 UI 任务（此时必在主线程，可安全操作 Tk）
+        # 执行子线程入队的 UI 任务（此时必在主线程，可安全操作 Tk；每轮限 200 条）
         try:
-            while True:
+            _ui_cnt = 0
+            while _ui_cnt < 200:
                 fn, args = self.ui_queue.get_nowait()
+                _ui_cnt += 1
                 try:
                     fn(*args)
                 except Exception:
@@ -1379,12 +1396,8 @@ class WindowsLauncherApp:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
-        t = threading.Thread(
-            target=self.read_process_output,
-            args=(proc, 'backend'),
-            daemon=True
-        )
-        t.start()
+        # read_process_output 内部会为 stdout/stderr 各起一个独立 drain 线程并立即返回
+        self.read_process_output(proc, 'backend')
         return proc
 
     def _health_watchdog(self):
@@ -1402,15 +1415,25 @@ class WindowsLauncherApp:
         fail_count = 0
         # 连续多少次 /health 超时（端口仍监听）才判定为真死锁
         DEADLOCK_THRESHOLD = 12
+        # 后端启动/停止期间看门狗不干预；重启带 30s 冷却，避免后端反复崩溃时疯狂重启
+        self._last_watchdog_restart = 0.0
         while True:
             _time.sleep(15)
             # 用户点了"停止"：停止自愈，绝不自动重启（保持循环以便下次"启动"重置标志后恢复）
             if getattr(self, '_stop_requested', False):
                 fail_count = 0
                 continue
+            # 启动/停止流程进行中：不干预
+            if getattr(self, '_starting', False):
+                fail_count = 0
+                continue
             try:
                 if not is_port_open(8000):
-                    # 端口彻底不通 = 后端进程已退出 → 明确需要重启
+                    # 端口彻底不通 = 后端进程已退出 → 明确需要重启（带 30s 冷却）
+                    now = _time.time()
+                    if now - getattr(self, '_last_watchdog_restart', 0.0) < 30:
+                        continue
+                    self._last_watchdog_restart = now
                     self.log_queue.put(('backend', "看门狗：8000 端口未监听，正在自动重启后端"))
                     self.backend_process = self._start_backend()
                     fail_count = 0
@@ -1441,132 +1464,143 @@ class WindowsLauncherApp:
         self.add_log("开始启动系统...", 'system')
 
         def run_start():
-            if not self.check_python_version():
-                self._set_button_state(start='normal')
-                return
+            # 启动流程期间禁止看门狗干预（避免与 run_start 竞争启动后端）
+            self._starting = True
+            try:
+                if not self.check_python_version():
+                    self._set_button_state(start='normal')
+                    return
 
-            if not self.install_backend_deps():
-                self._set_button_state(start='normal')
-                return
+                if not self.install_backend_deps():
+                    self._set_button_state(start='normal')
+                    return
 
-            if not self.install_frontend_deps():
-                self._set_button_state(start='normal')
-                return
+                if not self.install_frontend_deps():
+                    self._set_button_state(start='normal')
+                    return
 
-            if not self.ensure_directories():
-                self._set_button_state(start='normal')
-                return
+                if not self.ensure_directories():
+                    self._set_button_state(start='normal')
+                    return
 
-            self.check_database()
+                self.check_database()
 
-            # 先清理本启动器自己可能残留的子进程（绝不无差别 kill 端口，避免误杀外部进程）
-            self.kill_own_process(getattr(self, 'backend_process', None))
-            self.backend_process = None
-            self.kill_own_process(getattr(self, 'frontend_process', None))
-            self.frontend_process = None
-            time.sleep(1)
+                # 先清理本启动器自己可能残留的子进程（绝不无差别 kill 端口，避免误杀外部进程）
+                self.kill_own_process(getattr(self, 'backend_process', None))
+                self.backend_process = None
+                self.kill_own_process(getattr(self, 'frontend_process', None))
+                self.frontend_process = None
+                time.sleep(1)
 
-            # 启动自愈看门狗（仅一次）：仅重启本启动器自己管理的后端，绝不误杀外部进程
-            # 同时重置停止标志：允许看门狗在本次启动后恢复自愈能力
-            self._stop_requested = False
-            if not getattr(self, '_watchdog_started', False):
-                threading.Thread(target=self._health_watchdog, daemon=True).start()
-                self._watchdog_started = True
+                # 启动自愈看门狗（仅一次）：仅重启本启动器自己管理的后端，绝不误杀外部进程
+                # 同时重置停止标志：允许看门狗在本次启动后恢复自愈能力
+                self._stop_requested = False
+                if not getattr(self, '_watchdog_started', False):
+                    threading.Thread(target=self._health_watchdog, daemon=True).start()
+                    self._watchdog_started = True
 
-            # 若 8000 已被外部健康进程占用，则复用而非重复启动（避免端口冲突与误杀）
-            external_backend_healthy = is_port_open(8000) and is_service_healthy('http://localhost:8000/health', timeout=3)
-            if external_backend_healthy:
-                self.add_log("复用外部已运行的后端服务 (端口:8000)，本启动器不再重复启动", 'success')
-                self._ui_set_service('backend', "运行中", self.colors['green'])
-                self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
-            else:
-                if is_port_open(8000):
-                    self.add_log("8000 端口被占用但无 HTTP 响应，可能是外部异常进程，请手动停止后重试", 'warning')
-                self.add_log("正在启动后端服务...", 'system')
-                self._ui_set_service('backend', "启动中...", self.colors['blue'])
-                self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
-
-                self.backend_process = self._start_backend()
-
-                if self.wait_for_port(8000):
+                # 若 8000 已被外部健康进程占用，则复用而非重复启动（避免端口冲突与误杀）
+                external_backend_healthy = is_port_open(8000) and is_service_healthy('http://localhost:8000/health', timeout=3)
+                if external_backend_healthy:
+                    self.add_log("复用外部已运行的后端服务 (端口:8000)，本启动器不再重复启动", 'success')
+                    self._ui_set_service('backend', "运行中", self.colors['green'])
                     self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
-                    # 端口通了后再做 HTTP 健康检查确保服务真正可用
-                    if is_service_healthy('http://localhost:8000/health', timeout=3):
-                        self.add_log("后端服务启动成功并健康就绪 (端口:8000)", 'success')
-                        self._ui_set_service('backend', "运行中", self.colors['green'])
-                    else:
-                        self.add_log("后端端口已开放但 HTTP 服务未就绪，继续等待...", 'warning')
-                        time.sleep(2)
-                        if is_service_healthy('http://localhost:8000/health', timeout=5):
-                            self.add_log("后端服务最终就绪 (端口:8000)", 'success')
+                else:
+                    if is_port_open(8000):
+                        self.add_log("8000 端口被占用但无 HTTP 响应，可能是外部异常进程，请手动停止后重试", 'warning')
+                    self.add_log("正在启动后端服务...", 'system')
+                    self._ui_set_service('backend', "启动中...", self.colors['blue'])
+                    self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
+
+                    self.backend_process = self._start_backend()
+
+                    if self.wait_for_port(8000):
+                        self._update_progress(self.backend_progress_canvas, 180, self.colors['green'])
+                        # 端口通了后再做 HTTP 健康检查确保服务真正可用
+                        if is_service_healthy('http://localhost:8000/health', timeout=3):
+                            self.add_log("后端服务启动成功并健康就绪 (端口:8000)", 'success')
                             self._ui_set_service('backend', "运行中", self.colors['green'])
                         else:
-                            self.add_log("后端服务可能异常，请检查后端控制台日志", 'error')
-                            self._ui_set_service('backend', "异常", self.colors['orange'])
-                else:
-                    self._update_progress(self.backend_progress_canvas, 180, self.colors['orange'])
-                    self.add_log("后端服务启动超时，可能仍在启动中...", 'warning')
-                    self._ui_set_service('backend', "运行中", self.colors['green'])
-
-            # 若 5173 已被外部健康进程占用，则复用而非重复启动（避免端口冲突与误杀）
-            external_frontend_healthy = is_port_open(5173) and is_service_healthy('http://localhost:5173', timeout=3)
-            if external_frontend_healthy:
-                self.add_log("复用外部已运行的前端服务 (端口:5173)，本启动器不再重复启动", 'success')
-                self._ui_set_service('frontend', "运行中", self.colors['green'])
-                self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
-            else:
-                if is_port_open(5173):
-                    self.add_log("5173 端口被占用但无 HTTP 响应，可能是外部异常进程，请手动停止后重试", 'warning')
-                self.add_log("正在启动前端服务...", 'system')
-                self._ui_set_service('frontend', "启动中...", self.colors['blue'])
-                self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
-
-                frontend_dir = os.path.join(os.path.dirname(__file__), 'frontend')
-                self.frontend_process = subprocess.Popen(
-                    ['cmd', '/c', 'npm', 'run', 'dev'],
-                    cwd=frontend_dir,
-                    creationflags=CREATE_NO_WINDOW,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=False
-                )
-
-                self.frontend_log_thread = threading.Thread(
-                    target=self.read_process_output,
-                    args=(self.frontend_process, 'frontend'),
-                    daemon=True
-                )
-                self.frontend_log_thread.start()
-
-                if self.wait_for_port(5173):
-                    self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
-                    if is_service_healthy('http://localhost:5173', timeout=3):
-                        self.add_log("前端服务启动成功并健康就绪 (端口:5173)", 'success')
-                        self._ui_set_service('frontend', "运行中", self.colors['green'])
+                            self.add_log("后端端口已开放但 HTTP 服务未就绪，继续等待...", 'warning')
+                            time.sleep(2)
+                            if is_service_healthy('http://localhost:8000/health', timeout=5):
+                                self.add_log("后端服务最终就绪 (端口:8000)", 'success')
+                                self._ui_set_service('backend', "运行中", self.colors['green'])
+                            else:
+                                self.add_log("后端服务可能异常，请检查后端控制台日志", 'error')
+                                self._ui_set_service('backend', "异常", self.colors['orange'])
                     else:
-                        self.add_log("前端端口已开放但 HTTP 服务未就绪，继续等待...", 'warning')
-                        time.sleep(2)
-                        if is_service_healthy('http://localhost:5173', timeout=5):
-                            self.add_log("前端服务最终就绪 (端口:5173)", 'success')
+                        self._update_progress(self.backend_progress_canvas, 180, self.colors['orange'])
+                        self.add_log("后端服务启动超时，可能仍在启动中...", 'warning')
+                        self._ui_set_service('backend', "运行中", self.colors['green'])
+
+                # 若 5173 已被外部健康进程占用，则复用而非重复启动（避免端口冲突与误杀）
+                external_frontend_healthy = is_port_open(5173) and is_service_healthy('http://localhost:5173', timeout=3)
+                if external_frontend_healthy:
+                    self.add_log("复用外部已运行的前端服务 (端口:5173)，本启动器不再重复启动", 'success')
+                    self._ui_set_service('frontend', "运行中", self.colors['green'])
+                    self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
+                else:
+                    if is_port_open(5173):
+                        self.add_log("5173 端口被占用但无 HTTP 响应，可能是外部异常进程，请手动停止后重试", 'warning')
+                    self.add_log("正在启动前端服务...", 'system')
+                    self._ui_set_service('frontend', "启动中...", self.colors['blue'])
+                    self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
+
+                    frontend_dir = os.path.join(os.path.dirname(__file__), 'frontend')
+                    self.frontend_process = subprocess.Popen(
+                        ['cmd', '/c', 'npm', 'run', 'dev'],
+                        cwd=frontend_dir,
+                        creationflags=CREATE_NO_WINDOW,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        shell=False
+                    )
+
+                    self.read_process_output(self.frontend_process, 'frontend')
+
+                    if self.wait_for_port(5173):
+                        self._update_progress(self.frontend_progress_canvas, 180, self.colors['green'])
+                        if is_service_healthy('http://localhost:5173', timeout=3):
+                            self.add_log("前端服务启动成功并健康就绪 (端口:5173)", 'success')
                             self._ui_set_service('frontend', "运行中", self.colors['green'])
                         else:
-                            self.add_log("前端服务可能异常，请检查前端控制台日志", 'error')
-                            self._ui_set_service('frontend', "异常", self.colors['orange'])
-                else:
-                    self._update_progress(self.frontend_progress_canvas, 180, self.colors['orange'])
-                    self.add_log("前端服务启动超时，可能仍在启动中...", 'warning')
-                    self._ui_set_service('frontend', "运行中", self.colors['green'])
+                            self.add_log("前端端口已开放但 HTTP 服务未就绪，继续等待...", 'warning')
+                            time.sleep(2)
+                            if is_service_healthy('http://localhost:5173', timeout=5):
+                                self.add_log("前端服务最终就绪 (端口:5173)", 'success')
+                                self._ui_set_service('frontend', "运行中", self.colors['green'])
+                            else:
+                                self.add_log("前端服务可能异常，请检查前端控制台日志", 'error')
+                                self._ui_set_service('frontend', "异常", self.colors['orange'])
+                    else:
+                        self._update_progress(self.frontend_progress_canvas, 180, self.colors['orange'])
+                        self.add_log("前端服务启动超时，可能仍在启动中...", 'warning')
+                        self._ui_set_service('frontend', "运行中", self.colors['green'])
 
-            self.add_log("所有服务启动完成", 'success')
+                self.add_log("所有服务启动完成", 'success')
 
-            self._set_button_state(start='normal', stop='normal', open='normal')
+                self._set_button_state(start='normal', stop='normal', open='normal')
 
-            time.sleep(2)
-            self._to_ui(self.open_browser)
+                time.sleep(2)
+                self._to_ui(self.open_browser)
+            finally:
+                self._starting = False
 
         threading.Thread(target=run_start, daemon=True).start()
 
     def stop_services(self):
+        """对外入口：主线程点击"停止系统"时转后台线程执行，避免 sleep 阻塞 UI；
+        子线程调用（还原备份流程）则同步执行。"""
+        if threading.current_thread() is self._main_thread:
+            if getattr(self, '_stop_in_progress', False):
+                return
+            self._stop_in_progress = True
+            threading.Thread(target=self._stop_services_impl, daemon=True).start()
+        else:
+            self._stop_services_impl()
+
+    def _stop_services_impl(self):
         self.add_log("正在停止服务...", 'system')
 
         # 置位停止标志：看门狗收到后不再自动重启（避免"点了停止又被拉起来"）
@@ -1608,6 +1642,7 @@ class WindowsLauncherApp:
         self.backend_process = None
         self.frontend_process = None
         self._set_button_state(start='normal', stop='disabled', open='disabled')
+        self._stop_in_progress = False
 
     def open_browser(self):
         self.add_log("正在打开浏览器...", 'system')
@@ -1671,6 +1706,7 @@ class WindowsLauncherApp:
         self.backup_scheduler_thread = None
 
     def _backup_scheduler_loop(self):
+        last_logged_next = None
         while not self.backup_scheduler_event.is_set():
             cfg = self.backup_config.get('auto_backup', {})
             if not cfg.get('enabled'):
@@ -1678,7 +1714,10 @@ class WindowsLauncherApp:
             next_time = self._compute_next_backup_time(cfg)
             now = datetime.now()
             wait_seconds = max(60, int((next_time - now).total_seconds()))
-            self.add_log(f"下次自动备份时间: {next_time.strftime('%Y-%m-%d %H:%M')}", 'system', channel='backup')
+            # 仅当下次时间变化时才打印，避免每 60s 刷一条日志堆积
+            if next_time.strftime('%Y-%m-%d %H:%M') != last_logged_next:
+                self.add_log(f"下次自动备份时间: {next_time.strftime('%Y-%m-%d %H:%M')}", 'system', channel='backup')
+                last_logged_next = next_time.strftime('%Y-%m-%d %H:%M')
             slept = 0
             while slept < wait_seconds and not self.backup_scheduler_event.is_set():
                 chunk = min(60, wait_seconds - slept)
@@ -2000,6 +2039,7 @@ class WindowsLauncherApp:
             try:
                 tw.config(state=tk.NORMAL)
                 tw.insert(tk.END, line, tag)
+                self._trim_log_text(tw)
                 tw.config(state=tk.DISABLED)
                 tw.see(tk.END)
             except Exception:
@@ -2008,6 +2048,7 @@ class WindowsLauncherApp:
         if getattr(self, '_settings_view_open', False) and getattr(self, 'settings_log_text', None):
             self.settings_log_text.config(state=tk.NORMAL)
             self.settings_log_text.insert(tk.END, line, tag)
+            self._trim_log_text(self.settings_log_text)
             self.settings_log_text.config(state=tk.DISABLED)
             self.settings_log_text.see(tk.END)
 
@@ -2131,7 +2172,8 @@ class WindowsLauncherApp:
         # 检测端口占用而不仅是进程对象，覆盖非本启动器启动的服务
         if is_port_open(8000) or is_port_open(5173) or self.backend_process or self.frontend_process:
             if messagebox.askokcancel("退出确认", "服务正在运行中，确定要退出吗？\n退出时将自动停止所有相关进程。"):
-                self.stop_services()
+                # 退出时同步停止（不转后台线程），确保进程停干净后再销毁窗口
+                self._stop_services_impl()
                 self.root.destroy()
         else:
             self.root.destroy()
