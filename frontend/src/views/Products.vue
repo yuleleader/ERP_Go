@@ -185,6 +185,7 @@
                     :file-list="imageFileList"
                     :on-exceed="onImageExceed"
                     :on-remove="handleImageRemove"
+                    :on-preview="handleUploadPreview"
                     :http-request="customUpload"
                     :disabled="imageUploading"
                   >
@@ -375,6 +376,14 @@
         </table>
       </div>
     </el-dialog>
+
+    <!-- 上传区图片大图预览 -->
+    <el-image-viewer
+      v-if="uploadPreviewVisible"
+      :url-list="uploadPreviewList"
+      :initial-index="uploadPreviewIndex"
+      @close="uploadPreviewVisible = false"
+    />
   </div>
 </template>
 
@@ -702,6 +711,21 @@ function resetForm() {
 }
 
 // ===== 图片上传（自定义 http-request） =====
+const uploadPreviewVisible = ref(false)
+const uploadPreviewList = ref([])
+const uploadPreviewIndex = ref(0)
+
+// 点击上传区缩略图 → 打开大图预览（支持左右切换/退出）
+function handleUploadPreview(file) {
+  const urls = imageFileList.value.map((f) => f.url)
+  const idx = imageFileList.value.findIndex(
+    (f) => (file.uid && f.uid === file.uid) || (file.name && f.name === file.name)
+  )
+  uploadPreviewList.value = urls
+  uploadPreviewIndex.value = Math.max(0, idx)
+  uploadPreviewVisible.value = true
+}
+
 function onImageExceed() {
   ElMessage.warning('每个商品最多上传 5 张图片')
 }

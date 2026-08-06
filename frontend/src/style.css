@@ -2,8 +2,19 @@
   z-index: 99999 !important;
 }
 
+/* 注意：不要给 __mask 单独提高 z-index！
+   遮罩(mask) 与 关闭/左右切换按钮(btn) 是同一层的兄弟节点，
+   若 mask 层级过高会盖住按钮导致"无法点击左右和退出"。
+   这里仅把按钮层级提到 mask 之上，确保可点。 */
 .el-image-viewer__mask {
-  z-index: 99998 !important;
+  z-index: 0 !important;
+}
+
+.el-image-viewer__btn,
+.el-image-viewer__close,
+.el-image-viewer__prev,
+.el-image-viewer__next {
+  z-index: 100 !important;
 }
 
 .el-table__fixed-right {
