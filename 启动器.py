@@ -2091,7 +2091,7 @@ class WindowsLauncherApp:
 
 
     # ═══════════════════════════════════════
-    # macOS 风格标题栏：红黄绿交通灯 + 拖拽 + 缩放
+    # Windows 风格标题栏：右上角 最小化/最大化/关闭 + 拖拽 + 缩放
     # ═══════════════════════════════════════
     def create_title_bar(self):
         TITLE_H = 40
@@ -2110,12 +2110,12 @@ class WindowsLauncherApp:
         title_bar.pack_propagate(False)
         self.title_bar = title_bar
 
-        # 左侧红黄绿交通灯
-        lights = tk.Frame(title_bar, bg=self.colors['title_bar_bg'])
-        lights.pack(side=tk.LEFT, padx=(16, 0))
-        self._make_traffic_light(lights, '#ff5f57', self._on_close, 'close')
-        self._make_traffic_light(lights, '#febc2e', self._on_minimize, 'min')
-        self._make_traffic_light(lights, '#28c840', self._on_zoom, 'zoom')
+        # 右侧 Windows 风格按钮：最小化 / 最大化(还原) / 关闭
+        btns = tk.Frame(title_bar, bg=self.colors['title_bar_bg'])
+        btns.pack(side=tk.RIGHT)
+        self._make_win_button(btns, 'min', self._on_minimize)
+        self._max_btn = self._make_win_button(btns, 'max', self._on_zoom)
+        self._make_win_button(btns, 'close', self._on_close)
 
         # 居中标题
         tk.Label(title_bar, text="ERP_GO 订单管理系统", font=('微软雅黑', 13, 'bold'),
@@ -2139,24 +2139,42 @@ class WindowsLauncherApp:
 
         self._center_window()
 
-    def _make_traffic_light(self, parent, color, cmd, glyph):
-        cv = tk.Canvas(parent, width=14, height=14, bg=self.colors['title_bar_bg'],
+    def _make_win_button(self, parent, kind, cmd):
+        W, H = 46, 40
+        base = self.colors['title_bar_bg']
+        icon_color = self.colors['text_primary']
+        hover_bg = '#c42b1c' if kind == 'close' else '#e8e8ed'  # 关闭悬停红，其余悬停浅灰
+
+        cv = tk.Canvas(parent, width=W, height=H, bg=base,
                        highlightthickness=0, cursor='hand2')
-        cv.pack(side=tk.LEFT, padx=(0, 8))
+        cv.pack(side=tk.LEFT)
 
         def redraw(hover=False):
             cv.delete('all')
-            cx, cy, r = 7, 7, 6
-            cv.create_oval(cx - r, cy - r, cx + r, cy + r, fill=color, outline='')
-            if hover:
-                g = {'close': '✕', 'min': '–', 'zoom': '+'}.get(glyph, '')
-                cv.create_text(cx, cy + 0.5, text=g, font=('Arial', 8, 'bold'), fill='#5b5b5b')
+            cv.configure(bg=hover_bg if hover else base)
+            fg = '#ffffff' if (hover and kind == 'close') else icon_color
+            cx, cy = W / 2, H / 2
+            if kind == 'min':
+                cv.create_rectangle(cx - 6, cy - 1, cx + 6, cy + 1, fill=fg, outline='')
+            elif kind == 'max':
+                if self.root.state() == 'zoomed':
+                    # 还原图标：外框 + 内层框（右上重叠）
+                    cv.create_rectangle(cx - 7, cy - 6, cx + 6, cy + 7, outline=fg, width=1.3)
+                    cv.create_rectangle(cx - 4, cy - 3, cx + 9, cy + 5,
+                                        fill=hover_bg if hover else base, outline=fg, width=1.3)
+                else:
+                    cv.create_rectangle(cx - 7, cy - 6, cx + 7, cy + 6, outline=fg, width=1.4)
+            else:  # close
+                r = 4.5
+                cv.create_line(cx - r, cy - r, cx + r, cy + r, fill=fg, width=1.6)
+                cv.create_line(cx - r, cy + r, cx + r, cy - r, fill=fg, width=1.6)
 
         cv._redraw = redraw
         cv.bind('<Enter>', lambda e: redraw(hover=True))
         cv.bind('<Leave>', lambda e: redraw(hover=False))
         cv.bind('<ButtonPress-1>', lambda e: (cmd(), 'break')[1])
         redraw()
+        return cv
 
     def _start_move(self, e):
         self._mx = e.x_root
@@ -2182,6 +2200,8 @@ class WindowsLauncherApp:
                 self.root.state('zoomed')
         except Exception:
             pass
+        if getattr(self, '_max_btn', None):
+            self._max_btn._redraw(hover=False)
 
     def _on_press(self, e):
         # 标题栏区域交给拖拽处理，不触发缩放
