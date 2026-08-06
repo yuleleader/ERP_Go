@@ -42,10 +42,6 @@
           <el-button :disabled="!canAdd" type="primary" plain @click="showAddDialog">新增</el-button>
           <el-button :disabled="!canModify" @click="showModifyDialog">修改</el-button>
           <el-button :disabled="!canDelete" type="danger" plain @click="confirmDelete">删除</el-button>
-          <el-button disabled @click="notImplemented('打印')">打印</el-button>
-          <el-button disabled @click="notImplemented('导出')">导出</el-button>
-          <el-button disabled @click="notImplemented('设置')">设置</el-button>
-          <el-button disabled @click="notImplemented('退出')">退出</el-button>
         </div>
 
         <!-- 搜索框 -->
@@ -56,8 +52,9 @@
             placeholder="关键字可输入编码、名称进行查询"
             clearable
             style="width: 280px;"
+            @keyup.enter="applyQuery"
           />
-          <el-button @click="resetFilter" style="margin-left: 10px;">重写</el-button>
+          <el-button type="primary" @click="applyQuery" style="margin-left: 10px;">查询</el-button>
           <span class="table-title">{{ currentTableTitle }}</span>
         </div>
 
@@ -65,7 +62,12 @@
         <el-table :data="filteredRows" v-loading="loading" border style="width: 100%;" empty-text="暂无数据">
           <el-table-column type="index" label="行号" width="70" align="center" />
           <el-table-column prop="code" label="编码" min-width="180" />
-          <el-table-column prop="name" label="名称" min-width="220" />
+          <el-table-column prop="name" label="名称" min-width="220">
+            <template #default="{ row }">
+              <span>{{ row.name }}</span>
+              <el-tag v-if="row.isSelf" size="small" type="warning" style="margin-left: 6px;">本类</el-tag>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
     </div>
@@ -119,10 +121,10 @@
  * 类别管理（导航管理 > 类别）
  * - 顶部面包屑 + 关闭
  * - 左：所有类别树（一级 + 二级）
- * - 右：按左树选中层级切换右表内容（根=一级 / 选一级=二级 / 选二级=商品）
- * - 操作：新增/修改/删除可用；打印/导出/设置/退出占位
+ * - 右：按左树选中层级切换右表内容（根=一级 / 选一级=父类自身+其下二级 / 选二级=商品）
+ * - 操作：新增/修改/删除
  * - 删除：有子项禁删
- * - 搜索：前端按关键字过滤当前右表
+ * - 查询：输入关键字点击"查询"（或回车）过滤当前右表
  */
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
@@ -179,7 +181,7 @@ function findNodeById(nodes, id) {
 // ===== 选中 =====
 function onTreeSelect(node) {
   selectedNode.value = node
-  resetFilter()
+  resetQuery()
 }
 
 // ===== 当前层级与右表内容 =====
@@ -190,7 +192,7 @@ const allRows = ref([])  // 当前右表的"原始"数据（不经过筛选）
 
 const currentTableTitle = computed(() => {
   if (selectedLevel.value === 0) return '全部一级类别'
-  if (selectedLevel.value === 1) return `一级 [${selectedNode.value.category_code}]${selectedNode.value.category_name} 的子类别`
+  if (selectedLevel.value === 1) return `一级 [${selectedNode.value.category_code}]${selectedNode.value.category_name} 及其子类别`
   if (selectedLevel.value === 2) return `二级 [${selectedNode.value.category_code}]${selectedNode.value.category_name} 的商品`
   return ''
 })
@@ -205,11 +207,19 @@ async function loadRightRows() {
     return
   }
   if (selectedLevel.value === 1) {
-    // 选一级：其下二级
+    // 选一级：父类自身 + 其下二级（父类排第一行，带"本类"标记）
     const children = selectedNode.value.children || []
-    allRows.value = children.map(n => ({
-      id: n.id, code: n.category_code, name: n.category_name
-    }))
+    allRows.value = [
+      {
+        id: selectedNode.value.id,
+        code: selectedNode.value.category_code,
+        name: selectedNode.value.category_name,
+        isSelf: true
+      },
+      ...children.map(n => ({
+        id: n.id, code: n.category_code, name: n.category_name
+      }))
+    ]
     return
   }
   if (selectedLevel.value === 2) {
@@ -228,10 +238,16 @@ async function loadRightRows() {
   }
 }
 
-// 前端筛选当前右表
+// 查询：输入关键字后点击"查询"（或回车）才对当前右表过滤
 const filterKeyword = ref('')
+const appliedKeyword = ref('')
+
+function applyQuery() {
+  appliedKeyword.value = filterKeyword.value.trim().toLowerCase()
+}
+
 const filteredRows = computed(() => {
-  const kw = filterKeyword.value.trim().toLowerCase()
+  const kw = appliedKeyword.value
   if (!kw) return allRows.value
   return allRows.value.filter(r =>
     String(r.code || '').toLowerCase().includes(kw) ||
@@ -239,9 +255,10 @@ const filteredRows = computed(() => {
   )
 })
 
-function resetFilter() {
+// 切换选中节点时清空查询条件
+function resetQuery() {
   filterKeyword.value = ''
-  loadRightRows()
+  appliedKeyword.value = ''
 }
 
 // ===== 按钮可用性 =====
@@ -405,11 +422,6 @@ async function confirmDelete() {
       ElMessage.error(e.response?.data?.detail || '删除失败')
     }
   }
-}
-
-// ===== 占位按钮 =====
-function notImplemented(name) {
-  ElMessage.info(`${name}功能暂未开放`)
 }
 
 // ===== 面包屑与关闭 =====
