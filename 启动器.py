@@ -1124,29 +1124,32 @@ class WindowsLauncherApp:
         self.add_log(text, 'frontend')
 
     def read_process_output(self, process, source):
-        """线程安全地读取子进程管道。
+        """读取子进程 stdout/stderr（兼容旧调用：由本函数内部起两个线程分别 drain 两个管道）。
 
-        ⚠️ 关键：子线程**绝不能直接调用任何 Tkinter 方法**（包括 self.root.after）。
-        Tkinter/Tcl 解释器不是线程安全的，子线程调用 after() 会与主线程竞争 Tcl 锁，
-        导致读线程死锁、停止 drain 管道，进而后端写 stdout 被阻塞、整个事件循环挂起
-        （表现为“后端端口在监听但所有请求超时”）。
-
-        本方法只负责把日志放入线程安全的 queue，所有 Tkinter 更新交由主线程的
-        _poll_log_queue 完成。
+        历史教训（死锁根因）：
+        - 旧实现是在【一个线程】里顺序 readline stdout 再 readline stderr——
+          若 stdout 长时间无输出，readline 阻塞，stderr 永远读不到；
+          后端一旦大量写 stderr（错误堆栈），stderr 管道缓冲区（64KB）写满，
+          后端写 stderr 阻塞 → 整个事件循环挂起（端口在监听但所有请求超时）。
+        - 本方法改为【两个独立线程】分别 drain stdout 和 stderr，互不阻塞。
+        - 仍遵守铁律：子线程绝不直接调用任何 Tkinter 方法（包括 root.after），
+          只把日志放入线程安全的 log_queue，由主线程 _poll_log_queue 消费。
         """
-        try:
-            while process.poll() is None:
-                line = process.stdout.readline()
-                if line:
-                    decoded = line.decode('utf-8', errors='ignore').strip()
-                    if decoded:
-                        self.log_queue.put((source, decoded))
+        threading.Thread(target=self._read_single_pipe, args=(process, source, 'stdout'), daemon=True).start()
+        threading.Thread(target=self._read_single_pipe, args=(process, source, 'stderr'), daemon=True).start()
 
-                line = process.stderr.readline()
-                if line:
-                    decoded = line.decode('utf-8', errors='ignore').strip()
-                    if decoded:
-                        self.log_queue.put((source + '_err', decoded))
+    def _read_single_pipe(self, process, source, pipe):
+        """独立线程 drain 单个管道（stdout 或 stderr），互不阻塞。"""
+        stream = process.stdout if pipe == 'stdout' else process.stderr
+        tag = source if pipe == 'stdout' else source + '_err'
+        try:
+            while True:
+                line = stream.readline()
+                if not line:
+                    break  # EOF：进程退出或管道关闭
+                decoded = line.decode('utf-8', errors='ignore').strip()
+                if decoded:
+                    self.log_queue.put((tag, decoded))
         except Exception:
             pass
 
