@@ -77,43 +77,44 @@ class WindowsLauncherApp:
         self.root.geometry("1240x880")
         self.root.minsize(980, 680)
         self.root.resizable(True, True)
-        self.root.configure(bg='#2c3138')
+        self.root.configure(bg='#0d1117')
 
         self.colors = {
-            'bg':              '#2c3138',   # 主背景（深灰蓝，磨砂玻璃风）
-            'bg_light':        '#323841',   # 浅色背景
-            'card':            '#374151',   # 卡片背景
-            'card_border':     '#46505e',   # 卡片边框（淡亮边）
-            'card_border_glow': '#4ade80',  # 卡片霓虹边框
-            'text_primary':    '#e5e7eb',   # 主文字
-            'text_secondary':  '#9ca3af',   # 辅助文字
-            'text_tertiary':   '#6b7280',   # 三级文字
-            'blue':            '#3b82f6',   # 科技蓝
-            'blue_light':      '#60a5fa',   # 蓝色悬停
-            'blue_dark':       '#2563eb',   # 蓝色按下
-            'green':           '#4ade80',   # 成功绿
-            'green_light':     '#6ee7a0',   # 绿色悬停
-            'green_dark':      '#22c55e',   # 绿色按下
+            'bg':              '#0d1117',   # 主背景（深空黑蓝，科技风）
+            'bg_light':        '#10161f',   # 浅色背景
+            'card':            '#141c28',   # 卡片背景（深海军蓝）
+            'card_border':     '#22354d',   # 卡片边框（暗青描边）
+            'card_border_glow': '#22d3ee',  # 卡片霓虹边框（青色）
+            'text_primary':    '#e2e8f0',   # 主文字
+            'text_secondary':  '#8b98ab',   # 辅助文字
+            'text_tertiary':   '#5b6b83',   # 三级文字
+            'blue':            '#38bdf8',   # 科技蓝
+            'blue_light':      '#7dd3fc',   # 蓝色悬停
+            'blue_dark':       '#0284c7',   # 蓝色按下
+            'green':           '#34d399',   # 成功绿（青绿）
+            'green_light':     '#6ee7b7',   # 绿色悬停
+            'green_dark':      '#10b981',   # 绿色按下
             'red':             '#f87171',   # 危险红
             'red_light':       '#fca5a5',   # 红色悬停
             'red_dark':        '#ef4444',   # 红色按下
-            'orange':          '#f59e0b',   # 警告橙
-            'yellow':          '#eab308',   # 黄色
-            'cyan':            '#22d3ee',   # 青色
+            'orange':          '#fbbf24',   # 警告橙
+            'yellow':          '#facc15',   # 黄色
+            'cyan':            '#22d3ee',   # 青色（主强调）
+            'cyan_dim':        '#164e63',   # 青色暗态（描边/轨道）
             'purple':          '#a78bfa',   # 紫色
-            'progress_track':  '#4b5563',   # 进度条轨道
-            'progress_fill':   '#4ade80',   # 进度条填充
-            'log_bg':          '#1e2228',   # 终端日志背景
+            'progress_track':  '#223047',   # 进度条轨道
+            'progress_fill':   '#34d399',   # 进度条填充
+            'log_bg':          '#0a0f16',   # 终端日志背景（近黑）
             'log_text':        '#cbd5e1',   # 终端日志文字
-            'log_border':      '#374151',   # 终端边框
-            'divider':         '#4b5563',   # 分割线
-            'tab_active_bg':   '#4ade80',   # 标签页激活背景（绿）
-            'tab_active_border': '#4ade80', # 标签页激活边框
-            'tab_inactive_bg': '#374151',   # 标签页非激活背景
-            'tab_inactive_text': '#9ca3af', # 标签页非激活文字
-            'title_bar_bg':    '#1e2227',   # 标题栏背景
-            'title_bar_btn':   '#374151',   # 标题栏按钮背景
-            'title_bar_btn_hover': '#46505e', # 标题栏按钮悬停
+            'log_border':      '#1f2a3a',   # 终端边框
+            'divider':         '#223047',   # 分割线
+            'tab_active_bg':   '#22d3ee',   # 标签页激活背景（青色）
+            'tab_active_border': '#22d3ee', # 标签页激活边框
+            'tab_inactive_bg': '#111a26',   # 标签页非激活背景
+            'tab_inactive_text': '#64748b', # 标签页非激活文字
+            'title_bar_bg':    '#0d1117',   # 标题栏背景
+            'title_bar_btn':   '#141c28',   # 标题栏按钮背景
+            'title_bar_btn_hover': '#1f2a3a', # 标题栏按钮悬停
         }
 
         self.style = ttk.Style()
@@ -246,16 +247,16 @@ class WindowsLauncherApp:
         # ═══════════════════════════════════════
         # Sidebar (72px)
         # ═══════════════════════════════════════
-        sidebar = tk.Frame(self.root, bg='#1e2227', width=72)
+        sidebar = tk.Frame(self.root, bg='#0a0e14', width=72)
         sidebar.pack(side=tk.LEFT, fill=tk.Y)
         sidebar.pack_propagate(False)
 
-        sidebar_top = tk.Frame(sidebar, bg='#1e2227')
+        sidebar_top = tk.Frame(sidebar, bg='#0a0e14')
         sidebar_top.pack(side=tk.TOP, fill=tk.X, pady=(22, 0))
 
-        # 侧边栏仅保留首页与设置两个有效入口（矢量线性图标）
+        # 侧边栏仅保留首页与设置两个有效入口（矢量线性图标，科技青色高亮）
         def make_nav_icon(parent, name, cmd, active_view, pad_bottom=0):
-            cv = tk.Canvas(parent, width=40, height=40, bg='#1e2227',
+            cv = tk.Canvas(parent, width=40, height=40, bg='#0a0e14',
                            highlightthickness=0, cursor='hand2')
             cv.pack(pady=(0, pad_bottom))
             cv._name = name
@@ -265,11 +266,11 @@ class WindowsLauncherApp:
                 cv.delete('all')
                 active = getattr(self, '_current_view', 'home') == active_view
                 if active:
-                    bg, icon_color = '#22c55e', '#ffffff'
+                    bg, icon_color = '#164e63', '#22d3ee'
                 elif hover:
-                    bg, icon_color = '#2a2f37', '#cbd5e1'
+                    bg, icon_color = '#131c2a', '#cbd5e1'
                 else:
-                    bg, icon_color = '#1e2227', '#9ca3af'
+                    bg, icon_color = '#0a0e14', '#5b6b83'
                 cv.configure(bg=bg)
                 self._draw_icon(cv, name, 20, 20, 22, icon_color)
 
@@ -281,7 +282,7 @@ class WindowsLauncherApp:
             return cv
 
         self.nav_home = make_nav_icon(sidebar_top, 'home', self._show_home_view, 'home', pad_bottom=18)
-        sidebar_bottom = tk.Frame(sidebar, bg='#1e2227')
+        sidebar_bottom = tk.Frame(sidebar, bg='#0a0e14')
         sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 22))
         self.nav_settings = make_nav_icon(sidebar_bottom, 'settings', self.open_settings_window, 'settings')
 
@@ -296,13 +297,51 @@ class WindowsLauncherApp:
         main = tk.Frame(self.root, bg=root_bg)
         main.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        # ═══════════════════════════════════════
+        # Top HUD header：品牌标识 + 系统信息 + 发光分隔线
+        # ═══════════════════════════════════════
         header = tk.Frame(main, bg=root_bg)
-        header.pack(fill=tk.X, padx=24, pady=(26, 0))
-        tk.Label(header, text="订单管理系统", font=('微软雅黑', 22, 'bold'),
-                 bg=root_bg, fg='#e5e7eb', anchor=tk.CENTER).pack(fill=tk.X)
+        header.pack(fill=tk.X, padx=28, pady=(20, 0))
+
+        # 左侧：发光 logo 方块 + 系统名 + 副标题
+        brand = tk.Frame(header, bg=root_bg)
+        brand.pack(side=tk.LEFT)
+
+        logo_cv = tk.Canvas(brand, width=22, height=22, bg=root_bg, highlightthickness=0)
+        logo_cv.pack(side=tk.LEFT, pady=(2, 0))
+        self._draw_rounded_rect(logo_cv, 0, 0, 22, 22, 6, fill='#155e75', outline='')
+        self._draw_rounded_rect(logo_cv, 3.5, 3.5, 18.5, 18.5, 4, fill='#22d3ee', outline='')
+        logo_cv.create_text(11, 11, text='G', font=('Consolas', 10, 'bold'), fill='#06222e')
+
+        tk.Label(brand, text="ERP_GO 订单管理系统", font=('微软雅黑', 18, 'bold'),
+                 bg=root_bg, fg=self.colors['text_primary']).pack(side=tk.LEFT, padx=(10, 0))
+        tk.Label(brand, text="CONTROL CENTER", font=('Consolas', 9, 'bold'),
+                 bg=root_bg, fg=self.colors['cyan']).pack(side=tk.LEFT, padx=(14, 0), pady=(4, 0))
+
+        # 右侧：系统状态信息
+        info = tk.Frame(header, bg=root_bg)
+        info.pack(side=tk.RIGHT)
+        tk.Label(info, text="●", font=('Consolas', 11), bg=root_bg,
+                 fg=self.colors['cyan']).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Label(info, text="SYS:8000   WEB:5173", font=('Consolas', 9, 'bold'),
+                 bg=root_bg, fg=self.colors['text_secondary']).pack(side=tk.LEFT)
+
+        # 青色发光分隔线（左侧青色段 + 尾部节点）
+        hud_line = tk.Canvas(main, height=4, bg=root_bg, highlightthickness=0)
+        hud_line.pack(fill=tk.X, padx=28, pady=(12, 0))
+
+        def _draw_hud_line(e):
+            hud_line.delete('all')
+            w = e.width
+            hud_line.create_line(0, 2, w, 2, fill=self.colors['divider'], width=1)
+            seg = max(70, int(w * 0.18))
+            hud_line.create_line(0, 2, seg, 2, fill=self.colors['cyan'], width=2)
+            hud_line.create_rectangle(seg - 3, 0.5, seg + 0.5, 3.5, fill=self.colors['cyan'], outline='')
+
+        hud_line.bind('<Configure>', _draw_hud_line)
 
         content = tk.Frame(main, bg=root_bg)
-        content.pack(fill=tk.BOTH, expand=True, padx=24, pady=(18, 0))
+        content.pack(fill=tk.BOTH, expand=True, padx=28, pady=(16, 0))
 
         # 首页视图：服务概览 + 实时日志
         self.home_view = tk.Frame(content, bg=root_bg)
@@ -318,9 +357,9 @@ class WindowsLauncherApp:
         left_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
 
         self._create_service_tile(left_body, 'backend', "后端接口服务", "后端在线服务", "后端在线服务", "server",
-                                  self.colors['green'], side=tk.TOP)
+                                  self.colors['green'], side=tk.TOP, srv_tag="SRV-01 · API")
         self._create_service_tile(left_body, 'frontend', "前端网页客户端", "前端页面服务", "前端页面服务", "window",
-                                  self.colors['blue'], side=tk.TOP)
+                                  self.colors['blue'], side=tk.TOP, srv_tag="SRV-02 · WEB")
 
         # ── Right: realtime log ──
         right_body = tk.Frame(right_card, bg=self.colors['card'])
@@ -333,7 +372,7 @@ class WindowsLauncherApp:
         tab_specs = [("综合", "grid", "all"), ("前端", "window", "frontend"),
                      ("后端", "server", "backend"), ("备份", "save", "backup")]
         for i, (t, ic, key) in enumerate(tab_specs):
-            cv = tk.Canvas(tab_frame, width=86, height=30, bg='#2f3742',
+            cv = tk.Canvas(tab_frame, width=86, height=30, bg=self.colors['tab_inactive_bg'],
                            highlightthickness=0, cursor='hand2')
             cv.pack(side=tk.LEFT, padx=(0, 6))
             cv._text = t
@@ -343,11 +382,11 @@ class WindowsLauncherApp:
             def tab_redraw(cv=cv):
                 cv.delete('all')
                 if cv._active:
-                    bg, fg = self.colors['green'], '#111827'
+                    bg, fg = self.colors['cyan'], '#06222e'
                 else:
-                    bg, fg = '#2f3742', self.colors['text_secondary']
+                    bg, fg = self.colors['tab_inactive_bg'], self.colors['tab_inactive_text']
                 cv.configure(bg=bg)
-                cv.create_text(43, 15, text=cv._text, font=('微软雅黑', 11), fill=fg, tags='t')
+                cv.create_text(43, 15, text=cv._text, font=('微软雅黑', 11, 'bold'), fill=fg, tags='t')
 
             cv._redraw = tab_redraw
             tab_redraw()
@@ -357,7 +396,7 @@ class WindowsLauncherApp:
         search_row = tk.Frame(right_body, bg=self.colors['card'])
         search_row.pack(fill=tk.X, padx=12, pady=(0, 8))
 
-        search = tk.Entry(search_row, bg='#1e2228', fg=self.colors['text_secondary'],
+        search = tk.Entry(search_row, bg=self.colors['log_bg'], fg=self.colors['text_secondary'],
                           insertbackground=self.colors['text_secondary'], relief=tk.FLAT,
                           font=('微软雅黑', 10))
         search.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -381,27 +420,27 @@ class WindowsLauncherApp:
         search_btn.bind('<Button-1>', lambda e: self._filter_log(search.get()))
         search_redraw()
 
-        log_area = tk.Frame(right_body, bg='#1e2228')
+        log_area = tk.Frame(right_body, bg=self.colors['log_bg'])
         log_area.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
 
         log_font = ('Consolas', 9) if sys.platform == 'win32' else ('Menlo', 10)
         self.all_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                    bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
+                                    bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
                                     padx=10, pady=8, spacing1=2, highlightthickness=0,
                                     insertbackground=self.colors['blue'])
         self.all_log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.backend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                         bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
+                                         bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
                                          padx=10, pady=8, spacing1=2, highlightthickness=0)
         self.frontend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                          bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
+                                          bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
                                           padx=10, pady=8, spacing1=2, highlightthickness=0)
         self.backup_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                        bg='#1e2228', fg=self.colors['log_text'], relief=tk.FLAT,
+                                        bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
                                         padx=10, pady=8, spacing1=2, highlightthickness=0)
 
-        scrollbar_frame = tk.Frame(log_area, bg='#1e2228', width=12)
+        scrollbar_frame = tk.Frame(log_area, bg=self.colors['log_bg'], width=12)
         scrollbar_frame.pack(side=tk.RIGHT, fill=tk.Y)
         scrollbar_frame.pack_propagate(False)
         self.log_scrollbar = ttk.Scrollbar(scrollbar_frame, orient=tk.VERTICAL,
@@ -431,63 +470,70 @@ class WindowsLauncherApp:
         # ═══════════════════════════════════════
         # 每个按钮由左右两部分组成：左侧放图标+文字，右侧为纯色色块
         self._btn_spec = {
-            'start':   {'color': '#22c55e', 'hover': '#4ade80', 'press': '#16a34a', 'off': '#374151'},
-            'stop':    {'color': '#ef4444', 'hover': '#f87171', 'press': '#dc2626', 'off': '#374151'},
-            'open':    {'color': '#3b82f6', 'hover': '#60a5fa', 'press': '#2563eb', 'off': '#374151'},
-            'refresh': {'color': '#06b6d4', 'hover': '#22d3ee', 'press': '#0891b2', 'off': '#374151'},
+            'start':   {'color': '#10b981', 'hover': '#34d399', 'press': '#059669', 'off': '#1c2634'},
+            'stop':    {'color': '#ef4444', 'hover': '#f87171', 'press': '#dc2626', 'off': '#1c2634'},
+            'open':    {'color': '#0284c7', 'hover': '#38bdf8', 'press': '#0369a1', 'off': '#1c2634'},
+            'refresh': {'color': '#0891b2', 'hover': '#22d3ee', 'press': '#0e7490', 'off': '#1c2634'},
         }
 
         btn_row = tk.Frame(main, bg=root_bg)
-        btn_row.pack(fill=tk.X, padx=24, pady=(16, 24))
+        btn_row.pack(fill=tk.X, padx=28, pady=(18, 22))
         for _i in range(4):
             btn_row.grid_columnconfigure(_i, weight=1)
         btn_row.grid_rowconfigure(0, weight=1)
 
         self.start_btn = self._make_func_btn(btn_row, "启动系统", "play",
-                                             self._btn_spec['start'], self.start_services, '_start_enabled', col=0)
+                                             self._btn_spec['start'], self.start_services, '_start_enabled', col=0, badge="01")
         self.stop_btn = self._make_func_btn(btn_row, "停止系统", "stop",
-                                            self._btn_spec['stop'], self.stop_services, '_stop_enabled', col=1)
+                                            self._btn_spec['stop'], self.stop_services, '_stop_enabled', col=1, badge="02")
         self.open_btn = self._make_func_btn(btn_row, "打开页面", "browser",
-                                            self._btn_spec['open'], self.open_browser, '_open_enabled', col=2)
+                                            self._btn_spec['open'], self.open_browser, '_open_enabled', col=2, badge="03")
         self.refresh_btn = self._make_func_btn(btn_row, "刷新状态", "refresh",
-                                               self._btn_spec['refresh'], self.refresh_status, None, col=3)
+                                               self._btn_spec['refresh'], self.refresh_status, None, col=3, badge="04")
 
     # ─────────────────────────────────────────
     # Service tile / toggle / wave helpers
     # ─────────────────────────────────────────
-    def _create_service_tile(self, parent, key, name, tag_on, tag_off, glyph, accent=None, side=tk.LEFT):
-        tile = tk.Frame(parent, bg='#2b323b', highlightbackground=self.colors['card_border'], highlightthickness=1)
+    def _create_service_tile(self, parent, key, name, tag_on, tag_off, glyph, accent=None, side=tk.LEFT, srv_tag=None):
+        tile = tk.Frame(parent, bg='#111a26', highlightbackground=self.colors['card_border'], highlightthickness=1)
         if side == tk.TOP:
             tile.pack(side=tk.TOP, fill=tk.X, expand=False, padx=8, pady=6)
         else:
             tile.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=6, pady=6)
 
-        icon = tk.Canvas(tile, width=64, height=64, bg='#2b323b', highlightthickness=0)
-        icon.pack(pady=(20, 4))
+        # 左上角 [SRV-xx] 科技标签
+        if srv_tag:
+            tag_lbl = tk.Label(tile, text=srv_tag, font=('Consolas', 8, 'bold'),
+                               bg='#111a26', fg=self.colors['cyan'])
+            tag_lbl.pack(anchor=tk.NW, padx=10, pady=(8, 0))
+
+        icon = tk.Canvas(tile, width=64, height=64, bg='#111a26', highlightthickness=0)
+        icon.pack(pady=(6, 4))
         accent = accent or self.colors['green']
-        self._hex(icon, 32, 32, 30, fill='#1e2228', outline=accent, width=1)
+        # 圆角方块图标底（科技面板感）
+        self._draw_rounded_rect(icon, 1, 1, 63, 63, 14, fill='#0d1520', outline=accent, width=1.5)
         self._draw_icon(icon, glyph, 32, 32, 36, accent)
 
-        tk.Label(tile, text=name, font=('微软雅黑', 13, 'bold'), bg='#2b323b',
-                 fg=self.colors['text_primary']).pack(pady=(2, 10))
+        tk.Label(tile, text=name, font=('微软雅黑', 13, 'bold'), bg='#111a26',
+                 fg=self.colors['text_primary']).pack(pady=(2, 8))
 
-        wave = tk.Canvas(tile, width=180, height=14, bg='#2b323b', highlightthickness=0)
+        wave = tk.Canvas(tile, width=180, height=14, bg='#111a26', highlightthickness=0)
         wave.pack()
         self._draw_wave(wave, accent)
         setattr(self, f'{key}_wave_canvas', wave)
 
-        slider = tk.Canvas(tile, width=180, height=14, bg='#2b323b', highlightthickness=0)
+        slider = tk.Canvas(tile, width=180, height=14, bg='#111a26', highlightthickness=0)
         slider.pack(pady=(8, 4))
         self._draw_progress_track(slider, 180, 6)
         setattr(self, f'{key}_progress_canvas', slider)
 
-        row = tk.Frame(tile, bg='#2b323b')
+        row = tk.Frame(tile, bg='#111a26')
         row.pack(fill=tk.X, pady=(2, 12), padx=14)
-        indicator = tk.Label(row, text="未启动", font=('微软雅黑', 11), bg='#2b323b',
+        indicator = tk.Label(row, text="未启动", font=('微软雅黑', 11), bg='#111a26',
                              fg=self.colors['text_tertiary'])
         indicator.pack(side=tk.LEFT)
         setattr(self, f'{key}_indicator', indicator)
-        toggle = tk.Canvas(row, width=44, height=22, bg='#2b323b', highlightthickness=0)
+        toggle = tk.Canvas(row, width=44, height=22, bg='#111a26', highlightthickness=0)
         toggle.pack(side=tk.RIGHT)
         setattr(self, f'{key}_toggle_canvas', toggle)
         self._draw_toggle(toggle, False)
@@ -507,7 +553,7 @@ class WindowsLauncherApp:
         canvas.delete('all')
         w, h = 44, 22
         r = h // 2
-        bg = self.colors['green'] if on else '#4b5563'
+        bg = self.colors['green'] if on else '#2b3a4e'
         self._draw_rounded_rect(canvas, 0, 0, w, h, r, fill=bg, outline='', tags='tg')
         knob_r = 8
         padding = 1.5
@@ -653,8 +699,8 @@ class WindowsLauncherApp:
         b = max(0, min(255, int(b * factor)))
         return f'#{r:02x}{g:02x}{b:02x}'
 
-    def _make_func_btn(self, parent, text, icon, spec, cmd, enabled_attr, col=None):
-        c = tk.Canvas(parent, height=120, bg=parent.cget('bg'), highlightthickness=0, cursor='hand2')
+    def _make_func_btn(self, parent, text, icon, spec, cmd, enabled_attr, col=None, badge=None):
+        c = tk.Canvas(parent, height=100, bg=parent.cget('bg'), highlightthickness=0, cursor='hand2')
         if col is not None:
             c.grid(row=0, column=col, sticky='nsew', padx=8)
         else:
@@ -662,6 +708,7 @@ class WindowsLauncherApp:
         c._spec = spec
         c._text = text
         c._icon = icon
+        c._badge = badge
         c._enabled_attr = enabled_attr
         c._cmd = cmd
         c._hover = False
@@ -671,7 +718,7 @@ class WindowsLauncherApp:
             w = c.winfo_width()
             h = c.winfo_height()
             if w < 20 or h < 20:
-                w, h = 200, 120
+                w, h = 200, 100
             enabled = (enabled_attr is None) or getattr(self, enabled_attr, True)
             if not enabled:
                 color = spec['off']
@@ -682,12 +729,19 @@ class WindowsLauncherApp:
             else:
                 color = spec['color']
             c.delete('all')
-            self._draw_rounded_rect(c, 0, 0, w, h, 12, fill=color, outline='', tags='btn_bg')
-            icon_color = '#ffffff' if enabled else '#9aa3af'
-            icon_size = min(34, w * 0.28)
-            self._draw_icon(c, icon, w / 2, h * 0.38, icon_size, icon_color)
-            c.create_text(w / 2, h * 0.72, text=text, font=('微软雅黑', 13, 'bold'),
+            # 科技风：先画暗青色描边，再画主体填充（描边营造霓虹面板感）
+            outline = self.colors['cyan'] if enabled and (c._hover or c._press) else self.colors['card_border']
+            self._draw_rounded_rect(c, 0, 0, w, h, 12, fill=color, outline=outline, width=1.5, tags='btn_bg')
+            icon_color = '#ffffff' if enabled else '#465a72'
+            icon_size = min(30, w * 0.26)
+            self._draw_icon(c, icon, w / 2, h * 0.36, icon_size, icon_color)
+            c.create_text(w / 2, h * 0.74, text=text, font=('微软雅黑', 13, 'bold'),
                           fill=icon_color, tags='tx')
+            # 左上角 [0X] 编号标签
+            if badge:
+                c.create_text(12, 10, text=f"[{badge}]", font=('Consolas', 8, 'bold'),
+                              fill=self.colors['cyan'] if enabled else '#465a72',
+                              anchor=tk.NW, tags='tx')
 
         c._redraw = redraw
 
@@ -761,6 +815,11 @@ class WindowsLauncherApp:
             r = 10
             w, h = event.width, event.height
             self._draw_rounded_rect(card, 0, 0, w, h, r, fill=self.colors['card'], outline=self.colors['card_border'], width=1, tags='bg')
+            # 左上角青色竖条（HUD 面板标签）
+            if title:
+                self._draw_rounded_rect(card, 16, 22, 22, 40, 3, fill=self.colors['cyan'], outline='', tags='bg')
+                card.create_text(w - 14, 22, text="[MODULE]", font=('Consolas', 8, 'bold'),
+                                 fill=self.colors['cyan_dim'], anchor=tk.NE, tags='bg')
 
         card.bind('<Configure>', _on_card_configure)
 
@@ -771,7 +830,7 @@ class WindowsLauncherApp:
                 bg=self.colors['card'], fg=self.colors['text_primary'],
                 anchor=tk.W
             )
-            title_label.pack(fill=tk.X, padx=16, pady=(14, 6))
+            title_label.pack(fill=tk.X, padx=(28, 16), pady=(14, 6))
 
         return card
     def _draw_rounded_rect(self, canvas, x1, y1, x2, y2, r, **kwargs):
@@ -879,13 +938,13 @@ class WindowsLauncherApp:
         glyph = getattr(canvas, '_glyph', '')
 
         if state == 'running':
-            word, fg, on, hex_fill = "运行中", self.colors['green'], True, '#16351f'
+            word, fg, on, hex_fill = "运行中", self.colors['green'], True, '#0c2318'
         elif state == 'error':
-            word, fg, on, hex_fill = "异常", self.colors['orange'], True, '#3f2c1e'
+            word, fg, on, hex_fill = "异常", self.colors['orange'], True, '#2b2009'
         elif state == 'starting':
-            word, fg, on, hex_fill = "启动中...", self.colors['blue'], True, '#1e293b'
+            word, fg, on, hex_fill = "启动中...", self.colors['blue'], True, '#0e2230'
         else:
-            word, fg, on, hex_fill = "未启动", self.colors['text_tertiary'], False, '#1e2228'
+            word, fg, on, hex_fill = "未启动", self.colors['text_tertiary'], False, '#0d1520'
 
         if indicator:
             indicator.config(text=word, fg=fg)
@@ -2027,7 +2086,7 @@ def main():
     except:
         pass
 
-    root.configure(bg='#2c3138')
+    root.configure(bg='#0d1117')
 
     app = WindowsLauncherApp(root)
 
