@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Date, Numeric
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Date, Numeric, Float
 from sqlalchemy.sql import func
 from sqlalchemy import event
 from datetime import datetime as dt, timezone, timedelta
@@ -169,6 +169,12 @@ class Product(Base):
     status = Column(String(20), default="active")
     category_id = Column(Integer, nullable=True, index=True)   # 关联类别表 id
     brand_id = Column(Integer, nullable=True, index=True)       # 关联品牌表 id
+    cost_price = Column(Float, nullable=True)                    # 成本价
+    retail_price = Column(Float, nullable=True)                  # 零售价
+    min_price = Column(Float, nullable=True)                     # 最低售价
+    remark1 = Column(String(500), nullable=True)                 # 备注 1
+    remark2 = Column(String(500), nullable=True)                 # 备注 2
+    remark3 = Column(String(500), nullable=True)                 # 备注 3
     created_by = Column(String(50), nullable=True)
     created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
@@ -215,6 +221,21 @@ class Brand(Base):
     updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
 
 
+class ProductImage(Base):
+    """商品图片（每条对应一张图）。同一 product_code 下最多 5 张，由后端上传接口校验。
+    文件存储路径：backend/data/images/product/{product_code}/{uuid}.{ext}
+    访问 URL：/data/images/product/{product_code}/{filename}（走 images.serve_router 鉴权）"""
+    __tablename__ = "product_images"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product_code = Column(String(50), nullable=False, index=True)
+    image_url = Column(String(500), nullable=False)               # 完整可访问路径
+    file_name = Column(String(255), nullable=True)                # 实际磁盘文件名
+    sort_order = Column(Integer, default=0)                       # 排序（上传时间顺序即可）
+    uploaded_by = Column(String(50), nullable=True)
+    created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
 @event.listens_for(User, 'before_insert')
 @event.listens_for(Shop, 'before_insert')
 @event.listens_for(Order, 'before_insert')
@@ -229,6 +250,7 @@ class Brand(Base):
 @event.listens_for(ShopWithdrawRecord, 'before_insert')
 @event.listens_for(Category, 'before_insert')
 @event.listens_for(Brand, 'before_insert')
+@event.listens_for(ProductImage, 'before_insert')
 def set_create_time_before_insert(mapper, connection, target):
     for col in ['created_at', 'create_time', 'login_time', 'start_time', 'updated_at', 'update_time']:
         if hasattr(target, col) and getattr(target, col) is None:

@@ -193,6 +193,12 @@ class ProductCreate(ProductBase):
     """商品创建模型"""
     category_id: Optional[int] = Field(None, description="关联类别表 id")
     brand_id: Optional[int] = Field(None, description="关联品牌表 id")
+    cost_price: Optional[float] = Field(None, ge=0, description="成本价")
+    retail_price: Optional[float] = Field(None, ge=0, description="零售价")
+    min_price: Optional[float] = Field(None, ge=0, description="最低售价")
+    remark1: Optional[str] = Field(None, max_length=500, description="备注1")
+    remark2: Optional[str] = Field(None, max_length=500, description="备注2")
+    remark3: Optional[str] = Field(None, max_length=500, description="备注3")
 
 class ProductUpdate(BaseModel):
     """商品更新模型"""
@@ -201,6 +207,12 @@ class ProductUpdate(BaseModel):
     status: Optional[str] = Field(None, description="商品状态：active/inactive")
     category_id: Optional[int] = Field(None, description="关联类别表 id")
     brand_id: Optional[int] = Field(None, description="关联品牌表 id")
+    cost_price: Optional[float] = Field(None, ge=0, description="成本价")
+    retail_price: Optional[float] = Field(None, ge=0, description="零售价")
+    min_price: Optional[float] = Field(None, ge=0, description="最低售价")
+    remark1: Optional[str] = Field(None, max_length=500, description="备注1")
+    remark2: Optional[str] = Field(None, max_length=500, description="备注2")
+    remark3: Optional[str] = Field(None, max_length=500, description="备注3")
 
 class ProductResponse(ProductBase):
     """商品响应模型"""
@@ -209,9 +221,27 @@ class ProductResponse(ProductBase):
     status: str = "active"
     category_id: Optional[int] = None
     brand_id: Optional[int] = None
+    cost_price: Optional[float] = None
+    retail_price: Optional[float] = None
+    min_price: Optional[float] = None
+    remark1: Optional[str] = None
+    remark2: Optional[str] = None
+    remark3: Optional[str] = None
     created_by: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProductImageItem(BaseModel):
+    """商品图片响应"""
+    id: int
+    product_code: str
+    image_url: str
+    sort_order: int = 0
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

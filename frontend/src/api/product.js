@@ -100,3 +100,39 @@ export function getProductCount() {
     method: 'get'
   })
 }
+
+/**
+ * 上传一张商品图片（最多 5 张，后端校验）
+ * @param {string} productCode - 商品编码
+ * @param {File} file - 图片文件（jpg/jpeg/png，≤5MB）
+ */
+export function uploadProductImage(productCode, file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request({
+    url: `/products/${productCode}/images`,
+    method: 'post',
+    data: form,
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+/**
+ * 列出商品的图片
+ */
+export function getProductImages(productCode) {
+  return request({
+    url: `/products/${productCode}/images`,
+    method: 'get'
+  })
+}
+
+/**
+ * 删除商品图片
+ */
+export function deleteProductImage(imageId) {
+  return request({
+    url: `/products/images/${imageId}`,
+    method: 'delete'
+  })
+}

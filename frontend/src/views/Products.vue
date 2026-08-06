@@ -88,17 +88,34 @@
           <el-table-column type="selection" width="45" />
           <el-table-column prop="product_code" label="商品编码" width="130" />
           <el-table-column prop="product_name" label="商品名称" min-width="160" />
-          <el-table-column label="类别" width="140">
+          <el-table-column label="类别" width="120">
             <template #default="{ row }">
               {{ categoryName(row.category_id) }}
             </template>
           </el-table-column>
-          <el-table-column label="品牌" width="120">
+          <el-table-column label="品牌" width="110">
             <template #default="{ row }">
               {{ brandName(row.brand_id) }}
             </template>
           </el-table-column>
-          <el-table-column prop="product_remark" label="备注" min-width="160" show-overflow-tooltip />
+          <el-table-column label="售价" width="100">
+            <template #default="{ row }">
+              <span v-if="row.retail_price != null">¥{{ Number(row.retail_price).toFixed(2) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="图片" width="60" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.image_count"
+                :src="imageUrlWithToken(row.cover_image)"
+                :preview-src-list="row.preview_urls || []"
+                fit="cover"
+                style="width: 36px; height: 36px; border-radius: 4px;"
+                :preview-teleported="true"
+              />
+              <span v-else style="color: #c0c4cc;">—</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="status" label="状态" width="80">
             <template #default="{ row }">
               <el-tag :type="row.status === 'active' ? 'success' : 'info'">
@@ -133,67 +150,137 @@
       </div>
     </div>
 
-    <!-- 创建/编辑商品对话框 -->
+    <!-- 创建/编辑商品对话框（表格风格） -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="600px"
+      width="960px"
+      :close-on-click-modal="false"
       @closed="resetForm"
     >
-      <el-form
-        ref="productFormRef"
-        :model="productForm"
-        :rules="productRules"
-        label-width="100px"
-      >
-        <el-form-item label="商品编码" v-if="dialogMode === 'edit'">
-          <el-input v-model="productForm.product_code" disabled />
-        </el-form-item>
-        <el-form-item label="商品名称" prop="product_name">
-          <el-input
-            v-model="productForm.product_name"
-            placeholder="请输入商品名称（2-100字符）"
-            maxlength="100"
-            show-word-limit
-          />
-        </el-form-item>
-        <el-form-item label="所属类别">
-          <el-select v-model="productForm.category_id" placeholder="请选择类别" clearable style="width: 100%;" filterable>
-            <el-option
-              v-for="cat in categoryFlat"
-              :key="cat.id"
-              :label="catLevelLabel(cat)"
-              :value="cat.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="所属品牌">
-          <el-select v-model="productForm.brand_id" placeholder="请选择品牌" clearable style="width: 100%;" filterable>
-            <el-option
-              v-for="b in brands"
-              :key="b.id"
-              :label="`${b.brand_name}（${b.brand_code}）`"
-              :value="b.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="商品备注" prop="product_remark">
-          <el-input
-            v-model="productForm.product_remark"
-            type="textarea"
-            :rows="4"
-            placeholder="请输入商品备注（最多500字符）"
-            maxlength="500"
-            show-word-limit
-          />
-        </el-form-item>
-        <el-form-item label="商品状态" v-if="dialogMode === 'edit'">
-          <el-select v-model="productForm.status" placeholder="请选择状态">
-            <el-option label="启用" value="active" />
-            <el-option label="停用" value="inactive" />
-          </el-select>
-        </el-form-item>
-      </el-form>
+      <div class="product-form-table" v-loading="dialogLoading">
+        <table class="form-table" cellspacing="0" cellpadding="0">
+          <tbody>
+            <tr>
+              <th class="th-label">商品编码</th>
+              <td class="td-value" :class="{ readonly: dialogMode === 'edit' }">
+                <el-input
+                  v-if="dialogMode === 'edit'"
+                  v-model="productForm.product_code"
+                  disabled
+                />
+                <span v-else class="placeholder">保存后自动生成 PLU-000xxx</span>
+              </td>
+              <th class="th-label">商品名称</th>
+              <td class="td-value">
+                <el-input v-model="productForm.product_name" placeholder="商品名称" maxlength="100" show-word-limit />
+              </td>
+              <td class="td-image-cell" rowspan="9">
+                <div class="image-upload-area">
+                  <div class="image-upload-title">商品图片（上传）</div>
+                  <el-upload
+                    v-if="dialogMode === 'edit' && !!savedProductCode"
+                    list-type="picture-card"
+                    :limit="5"
+                    :file-list="imageFileList"
+                    :on-exceed="onImageExceed"
+                    :on-remove="handleImageRemove"
+                    :http-request="customUpload"
+                    :disabled="imageUploading"
+                  >
+                    <el-icon><Plus /></el-icon>
+                  </el-upload>
+                  <div v-else class="image-upload-hint">
+                    请先保存商品基本信息后再上传图片
+                  </div>
+                  <div class="image-upload-tip">最多 5 张（jpg / jpeg / png，≤ 5MB）</div>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">类别</th>
+              <td class="td-value">
+                <el-select v-model="productForm.category_id" placeholder="请选择" clearable filterable style="width: 100%;">
+                  <el-option
+                    v-for="cat in categoryFlat"
+                    :key="cat.id"
+                    :label="catLevelLabel(cat)"
+                    :value="cat.id"
+                  />
+                </el-select>
+              </td>
+              <th class="th-label">品牌</th>
+              <td class="td-value">
+                <el-select v-model="productForm.brand_id" placeholder="请选择" clearable filterable style="width: 100%;">
+                  <el-option
+                    v-for="b in brands"
+                    :key="b.id"
+                    :label="`${b.brand_name}（${b.brand_code}）`"
+                    :value="b.id"
+                  />
+                </el-select>
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">成本价</th>
+              <td class="td-value">
+                <el-input-number v-model="productForm.cost_price" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="0.00" />
+              </td>
+              <th class="th-label">零售价</th>
+              <td class="td-value">
+                <el-input-number v-model="productForm.retail_price" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="0.00" />
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">最低售价</th>
+              <td class="td-value" colspan="3">
+                <el-input-number v-model="productForm.min_price" :min="0" :precision="2" :controls="false" style="width: 200px;" placeholder="0.00" />
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">备注1</th>
+              <td class="td-value" colspan="3">
+                <el-input v-model="productForm.remark1" maxlength="500" show-word-limit />
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">备注2</th>
+              <td class="td-value" colspan="3">
+                <el-input v-model="productForm.remark2" maxlength="500" show-word-limit />
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">备注3</th>
+              <td class="td-value" colspan="3">
+                <el-input v-model="productForm.remark3" maxlength="500" show-word-limit />
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">商品备注</th>
+              <td class="td-value" colspan="3">
+                <el-input v-model="productForm.product_remark" type="textarea" :rows="3" maxlength="500" show-word-limit />
+              </td>
+            </tr>
+
+            <tr>
+              <th class="th-label">商品状态</th>
+              <td class="td-value" colspan="3">
+                <el-radio-group v-model="productForm.status">
+                  <el-radio-button label="active">启用</el-radio-button>
+                  <el-radio-button label="inactive">停用</el-radio-button>
+                </el-radio-group>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -213,12 +300,24 @@
           <span class="value">{{ currentProduct.product_name }}</span>
         </div>
         <div class="detail-item">
-          <span class="label">所属类别：</span>
+          <span class="label">类别：</span>
           <span class="value">{{ categoryName(currentProduct.category_id) || '未设置' }}</span>
         </div>
         <div class="detail-item">
-          <span class="label">所属品牌：</span>
+          <span class="label">品牌：</span>
           <span class="value">{{ brandName(currentProduct.brand_id) || '未设置' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">成本价：</span>
+          <span class="value">¥{{ Number(currentProduct.cost_price || 0).toFixed(2) }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">零售价：</span>
+          <span class="value">¥{{ Number(currentProduct.retail_price || 0).toFixed(2) }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">最低售价：</span>
+          <span class="value">¥{{ Number(currentProduct.min_price || 0).toFixed(2) }}</span>
         </div>
         <div class="detail-item">
           <span class="label">商品状态：</span>
@@ -230,6 +329,32 @@
           <span class="label">商品备注：</span>
           <div class="remark-content">
             {{ currentProduct.product_remark || '暂无备注' }}
+          </div>
+        </div>
+        <div class="detail-item">
+          <span class="label">备注1：</span>
+          <span class="value">{{ currentProduct.remark1 || '—' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">备注2：</span>
+          <span class="value">{{ currentProduct.remark2 || '—' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">备注3：</span>
+          <span class="value">{{ currentProduct.remark3 || '—' }}</span>
+        </div>
+        <div class="detail-item" v-if="currentProductImages.length">
+          <span class="label">商品图片：</span>
+          <div class="image-list">
+            <el-image
+              v-for="img in currentProductImages"
+              :key="img.id"
+              :src="imageUrlWithToken(img.image_url)"
+              :preview-src-list="previewableImageUrls(currentProductImages)"
+              :preview-teleported="true"
+              fit="cover"
+              style="width: 80px; height: 80px; border-radius: 4px;"
+            />
           </div>
         </div>
         <div class="detail-item">
@@ -251,8 +376,7 @@
 
 <script setup>
 /**
- * 商品管理页面（主从布局）
- * 左侧：类别 / 品牌（上方切换按钮），右侧：对应商品列表 + 搜索 + 新增
+ * 商品管理页面（主从布局 + 表格风格新建/编辑对话框 + 商品图片上传）
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
@@ -263,26 +387,30 @@ import {
   updateProduct,
   deleteProduct,
   batchDeleteProducts,
-  getProductCount
+  getProductCount,
+  uploadProductImage,
+  getProductImages,
+  deleteProductImage
 } from '@/api/product'
 import { getCategories } from '@/api/category'
 import { getBrands } from '@/api/brand'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDateTime } from '@/utils/format'
+import { imageUrlWithToken } from '@/utils/imageUrl'
+import { Plus } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 
-// 权限检查：老板端和销售端可以访问商品管理
+// 权限检查
 const canManageProducts = computed(() => ['boss', 'sales'].includes(userStore.userInfo?.role))
 
 // ===== 左侧导航 =====
-const leftMode = ref('category')        // category | brand
-const selectedId = ref(null)            // 选中的类别/品牌 id（null=全部）
+const leftMode = ref('category')
+const selectedId = ref(null)
 const leftLoading = ref(false)
-const categories = ref([])              // 树形结构
+const categories = ref([])
 const brands = ref([])
 
-// 拉平类别（含二级），用于左侧列表与下拉
 const categoryFlat = computed(() => {
   const list = []
   const walk = (nodes) => {
@@ -294,10 +422,8 @@ const categoryFlat = computed(() => {
   walk(categories.value)
   return list
 })
-
 const currentLeftList = computed(() => (leftMode.value === 'category' ? categoryFlat.value : brands.value))
 
-// 编码/名称映射
 const categoryMap = computed(() => {
   const m = {}
   for (const c of categoryFlat.value) m[c.id] = c
@@ -313,7 +439,6 @@ const brandName = (id) => (id ? brandMap.value[id]?.brand_name || '' : '')
 const catLevelLabel = (cat) =>
   cat.level > 1 ? `　　${cat.category_name}（${cat.category_code}）` : `${cat.category_name}（${cat.category_code}）`
 
-// 加载左侧数据
 async function loadLeftData() {
   leftLoading.value = true
   try {
@@ -325,13 +450,6 @@ async function loadLeftData() {
   } finally {
     leftLoading.value = false
   }
-}
-
-// 切换类别/品牌时重置选中并刷新商品
-function onLeftModeChange() {
-  selectedId.value = null
-  pagination.page = 1
-  fetchProducts()
 }
 
 function selectLeft(id) {
@@ -361,7 +479,6 @@ async function fetchProducts() {
     ElMessage.warning('您没有权限访问商品管理')
     return
   }
-
   loading.value = true
   try {
     const params = {
@@ -370,7 +487,6 @@ async function fetchProducts() {
       keyword: filters.keyword || undefined,
       status: filters.status || undefined
     }
-    // 按左侧选中项过滤
     if (leftMode.value === 'category' && selectedId.value !== null) {
       params.category_id = selectedId.value
     }
@@ -378,8 +494,24 @@ async function fetchProducts() {
       params.brand_id = selectedId.value
     }
 
-    const response = await getProducts(params)
-    products.value = response
+    const list = await getProducts(params)
+    // 为每条商品加载首张图片用于列表缩略图
+    const enriched = await Promise.all((list || []).map(async (p) => {
+      try {
+        const imgs = await getProductImages(p.product_code)
+        const items = imgs.data || []
+        const preview_urls = items.map((i) => imageUrlWithToken(i.image_url))
+        return {
+          ...p,
+          image_count: items.length,
+          cover_image: items[0]?.image_url || '',
+          preview_urls
+        }
+      } catch (e) {
+        return { ...p, image_count: 0, cover_image: '', preview_urls: [] }
+      }
+    }))
+    products.value = enriched
 
     if (!filters.keyword && !filters.status && selectedId.value === null) {
       const countResponse = await getProductCount()
@@ -406,7 +538,14 @@ const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const dialogMode = ref('create')
 const submitting = ref(false)
-const productFormRef = ref(null)
+const dialogLoading = ref(false)
+
+// 保存后返回的 product_code（用于编辑模式上传图片）
+const savedProductCode = ref('')
+
+// 图片上传（el-upload）
+const imageFileList = ref([])
+const imageUploading = ref(false)
 
 const productForm = reactive({
   product_code: '',
@@ -414,102 +553,198 @@ const productForm = reactive({
   product_remark: '',
   status: 'active',
   category_id: null,
-  brand_id: null
+  brand_id: null,
+  cost_price: null,
+  retail_price: null,
+  min_price: null,
+  remark1: '',
+  remark2: '',
+  remark3: ''
 })
 
 const currentProduct = ref({})
-
-const productRules = {
-  product_name: [
-    { required: true, message: '请输入商品名称', trigger: 'blur' },
-    { min: 2, max: 100, message: '商品名称长度应在2-100字符之间', trigger: 'blur' }
-  ],
-  product_remark: [
-    { max: 500, message: '商品备注不能超过500字符', trigger: 'blur' }
-  ]
-}
+const currentProductImages = ref([])
 
 const dialogTitle = computed(() =>
-  dialogMode.value === 'create' ? '新建商品' : '编辑商品'
+  dialogMode.value === 'create' ? '新建商品档案' : '编辑商品档案'
 )
 
 function showCreateDialog() {
   dialogMode.value = 'create'
-  productForm.product_code = ''
-  productForm.product_name = ''
-  productForm.product_remark = ''
-  productForm.status = 'active'
-  productForm.category_id = leftMode.value === 'category' ? selectedId.value : null
-  productForm.brand_id = leftMode.value === 'brand' ? selectedId.value : null
+  savedProductCode.value = ''
+  imageFileList.value = []
+  Object.assign(productForm, {
+    product_code: '',
+    product_name: '',
+    product_remark: '',
+    status: 'active',
+    category_id: leftMode.value === 'category' ? selectedId.value : null,
+    brand_id: leftMode.value === 'brand' ? selectedId.value : null,
+    cost_price: null,
+    retail_price: null,
+    min_price: null,
+    remark1: '',
+    remark2: '',
+    remark3: ''
+  })
   dialogVisible.value = true
 }
 
 async function viewProduct(row) {
   try {
-    const response = await getProductDetail(row.product_code)
-    currentProduct.value = response
+    const res = await getProductDetail(row.product_code)
+    currentProduct.value = res
+    const imgs = await getProductImages(row.product_code)
+    currentProductImages.value = imgs.data || []
     viewDialogVisible.value = true
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '获取商品详情失败')
   }
 }
 
-function editProduct(row) {
+function previewableImageUrls(items) {
+  return items.map((i) => imageUrlWithToken(i.image_url))
+}
+
+async function editProduct(row) {
   dialogMode.value = 'edit'
-  productForm.product_code = row.product_code
-  productForm.product_name = row.product_name
-  productForm.product_remark = row.product_remark || ''
-  productForm.status = row.status
-  productForm.category_id = row.category_id ?? null
-  productForm.brand_id = row.brand_id ?? null
-  dialogVisible.value = true
+  try {
+    const res = await getProductDetail(row.product_code)
+    Object.assign(productForm, {
+      product_code: res.product_code,
+      product_name: res.product_name,
+      product_remark: res.product_remark || '',
+      status: res.status || 'active',
+      category_id: res.category_id ?? null,
+      brand_id: res.brand_id ?? null,
+      cost_price: res.cost_price ?? null,
+      retail_price: res.retail_price ?? null,
+      min_price: res.min_price ?? null,
+      remark1: res.remark1 || '',
+      remark2: res.remark2 || '',
+      remark3: res.remark3 || ''
+    })
+    savedProductCode.value = res.product_code
+    const imgs = await getProductImages(res.product_code)
+    imageFileList.value = (imgs.data || []).map((i) => ({
+      id: i.id,
+      name: i.file_name,
+      url: imageUrlWithToken(i.image_url)
+    }))
+    dialogVisible.value = true
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '加载商品失败')
+  }
 }
 
 async function submitProduct() {
-  if (!productFormRef.value) return
+  if (!productForm.product_name || productForm.product_name.length < 2) {
+    ElMessage.warning('请填写商品名称（2-100 字符）')
+    return
+  }
+  submitting.value = true
   try {
-    await productFormRef.value.validate()
-    submitting.value = true
-    try {
-      const data = {
-        product_name: productForm.product_name,
-        product_remark: productForm.product_remark,
-        category_id: productForm.category_id || null,
-        brand_id: productForm.brand_id || null
-      }
-
-      if (dialogMode.value === 'create') {
-        await createProduct(data)
-        ElMessage.success('商品创建成功')
-      } else {
-        data.status = productForm.status
-        await updateProduct(productForm.product_code, data)
-        ElMessage.success('商品更新成功')
-      }
-
-      dialogVisible.value = false
-      fetchProducts()
-    } catch (error) {
-      ElMessage.error(error.response?.data?.detail || '操作失败')
-    } finally {
-      submitting.value = false
+    const payload = {
+      product_name: productForm.product_name,
+      product_remark: productForm.product_remark,
+      category_id: productForm.category_id || null,
+      brand_id: productForm.brand_id || null,
+      cost_price: productForm.cost_price ?? null,
+      retail_price: productForm.retail_price ?? null,
+      min_price: productForm.min_price ?? null,
+      remark1: productForm.remark1 || '',
+      remark2: productForm.remark2 || '',
+      remark3: productForm.remark3 || ''
     }
-  } catch {
-    // 表单验证未通过
+    let saved
+    if (dialogMode.value === 'create') {
+      saved = await createProduct(payload)
+      savedProductCode.value = saved.product_code
+      ElMessage.success('商品创建成功，现在可以上传图片了')
+      dialogMode.value = 'edit'
+      productForm.product_code = saved.product_code
+      // 关闭后允许再次打开做图片上传
+    } else {
+      payload.status = productForm.status
+      saved = await updateProduct(productForm.product_code, payload)
+      ElMessage.success('商品更新成功')
+    }
+    dialogVisible.value = false
+    fetchProducts()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '操作失败')
+  } finally {
+    submitting.value = false
   }
 }
 
 function resetForm() {
-  productFormRef.value?.resetFields()
-  productForm.product_code = ''
-  productForm.product_name = ''
-  productForm.product_remark = ''
-  productForm.status = 'active'
-  productForm.category_id = null
-  productForm.brand_id = null
+  Object.assign(productForm, {
+    product_code: '',
+    product_name: '',
+    product_remark: '',
+    status: 'active',
+    category_id: null,
+    brand_id: null,
+    cost_price: null,
+    retail_price: null,
+    min_price: null,
+    remark1: '',
+    remark2: '',
+    remark3: ''
+  })
+  imageFileList.value = []
+  savedProductCode.value = ''
 }
 
-// ===== 删除 =====
+// ===== 图片上传（自定义 http-request） =====
+function onImageExceed() {
+  ElMessage.warning('每个商品最多上传 5 张图片')
+}
+
+function customUpload(option) {
+  if (!savedProductCode.value) {
+    ElMessage.warning('请先保存商品基本信息')
+    return
+  }
+  imageUploading.value = true
+  uploadProductImage(savedProductCode.value, option.file)
+    .then((res) => {
+      const item = {
+        id: res.id,
+        name: res.file_name,
+        url: imageUrlWithToken(res.image_url)
+      }
+      imageFileList.value = [...imageFileList.value, item]
+      option.onSuccess(res)
+      ElMessage.success('图片上传成功')
+    })
+    .catch((err) => {
+      option.onError(err)
+      ElMessage.error(err.response?.data?.detail || '图片上传失败')
+    })
+    .finally(() => {
+      imageUploading.value = false
+    })
+}
+
+async function handleImageRemove(file) {
+  if (!file || !file.id) {
+    // 浏览器原生 File 对象（刚选未上传），直接从列表中移除即可
+    return true
+  }
+  try {
+    await deleteProductImage(file.id)
+    imageFileList.value = imageFileList.value.filter((f) => f.id !== file.id)
+    ElMessage.success('图片已删除')
+    return true
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '删除失败')
+    return false
+  }
+}
+
+// ===== 删除商品 =====
 async function handleDeleteProduct(row) {
   try {
     await ElMessageBox.confirm(
@@ -562,7 +797,6 @@ async function handleBatchDelete() {
   }
 }
 
-// ===== 生命周期 =====
 onMounted(() => {
   if (canManageProducts.value) {
     loadLeftData()
@@ -700,6 +934,12 @@ onMounted(() => {
   flex: 1;
 }
 
+.image-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .remark-content {
   flex: 1;
   padding: 10px;
@@ -708,6 +948,86 @@ onMounted(() => {
   line-height: 1.6;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* ===== 表格风格表单 ===== */
+.product-form-table {
+  padding: 4px 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.form-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.form-table th,
+.form-table td {
+  border: 1px solid #dcdfe6;
+  padding: 6px 10px;
+  vertical-align: middle;
+}
+
+.form-table .th-label {
+  width: 80px;
+  background: #f7f8fa;
+  text-align: center;
+  color: #606266;
+  font-weight: 500;
+}
+
+.form-table .td-value {
+  background: #fff;
+  color: #303133;
+}
+
+.form-table .td-value.readonly {
+  background: #fafafa;
+  color: #909399;
+}
+
+.form-table .placeholder {
+  color: #c0c4cc;
+  font-size: 12px;
+}
+
+.td-image-cell {
+  background: #f7f8fa;
+  vertical-align: top;
+  padding: 12px;
+  width: 220px;
+}
+
+.image-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-upload-title {
+  font-weight: 600;
+  color: #303133;
+  font-size: 13px;
+}
+
+.image-upload-tip {
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+}
+
+.image-upload-hint {
+  font-size: 12px;
+  color: #c0c4cc;
+  text-align: center;
+  padding: 30px 10px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+  width: 100%;
 }
 
 @media (max-width: 900px) {
