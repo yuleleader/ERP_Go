@@ -43,6 +43,40 @@ def _sanitize_code(code: str) -> str:
     return s.strip("._") or "unknown"
 
 
+async def delete_product_images(db: AsyncSession, product_code: str) -> int:
+    """删除某商品的全部图片：数据库记录 + 磁盘文件 + 空文件夹。
+
+    供删除商品（products.py）时联动调用，返回删除的图片记录数。
+    """
+    safe_code = _sanitize_code(product_code)
+    rows = (await db.execute(
+        select(ProductImage).where(ProductImage.product_code == safe_code)
+    )).scalars().all()
+
+    dir_path = PRODUCT_IMAGE_DIR / safe_code
+    for row in rows:
+        try:
+            url = row.image_url or ""
+            rel = url[len(WEB_PREFIX):].lstrip("/") if url.startswith(WEB_PREFIX) else None
+            if rel:
+                file_path = (IMAGE_ROOT / rel).resolve()
+                file_path.relative_to(IMAGE_ROOT.resolve())  # 防路径穿越
+                if file_path.is_file():
+                    await aio_remove(str(file_path))
+        except Exception:
+            pass  # 文件不存在/被占用不影响数据库清理
+        await db.delete(row)
+
+    # 尝试删除商品图片空文件夹（非空或失败则忽略）
+    try:
+        if dir_path.is_dir() and not any(dir_path.iterdir()):
+            dir_path.rmdir()
+    except Exception:
+        pass
+
+    return len(rows)
+
+
 @router.post("/{product_code}/images")
 async def upload_product_image(
     product_code: str,

@@ -12,6 +12,7 @@ from ..core.database import get_db
 from ..core.security import get_current_active_user
 from ..models.models import Product, User, OperationLog
 from ..schemas.schemas import ProductCreate, ProductUpdate, ProductResponse
+from ..api.product_images import delete_product_images
 
 router = APIRouter(prefix="/api/products", tags=["商品管理"])
 
@@ -307,7 +308,8 @@ async def delete_product(
             detail=f"该商品已被订单引用（订单号：{referenced_order.order_id}），不允许删除"
         )
 
-    # 删除商品
+    # 删除商品（联动清理该商品的图片：数据库记录 + 磁盘文件 + 空文件夹）
+    await delete_product_images(db, product.product_code)
     await db.delete(product)
     await db.commit()
 
@@ -365,6 +367,8 @@ async def batch_delete_products(
                     "reason": f"已被订单 {referenced_order.order_id} 引用"
                 })
             else:
+                # 联动清理该商品的图片（数据库记录 + 磁盘文件 + 空文件夹）
+                await delete_product_images(db, code)
                 await db.delete(product)
                 deleted_count += 1
 
