@@ -1,9 +1,9 @@
 <template>
   <div class="dashboard">
-    <!-- 经营概览（压缩为金额类一行） -->
+    <!-- 经营概览（三个卡片同一行） -->
     <div class="section-title">经营概览</div>
     <el-row :gutter="20">
-      <el-col :span="12">
+      <el-col :span="8">
         <el-card class="stat-card clickable compact" @click="goTo('/statistics')">
           <div class="stat-icon amount">
             <el-icon><Money /></el-icon>
@@ -14,7 +14,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :span="8">
         <el-card class="stat-card clickable compact" @click="goTo('/salary-settlement')">
           <div class="stat-icon commission">
             <el-icon><Wallet /></el-icon>
@@ -25,11 +25,7 @@
           </div>
         </el-card>
       </el-col>
-    </el-row>
-
-    <!-- 第二行：超期订单预警卡片 -->
-    <el-row :gutter="20" style="margin-top: 20px;">
-      <el-col :span="24">
+      <el-col :span="8">
         <el-card class="stat-card clickable compact overdue-card" @click="goOrders({ overdue: true })">
           <div class="stat-icon overdue">
             <el-icon><AlarmClock /></el-icon>
@@ -38,7 +34,6 @@
             <div class="stat-value danger">{{ stats.overdueOrders }}</div>
             <div class="stat-label">超期订单（超过 {{ stats.overdueDays }} 天未发货）</div>
           </div>
-          <div class="overdue-tip">点击查看全部超期订单 →</div>
         </el-card>
       </el-col>
     </el-row>
