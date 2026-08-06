@@ -28,6 +28,7 @@ DB_DIR = DATA_DIR / "db"
 IMAGES_DIR = DATA_DIR / "images"
 TEMP_DIR = IMAGES_DIR / "temp"
 OFFICIAL_DIR = IMAGES_DIR / "official"
+PRODUCT_DIR = IMAGES_DIR / "product"   # 商品图片目录（商品档案上传的图片）
 BACKUP_DIR = DATA_DIR / "backup"
 LOGS_DIR = DATA_DIR / "logs"
 QR_CACHE_DIR = DATA_DIR / "qr_codes"
@@ -45,7 +46,7 @@ def get_password_hash(password: str) -> str:
 
 # ==================== 目录初始化 ====================
 def create_directories():
-    dirs = [DATA_DIR, DB_DIR, IMAGES_DIR, TEMP_DIR, OFFICIAL_DIR, BACKUP_DIR, LOGS_DIR, QR_CACHE_DIR]
+    dirs = [DATA_DIR, DB_DIR, IMAGES_DIR, TEMP_DIR, OFFICIAL_DIR, PRODUCT_DIR, BACKUP_DIR, LOGS_DIR, QR_CACHE_DIR]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
     print("✓ 目录结构初始化完成")
@@ -347,6 +348,7 @@ def clean_user_data(conn: sqlite3.Connection):
         ("login_logs", "登录日志"),
         ("operation_logs", "操作日志"),
         ("images", "图片记录"),
+        ("product_images", "商品图片记录"),
         ("orders", "订单"),
         ("shops", "网店"),
         ("products", "商品"),
@@ -382,6 +384,33 @@ def clean_user_data(conn: sqlite3.Connection):
         print(f"✓ 共清理 {total} 条数据")
     else:
         print("  数据库已是最干净状态，无需清理")
+
+
+# ==================== 清理磁盘图片 ====================
+def clean_disk_images():
+    """删除所有业务上传的图片文件及其目录（临时图 / 订单正式图 / 商品图）。
+
+    无论 --reset 还是 --force 都会执行；删除后由 create_directories 重建空目录。
+    """
+    print("\n>>> 清理磁盘图片（临时图 / 订单正式图 / 商品图）")
+    total = 0
+    for d, label in [
+        (TEMP_DIR, "临时图片"),
+        (OFFICIAL_DIR, "订单正式图片"),
+        (PRODUCT_DIR, "商品图片"),
+    ]:
+        if d.exists():
+            files = [f for f in d.rglob("*") if f.is_file()]
+            shutil.rmtree(d, ignore_errors=True)
+            total += len(files)
+            print(f"  - {label}: 删除 {len(files)} 个文件，目录 {d.name}/ 已清除")
+        else:
+            print(f"  - {label}: 无（目录不存在）")
+    if total == 0:
+        print("  ✓ 磁盘上未发现已上传图片")
+    else:
+        print(f"  ✓ 共删除 {total} 个图片文件")
+    return total
 
 
 # ==================== 验证 ====================
@@ -432,15 +461,6 @@ def init_database(reset: bool = False):
                 f.unlink()
         print("✓ 旧数据库已删除")
 
-        # 清理图片存储
-        if OFFICIAL_DIR.exists():
-            file_count = sum(1 for _ in OFFICIAL_DIR.rglob("*") if _.is_file())
-            shutil.rmtree(OFFICIAL_DIR)
-            print(f"✓ 已删除 {file_count} 张已上传图片")
-        if TEMP_DIR.exists():
-            shutil.rmtree(TEMP_DIR)
-            print("✓ 临时图片目录已清除")
-
         # 清理二维码缓存
         if QR_CACHE_DIR.exists():
             shutil.rmtree(QR_CACHE_DIR)
@@ -462,8 +482,11 @@ def init_database(reset: bool = False):
         # 字段补全（向后兼容）
         ensure_columns(conn)
 
-        # 清理业务数据（保留管理员和系统配置）
+        # 清理业务数据（保留管理员和系统配置）：含全部图片的数据库记录
         clean_user_data(conn)
+
+        # 清理磁盘图片文件与目录（临时图/订单正式图/商品图，含 --force 与 --reset）
+        clean_disk_images()
 
         # 初始数据（补充缺失的管理员/配置）
         seed_all(conn)
