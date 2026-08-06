@@ -214,7 +214,8 @@ const menuGroups = computed(() => {
         {
           title: '系统运维',
           items: pick([
-            { label: '系统参数', path: '/settings', desc: '提成比例、数据清理等配置', show: isBoss },
+            { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss },
+            { label: '数据清理管理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss },
             { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
             { label: '系统信息', path: '/system-info', desc: '版本、运行环境与数据概况', show: isBoss }
           ])
