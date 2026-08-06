@@ -6,11 +6,11 @@
       </div>
       <el-menu
         :default-active="activeMenu"
-        router
         class="menu"
         background-color="#001529"
         text-color="#fff"
         active-text-color="#409EFF"
+        @select="handleMenuSelect"
       >
         <el-menu-item index="/smart-dashboard" v-if="userStore.isBoss">
           <span>智慧大屏</span>
@@ -21,38 +21,20 @@
         <el-menu-item index="/orders" v-if="userStore.role !== 'factory' && userStore.role !== 'shipping'">
           <span>订单管理</span>
         </el-menu-item>
-        <el-sub-menu index="basic-info" v-if="userStore.isBoss || userStore.isSales">
-          <template #title>
-            <span>基础信息</span>
-          </template>
-          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('products')">商品管理</div>
-          <div class="drawer-menu-item" @click="openBasicInfo('shops')">网店信息</div>
-          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('users')">用户管理</div>
-          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('logistics')">物流管理</div>
-          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('categories')">类别管理</div>
-          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('brands')">品牌管理</div>
-        </el-sub-menu>
+        <el-menu-item v-if="menuGroups['basic-info'].groups.some((g) => g.items.length)" index="group:basic-info">
+          <span>基础信息</span>
+          <el-icon class="group-arrow"><ArrowRight /></el-icon>
+        </el-menu-item>
         <el-menu-item index="/statistics">
           <span>数据统计</span>
         </el-menu-item>
-        <el-sub-menu index="finance" v-if="userStore.isBoss || userStore.isSales">
-          <template #title>
-            <span>财务模块</span>
-          </template>
-          <el-menu-item index="/salary-settlement" v-if="userStore.isBoss">工资结算</el-menu-item>
-          <el-menu-item index="/account-withdrawal">账户提现</el-menu-item>
-        </el-sub-menu>
-        <el-menu-item index="/settings" v-if="userStore.isBoss">
+        <el-menu-item v-if="menuGroups['finance'].groups.some((g) => g.items.length)" index="group:finance">
+          <span>财务模块</span>
+          <el-icon class="group-arrow"><ArrowRight /></el-icon>
+        </el-menu-item>
+        <el-menu-item v-if="menuGroups['system'].groups.some((g) => g.items.length)" index="group:system">
           <span>系统设置</span>
-        </el-menu-item>
-        <el-menu-item index="/logs" v-if="userStore.isBoss">
-          <span>日志管理</span>
-        </el-menu-item>
-        <el-menu-item index="/notifications">
-          <span>站内信管理</span>
-        </el-menu-item>
-        <el-menu-item index="/system-info" v-if="userStore.isBoss">
-          <span>系统信息</span>
+          <el-icon class="group-arrow"><ArrowRight /></el-icon>
         </el-menu-item>
       </el-menu>
       
@@ -110,7 +92,13 @@
     </template>
   </el-dialog>
 
-  <BasicInfoDrawer v-model:visible="basicInfoVisible" :module="basicInfoModule" />
+  <SubMenuDrawer
+    v-model:visible="drawerVisible"
+    :title="activeGroup.title"
+    :groups="activeGroup.groups"
+    :sidebar-width="200"
+    width="320"
+  />
 </template>
 
 <script setup>
@@ -119,9 +107,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import ExchangeCalculator from '@/modules/Common/components/ExchangeCalculator.vue'
-import BasicInfoDrawer from '@/components/BasicInfoDrawer.vue'
+import SubMenuDrawer from '@/components/SubMenuDrawer.vue'
 import { getUnreadCount } from '@/api/notification'
-import { Bell } from '@element-plus/icons-vue'
+import { Bell, ArrowRight } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -177,16 +165,98 @@ onUnmounted(() => {
   }
 })
 
-const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => route.meta.title || '')
 const isFullscreenDashboard = computed(() => route.name === 'SmartDashboard')
 
-// 基础信息模块：点击以抽屉式展示，不跳转子页面
-const basicInfoVisible = ref(false)
-const basicInfoModule = ref('')
-function openBasicInfo(module) {
-  basicInfoModule.value = module
-  basicInfoVisible.value = true
+// ========== 抽屉式二级菜单 ==========
+// 一级菜单点击后从右侧弹出抽屉展示二级菜单，点击二级菜单跳转到对应功能页面
+const menuGroups = computed(() => {
+  const isBoss = userStore.isBoss
+  const isSales = userStore.isSales
+  const pick = (arr) => arr.filter((item) => item.show !== false)
+
+  return {
+    'basic-info': {
+      title: '基础信息',
+      groups: [
+        {
+          title: '商品资料',
+          items: pick([
+            { label: '商品管理', path: '/products', desc: '维护商品资料与规格', show: isBoss },
+            { label: '类别管理', path: '/categories', desc: '两级类别与编码维护', show: isBoss },
+            { label: '品牌管理', path: '/brands', desc: '品牌编码与名称维护', show: isBoss }
+          ])
+        },
+        {
+          title: '店铺物流',
+          items: pick([
+            { label: '网店信息', path: '/shops', desc: '管理店铺账号与归属', show: isBoss || isSales },
+            { label: '物流管理', path: '/logistics', desc: '维护物流商与运费信息', show: isBoss }
+          ])
+        }
+      ].filter((g) => g.items.length)
+    },
+    finance: {
+      title: '财务模块',
+      groups: [
+        {
+          title: '财务结算',
+          items: pick([
+            { label: '工资结算', path: '/salary-settlement', desc: '销售提成核算与发放', show: isBoss },
+            { label: '账户提现', path: '/account-withdrawal', desc: '提现申请与审批记录', show: isBoss || isSales }
+          ])
+        }
+      ].filter((g) => g.items.length)
+    },
+    system: {
+      title: '系统设置',
+      groups: [
+        {
+          title: '系统运维',
+          items: pick([
+            { label: '系统参数', path: '/settings', desc: '提成比例、数据清理等配置', show: isBoss },
+            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
+            { label: '系统信息', path: '/system-info', desc: '版本、运行环境与数据概况', show: isBoss }
+          ])
+        },
+        {
+          title: '账号权限',
+          items: pick([
+            { label: '用户管理', path: '/users', desc: '账号、角色与权限维护', show: isBoss }
+          ])
+        },
+        {
+          title: '消息通讯',
+          items: pick([
+            { label: '站内信管理', path: '/notifications', desc: '消息收发与已读状态', show: true }
+          ])
+        }
+      ].filter((g) => g.items.length)
+    }
+  }
+})
+
+const drawerVisible = ref(false)
+const activeGroupKey = ref('basic-info')
+const activeGroup = computed(() => menuGroups.value[activeGroupKey.value] || { title: '', items: [] })
+
+// 当前路由属于哪个分组（用于侧边栏一级菜单高亮）
+const activeMenu = computed(() => {
+  for (const [key, group] of Object.entries(menuGroups.value)) {
+    if (group.groups.some((g) => g.items.some((item) => item.path === route.path))) {
+      return `group:${key}`
+    }
+  }
+  return route.path
+})
+
+function handleMenuSelect(index) {
+  if (index.startsWith('group:')) {
+    activeGroupKey.value = index.slice(6)
+    drawerVisible.value = true
+    return
+  }
+  if (index !== route.path) router.push(index)
 }
 
 const roleNames = {
@@ -356,17 +426,9 @@ function handleCommand(command) {
   margin-top: auto;
 }
 
-.drawer-menu-item {
-  height: 50px;
-  line-height: 50px;
-  padding: 0 20px;
-  cursor: pointer;
-  color: #fff;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.drawer-menu-item:hover {
-  background-color: #1f2d3d;
+.group-arrow {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.45;
 }
 </style>

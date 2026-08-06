@@ -42,3 +42,5 @@ backend/data/.secret_key
 # ── 临时文件 / 备份 ──
 data/
 backend/data/images/temp/
+generated-images/
+*.bak_*

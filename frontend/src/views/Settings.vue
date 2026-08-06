@@ -2,7 +2,7 @@
   <div class="settings-container">
     <el-card class="mb-4">
       <template #header>
-        <span>系统设置</span>
+        <span>参数设置</span>
       </template>
 
       <el-form :model="settings" label-width="150px">

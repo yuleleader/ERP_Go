@@ -188,12 +188,14 @@ class ShopWithdrawRecord(Base):
 
 
 class Category(Base):
-    """商品类别（基础信息-类别管理）"""
+    """商品类别（基础信息-类别管理），支持两级：一级 002，二级 002001"""
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    category_code = Column(Integer, unique=True, index=True, nullable=False)  # 三位数字，自增（=id）
-    category_name = Column(String(100), nullable=False)                       # 用户填写
+    category_code = Column(String(20), unique=True, index=True, nullable=False)  # 一级三位(002)，二级六位(002001)
+    category_name = Column(String(100), nullable=False)                          # 用户填写
+    parent_id = Column(Integer, nullable=True, index=True)                       # 上级类别 id，为空表示一级
+    level = Column(Integer, nullable=False, default=1)                           # 1=一级 2=二级
     created_by = Column(String(50), nullable=True)
     created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))

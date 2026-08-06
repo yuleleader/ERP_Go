@@ -220,22 +220,28 @@ class CategoryBase(BaseModel):
 
 class CategoryCreate(CategoryBase):
     """类别创建模型"""
-    pass
+    parent_id: Optional[int] = Field(None, description="上级类别 id，为空表示创建一级类别")
 
 class CategoryUpdate(BaseModel):
     """类别更新模型"""
     category_name: Optional[str] = Field(None, min_length=1, max_length=100, description="类别名称，用户填写")
 
 class CategoryResponse(CategoryBase):
-    """类别响应模型"""
+    """类别响应模型（支持两级树形结构）"""
     id: int
-    category_code: int          # 三位数字，自增（=id）
+    category_code: str          # 一级三位(002)，二级六位(002001)
+    parent_id: Optional[int] = None
+    level: int = 1
     created_by: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    children: List["CategoryResponse"] = []
 
     class Config:
         from_attributes = True
+
+
+CategoryResponse.model_rebuild()
 
 
 # ==================== 品牌管理相关 Schema ====================

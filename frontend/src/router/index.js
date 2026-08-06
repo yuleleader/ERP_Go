@@ -53,10 +53,22 @@ const routes = [
         meta: { title: '物流管理', roles: ['boss'] }
       },
       {
+        path: 'categories',
+        name: 'Categories',
+        component: () => import('@/views/Categories.vue'),
+        meta: { title: '类别管理', roles: ['boss'] }
+      },
+      {
+        path: 'brands',
+        name: 'Brands',
+        component: () => import('@/views/Brands.vue'),
+        meta: { title: '品牌管理', roles: ['boss'] }
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/Settings.vue'),
-        meta: { title: '系统设置', roles: ['boss'] }
+        meta: { title: '系统参数', roles: ['boss'] }
       },
       {
         path: 'logs',
@@ -80,7 +92,7 @@ const routes = [
         path: 'notifications',
         name: 'Notifications',
         component: () => import('@/views/Notifications.vue'),
-        meta: { title: '站内信' }
+        meta: { title: '站内信管理' }
       },
       {
         path: 'system-info',
