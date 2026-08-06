@@ -25,10 +25,12 @@
           <template #title>
             <span>基础信息</span>
           </template>
-          <el-menu-item index="/products" v-if="userStore.isBoss">商品管理</el-menu-item>
-          <el-menu-item index="/shops">网店信息</el-menu-item>
-          <el-menu-item index="/users" v-if="userStore.isBoss">用户管理</el-menu-item>
-          <el-menu-item index="/logistics" v-if="userStore.isBoss">物流管理</el-menu-item>
+          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('products')">商品管理</div>
+          <div class="drawer-menu-item" @click="openBasicInfo('shops')">网店信息</div>
+          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('users')">用户管理</div>
+          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('logistics')">物流管理</div>
+          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('categories')">类别管理</div>
+          <div class="drawer-menu-item" v-if="userStore.isBoss" @click="openBasicInfo('brands')">品牌管理</div>
         </el-sub-menu>
         <el-menu-item index="/statistics">
           <span>数据统计</span>
@@ -45,6 +47,12 @@
         </el-menu-item>
         <el-menu-item index="/logs" v-if="userStore.isBoss">
           <span>日志管理</span>
+        </el-menu-item>
+        <el-menu-item index="/notifications">
+          <span>站内信管理</span>
+        </el-menu-item>
+        <el-menu-item index="/system-info" v-if="userStore.isBoss">
+          <span>系统信息</span>
         </el-menu-item>
       </el-menu>
       
@@ -101,6 +109,8 @@
       <el-button type="primary" @click="handleChangePassword">确定</el-button>
     </template>
   </el-dialog>
+
+  <BasicInfoDrawer v-model:visible="basicInfoVisible" :module="basicInfoModule" />
 </template>
 
 <script setup>
@@ -109,6 +119,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import ExchangeCalculator from '@/modules/Common/components/ExchangeCalculator.vue'
+import BasicInfoDrawer from '@/components/BasicInfoDrawer.vue'
 import { getUnreadCount } from '@/api/notification'
 import { Bell } from '@element-plus/icons-vue'
 
@@ -169,6 +180,14 @@ onUnmounted(() => {
 const activeMenu = computed(() => route.path)
 const pageTitle = computed(() => route.meta.title || '')
 const isFullscreenDashboard = computed(() => route.name === 'SmartDashboard')
+
+// 基础信息模块：点击以抽屉式展示，不跳转子页面
+const basicInfoVisible = ref(false)
+const basicInfoModule = ref('')
+function openBasicInfo(module) {
+  basicInfoModule.value = module
+  basicInfoVisible.value = true
+}
 
 const roleNames = {
   boss: '老板端',
@@ -335,5 +354,19 @@ function handleCommand(command) {
   padding: 10px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: auto;
+}
+
+.drawer-menu-item {
+  height: 50px;
+  line-height: 50px;
+  padding: 0 20px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.drawer-menu-item:hover {
+  background-color: #1f2d3d;
 }
 </style>

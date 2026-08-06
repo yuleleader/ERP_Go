@@ -176,19 +176,6 @@
         </el-table>
       </div>
     </el-card>
-
-    <el-card style="margin-top: 20px;">
-      <template #header>
-        <span>系统信息</span>
-      </template>
-
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="系统版本">1.0.0</el-descriptions-item>
-        <el-descriptions-item label="数据库类型">SQLite</el-descriptions-item>
-        <el-descriptions-item label="Python版本">3.10+</el-descriptions-item>
-        <el-descriptions-item label="前端框架">Vue 3</el-descriptions-item>
-      </el-descriptions>
-    </el-card>
   </div>
 </template>
 

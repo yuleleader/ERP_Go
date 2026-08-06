@@ -83,6 +83,12 @@ const routes = [
         meta: { title: '站内信' }
       },
       {
+        path: 'system-info',
+        name: 'SystemInfo',
+        component: () => import('@/views/SystemInfo.vue'),
+        meta: { title: '系统信息', roles: ['boss'] }
+      },
+      {
         path: 'smart-dashboard',
         name: 'SmartDashboard',
         component: () => import('@/views/SmartDashboard.vue'),

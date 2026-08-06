@@ -210,3 +210,55 @@ class ProductResponse(ProductBase):
 
     class Config:
         from_attributes = True
+
+
+# ==================== 类别管理相关 Schema ====================
+
+class CategoryBase(BaseModel):
+    """类别基础模型"""
+    category_name: str = Field(..., min_length=1, max_length=100, description="类别名称，用户填写")
+
+class CategoryCreate(CategoryBase):
+    """类别创建模型"""
+    pass
+
+class CategoryUpdate(BaseModel):
+    """类别更新模型"""
+    category_name: Optional[str] = Field(None, min_length=1, max_length=100, description="类别名称，用户填写")
+
+class CategoryResponse(CategoryBase):
+    """类别响应模型"""
+    id: int
+    category_code: int          # 三位数字，自增（=id）
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== 品牌管理相关 Schema ====================
+
+class BrandBase(BaseModel):
+    """品牌基础模型"""
+    brand_name: str = Field(..., min_length=1, max_length=100, description="品牌名称，用户填写")
+
+class BrandCreate(BrandBase):
+    """品牌创建模型"""
+    pass
+
+class BrandUpdate(BaseModel):
+    """品牌更新模型"""
+    brand_name: Optional[str] = Field(None, min_length=1, max_length=100, description="品牌名称，用户填写")
+
+class BrandResponse(BrandBase):
+    """品牌响应模型"""
+    id: int
+    brand_code: int             # 三位数字，自增（=id）
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

@@ -186,6 +186,31 @@ class ShopWithdrawRecord(Base):
     create_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     update_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
 
+
+class Category(Base):
+    """商品类别（基础信息-类别管理）"""
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    category_code = Column(Integer, unique=True, index=True, nullable=False)  # 三位数字，自增（=id）
+    category_name = Column(String(100), nullable=False)                       # 用户填写
+    created_by = Column(String(50), nullable=True)
+    created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+    updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
+class Brand(Base):
+    """商品品牌（基础信息-品牌管理）"""
+    __tablename__ = "brands"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    brand_code = Column(Integer, unique=True, index=True, nullable=False)    # 三位数字，自增（=id）
+    brand_name = Column(String(100), nullable=False)                         # 用户填写
+    created_by = Column(String(50), nullable=True)
+    created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+    updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
 @event.listens_for(User, 'before_insert')
 @event.listens_for(Shop, 'before_insert')
 @event.listens_for(Order, 'before_insert')
@@ -198,6 +223,8 @@ class ShopWithdrawRecord(Base):
 @event.listens_for(Notification, 'before_insert')
 @event.listens_for(Product, 'before_insert')
 @event.listens_for(ShopWithdrawRecord, 'before_insert')
+@event.listens_for(Category, 'before_insert')
+@event.listens_for(Brand, 'before_insert')
 def set_create_time_before_insert(mapper, connection, target):
     for col in ['created_at', 'create_time', 'login_time', 'start_time', 'updated_at', 'update_time']:
         if hasattr(target, col) and getattr(target, col) is None:
@@ -211,6 +238,8 @@ def set_create_time_before_insert(mapper, connection, target):
 @event.listens_for(LogisticsCompany, 'before_update')
 @event.listens_for(Product, 'before_update')
 @event.listens_for(ShopWithdrawRecord, 'before_update')
+@event.listens_for(Category, 'before_update')
+@event.listens_for(Brand, 'before_update')
 def set_update_time_before_update(mapper, connection, target):
     for col in ['updated_at', 'update_time']:
         if hasattr(target, col):
