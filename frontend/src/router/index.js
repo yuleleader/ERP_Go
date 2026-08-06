@@ -32,7 +32,7 @@ const routes = [
         path: 'products',
         name: 'Products',
         component: () => import('@/views/Products.vue'),
-        meta: { title: '商品管理', roles: ['boss'] }
+        meta: { title: '商品管理' }
       },
       {
         path: 'shops',

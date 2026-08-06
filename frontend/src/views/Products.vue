@@ -70,10 +70,10 @@
           <el-button type="primary" @click="fetchProducts">搜索</el-button>
           <el-button @click="resetFilters">重置</el-button>
           <div class="toolbar-spacer"></div>
-          <el-button type="primary" @click="showCreateDialog">新建商品</el-button>
+          <el-button v-if="canEditProducts" type="primary" @click="showCreateDialog">新建商品</el-button>
         </div>
 
-        <div class="batch-actions" v-if="selectedProducts.length > 0">
+        <div class="batch-actions" v-if="canEditProducts && selectedProducts.length > 0">
           <el-button type="danger" size="small" @click="handleBatchDelete">
             批量删除 ({{ selectedProducts.length }})
           </el-button>
@@ -85,7 +85,7 @@
           style="width: 100%"
           @selection-change="handleSelectionChange"
         >
-          <el-table-column type="selection" width="45" />
+          <el-table-column v-if="canEditProducts" type="selection" width="45" />
           <el-table-column prop="product_code" label="商品编码" width="130" />
           <el-table-column prop="product_name" label="商品名称" min-width="160" />
           <el-table-column label="类别" width="120">
@@ -131,8 +131,8 @@
           <el-table-column label="操作" width="170" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="viewProduct(row)">查看</el-button>
-              <el-button link type="primary" size="small" @click="editProduct(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="handleDeleteProduct(row)">删除</el-button>
+              <el-button v-if="canEditProducts" link type="primary" size="small" @click="editProduct(row)">编辑</el-button>
+              <el-button v-if="canEditProducts" link type="danger" size="small" @click="handleDeleteProduct(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -414,8 +414,10 @@ import { Plus } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 
-// 权限检查
-const canManageProducts = computed(() => ['boss', 'sales'].includes(userStore.userInfo?.role))
+// 商品管理对所有人员开放查看
+const canManageProducts = computed(() => true)
+// 仅老板端/销售端可新增、编辑、删除、上传图片
+const canEditProducts = computed(() => ['boss', 'sales'].includes(userStore.userInfo?.role))
 
 // ===== 左侧导航 =====
 const leftMode = ref('category')
