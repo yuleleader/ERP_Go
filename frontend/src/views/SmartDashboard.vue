@@ -46,6 +46,11 @@
             <div class="stat-label">已发货订单</div>
             <div class="stat-value">{{ formatNumber(overview.shipped_orders) }}</div>
           </div>
+          <div class="stat-card refund">
+            <div class="stat-label">退款订单</div>
+            <div class="stat-value">{{ formatNumber(overview.refunded_orders) }}单</div>
+            <div class="stat-sub">退货金额 ¥{{ formatNumber(overview.refunded_amount) }}</div>
+          </div>
         </div>
 
         <!-- 月度销售趋势 -->
@@ -155,7 +160,9 @@ const overview = ref({
   shipped_orders: 0,
   pending_orders: 0,
   producing_orders: 0,
-  virtual_orders: 0
+  virtual_orders: 0,
+  refunded_orders: 0,
+  refunded_amount: 0
 });
 
 const productRanking = ref([]);
@@ -647,6 +654,30 @@ onUnmounted(() => {
   font-weight: bold;
   color: #fff;
   font-family: 'Courier New', monospace;
+}
+
+/* 退款订单卡片（暖色调区分） */
+.stat-card.refund {
+  border-color: rgba(255, 107, 107, 0.35);
+}
+
+.stat-card.refund:hover {
+  border-color: rgba(255, 107, 107, 0.6);
+  box-shadow: 0 0 15px rgba(255, 107, 107, 0.18);
+}
+
+.stat-card.refund .stat-label {
+  color: #fda4af;
+}
+
+.stat-card.refund .stat-value {
+  color: #fecaca;
+}
+
+.stat-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
 }
 
 /* 图表块 */
