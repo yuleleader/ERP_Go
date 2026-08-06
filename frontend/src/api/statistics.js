@@ -78,3 +78,11 @@ export function getDashboardSalesRanking(limit = 10) {
     params: { limit }
   })
 }
+
+// 获取老板端工作台三段式流程图统计（销售 -> 生产 -> 发货）
+export function getProcessFlow() {
+  return request({
+    url: '/statistics/process-flow',
+    method: 'get'
+  })
+}

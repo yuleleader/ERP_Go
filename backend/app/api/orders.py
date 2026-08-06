@@ -218,6 +218,7 @@ async def get_orders(
     produce_status: Optional[str] = None,
     shop_id: Optional[str] = None,
     keyword: Optional[str] = None,
+    created_by: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
@@ -252,6 +253,11 @@ async def get_orders(
         )
         query = query.where(like_conditions)
         count_query = count_query.where(like_conditions)
+
+    # 创建人筛选：仅老板端可按 created_by 过滤；销售端已在上方强制只看自己
+    if created_by and current_user.role == "boss":
+        query = query.where(cast(Order.created_by, String) == str(created_by))
+        count_query = count_query.where(cast(Order.created_by, String) == str(created_by))
 
     count_result = await db.execute(count_query)
     total = count_result.scalar()

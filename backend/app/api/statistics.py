@@ -582,6 +582,18 @@ async def get_factory_dashboard_stats(
     )
     shipped_orders = shipped_result.scalar() or 0
 
+    # 虚拟发货（shipping_status = virtual）
+    virtual_result = await db.execute(
+        select(func.count(Order.id)).filter(Order.shipping_status == "virtual")
+    )
+    virtual_orders = virtual_result.scalar() or 0
+
+    # 已退货/退款（shipping_status = refunded）
+    refunded_result = await db.execute(
+        select(func.count(Order.id)).filter(Order.shipping_status == "refunded")
+    )
+    refunded_orders = refunded_result.scalar() or 0
+
     # 未生产（produce_status = unproduce）
     unproduce_result = await db.execute(
         select(func.count(Order.id)).filter(Order.produce_status == "unproduce")
@@ -604,6 +616,8 @@ async def get_factory_dashboard_stats(
         "total_orders": total_orders,
         "pending_orders": pending_orders,
         "shipped_orders": shipped_orders,
+        "virtual_orders": virtual_orders,
+        "refunded_orders": refunded_orders,
         "unproduce_orders": unproduce_orders,
         "producing_orders": producing_orders,
         "produced_orders": produced_orders,
@@ -644,6 +658,60 @@ async def get_shipping_dashboard_stats(
         "total_orders": total_orders,
         "pending_orders": pending_orders,
         "shipped_orders": shipped_orders,
+        "update_time": beijing_now().isoformat()
+    }
+
+
+@router.get("/process-flow")
+async def get_process_flow_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """
+    老板端工作台三段式流程图统计（销售 -> 生产 -> 发货）
+    全部按订单当前状态实时计数：
+    - 销售：总订单数 / 未发货(pending) / 虚拟发货(virtual) / 已退货(refunded)
+    - 生产：未生产(unproduce) / 生产中(producing) / 生产完成(produced)
+    - 发货：未发货(pending) / 已发货(shipped)
+    """
+    if current_user.role != "boss":
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
+
+    async def count(filter_expr):
+        result = await db.execute(select(func.count(Order.id)).filter(filter_expr))
+        return result.scalar() or 0
+
+    # 销售段
+    total_orders = count(True)
+    sales_pending = count(Order.shipping_status == "pending")
+    sales_virtual = count(Order.shipping_status == "virtual")
+    sales_refunded = count(Order.shipping_status == "refunded")
+
+    # 生产段
+    produce_unproduce = count(Order.produce_status == "unproduce")
+    produce_producing = count(Order.produce_status == "producing")
+    produce_produced = count(Order.produce_status == "produced")
+
+    # 发货段
+    shipping_pending = count(Order.shipping_status == "pending")
+    shipping_shipped = count(Order.shipping_status == "shipped")
+
+    return {
+        "sales": {
+            "total_orders": total_orders,
+            "pending_orders": sales_pending,
+            "virtual_orders": sales_virtual,
+            "refunded_orders": sales_refunded
+        },
+        "produce": {
+            "unproduce_orders": produce_unproduce,
+            "producing_orders": produce_producing,
+            "produced_orders": produce_produced
+        },
+        "shipping": {
+            "pending_orders": shipping_pending,
+            "shipped_orders": shipping_shipped
+        },
         "update_time": beijing_now().isoformat()
     }
 

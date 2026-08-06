@@ -31,6 +31,17 @@
             <el-option label="生产完成" value="produced" />
           </el-select>
         </el-form-item>
+        <el-form-item label="创建人" v-if="isBoss">
+          <el-select v-model="filters.createdBy" placeholder="全部" clearable @change="fetchOrders" style="width: 180px;">
+            <el-option label="全部" value="" />
+            <el-option
+              v-for="u in userOptions"
+              :key="u.username"
+              :label="u.label"
+              :value="u.username"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="关键词">
           <el-input v-model="filters.keyword" placeholder="追溯码/商品名称" clearable @change="fetchOrders" />
         </el-form-item>
@@ -713,6 +724,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getOrders, createOrder, updateOrder, deleteOrder, getOrder } from '@/api/order'
+import { getUsers } from '@/api/user'
 import { getShops } from '@/api/shop'
 import { migrateImage, getOrderImages, deleteImage } from '@/api/image'
 import { getLogisticsCompanies } from '@/api/logistics'
@@ -877,8 +889,25 @@ const orderRules = {
 const filters = reactive({
   shippingStatus: '',
   produceStatus: '',
-  keyword: ''
+  keyword: '',
+  createdBy: ''
 })
+
+// 创建人下拉选项（仅老板端可见，列出全部用户）
+const userOptions = ref([])
+async function loadUserOptions() {
+  if (!isBoss.value) return
+  try {
+    const res = await getUsers({ limit: 1000 })
+    const list = res.data || res || []
+    userOptions.value = list.map(u => ({
+      username: u.username,
+      label: u.real_name ? `${u.real_name}(${u.username})` : u.username
+    }))
+  } catch (e) {
+    userOptions.value = []
+  }
+}
 
 const pagination = reactive({
   page: 1,
@@ -1043,6 +1072,7 @@ async function fetchOrders() {
     if (filters.shippingStatus) params.shipping_status = filters.shippingStatus
     if (filters.produceStatus) params.produce_status = filters.produceStatus
     if (filters.keyword) params.keyword = filters.keyword
+    if (filters.createdBy) params.created_by = filters.createdBy
 
     const response = await getOrders(params)
     orders.value = response.data || response
@@ -2015,6 +2045,7 @@ onMounted(async () => {
     filters.keyword = String(route.query.keyword)
   }
 
+  loadUserOptions()
   fetchOrders()
 
   if (canCreateOrder.value) {
