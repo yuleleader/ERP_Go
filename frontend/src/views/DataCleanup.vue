@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>数据清理管理</span>
+          <span>日志清理</span>
         </div>
       </template>
 

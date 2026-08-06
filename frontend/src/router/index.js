@@ -74,7 +74,7 @@ const routes = [
         path: 'data-cleanup',
         name: 'DataCleanup',
         component: () => import('@/views/DataCleanup.vue'),
-        meta: { title: '数据清理管理', roles: ['boss'] }
+        meta: { title: '日志清理', roles: ['boss'] }
       },
       {
         path: 'logs',
