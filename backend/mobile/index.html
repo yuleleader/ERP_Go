@@ -351,13 +351,24 @@
   async function loadOrder(id){
     id=id.trim(); if(!id){ toast("订单号不能为空"); return; }
     state.orderId=id;
+    state.order = null;        // 重置上次订单数据，避免失败时残留旧字段
     $("orderTitle").textContent = "订单详情";
     show("view-order");
     $("info").innerHTML='<div class="muted">加载中…</div>';
+    $("editForm").innerHTML='';                          // 清空"修改信息"
+    $("editBox").classList.add("hidden");                // 隐藏修改信息卡
+    $("images").innerHTML='<div class="muted">加载中…</div>';
     try{
       state.order = await api("/api/orders/"+encodeURIComponent(id));
       renderOrder();
-    }catch(err){ const m=(err&&err.message)?err.message:"加载失败"; $("info").innerHTML='<div class="muted">已识别二维码内容：<b>'+esc(id)+'</b>，但'+esc(m)+'。请确认这是本系统的订单二维码（微信/支付/名片码无法识别）。</div>'; }
+    }catch(err){
+      const m=(err&&err.message)?err.message:"加载失败";
+      $("info").innerHTML='<div class="muted">已识别二维码内容：<b>'+esc(id)+'</b>，但'+esc(m)+'。请确认这是本系统的订单二维码（微信/支付/名片码无法识别）。</div>';
+      // 失败时清空下方各区域，避免残留上一次订单的字段/图片
+      $("editForm").innerHTML='';
+      $("editBox").classList.add("hidden");
+      $("images").innerHTML='';
+    }
   }
   function renderOrder(){
     const o=state.order;
