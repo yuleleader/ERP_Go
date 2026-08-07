@@ -112,7 +112,7 @@
     <el-dialog
       v-if="selectedNotification"
       title="通知详情"
-      :visible="showDetail"
+      v-model="showDetail"
       width="500px"
       @close="handleCloseDetail"
     >
@@ -283,6 +283,7 @@
 
 <script setup>
 import { formatDate, formatDateTime } from '@/utils/format'
+import { imageUrlWithToken } from '@/utils/imageUrl'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Picture, Van, Bell, Box, Search, Document } from '@element-plus/icons-vue'
@@ -504,13 +505,13 @@ async function handleViewOrderDetail(orderId) {
     const imgResult = await getOrderImages(orderId)
     if (imgResult.code === 200 && imgResult.data) {
       orderSalesImages.value = imgResult.data.filter(item => item.layer === 'sales').map(item => ({
-        id: item.id, name: `sales_${item.id}`, url: item.image_url
+        id: item.id, name: `sales_${item.id}`, url: imageUrlWithToken(item.image_url)
       }))
       orderFactoryImages.value = imgResult.data.filter(item => item.layer === 'factory').map(item => ({
-        id: item.id, name: `factory_${item.id}`, url: item.image_url
+        id: item.id, name: `factory_${item.id}`, url: imageUrlWithToken(item.image_url)
       }))
       orderShippingImages.value = imgResult.data.filter(item => item.layer === 'shipping').map(item => ({
-        id: item.id, name: `shipping_${item.id}`, url: item.image_url
+        id: item.id, name: `shipping_${item.id}`, url: imageUrlWithToken(item.image_url)
       }))
     }
   } catch (error) {

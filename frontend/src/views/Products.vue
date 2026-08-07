@@ -514,11 +514,15 @@ const filters = reactive({
   status: ''
 })
 
+// 请求竞态保护：只应用最新一次列表查询结果（快速切换分类/品牌/分页时防旧响应覆盖）
+let productRequestSeq = 0
+
 async function fetchProducts() {
   if (!canManageProducts.value) {
     ElMessage.warning('您没有权限访问商品管理')
     return
   }
+  const reqSeq = ++productRequestSeq
   loading.value = true
   try {
     const params = {
@@ -535,6 +539,8 @@ async function fetchProducts() {
     }
 
     const list = await getProducts(params)
+    // 已过期响应直接丢弃
+    if (reqSeq !== productRequestSeq) return
     // 为每条商品加载首张图片用于列表缩略图
     const enriched = await Promise.all((list || []).map(async (p) => {
       try {
@@ -551,14 +557,18 @@ async function fetchProducts() {
         return { ...p, image_count: 0, cover_image: '', preview_urls: [] }
       }
     }))
+    // 图片加载期间可能已发起新请求，再次校验
+    if (reqSeq !== productRequestSeq) return
     products.value = enriched
 
-    if (!filters.keyword && !filters.status && selectedId.value === null) {
-      const countResponse = await getProductCount()
-      pagination.total = countResponse.total
-    } else {
-      pagination.total = (products.value && products.value.length) || 0
-    }
+    // 分页总数：按当前筛选条件请求（后端 count 接口支持与列表一致的过滤）
+    const countResponse = await getProductCount({
+      keyword: filters.keyword || undefined,
+      status: filters.status || undefined,
+      category_id: leftMode.value === 'category' && selectedId.value !== null ? selectedId.value : undefined,
+      brand_id: leftMode.value === 'brand' && selectedId.value !== null ? selectedId.value : undefined
+    })
+    pagination.total = countResponse.total
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '获取商品列表失败')
   } finally {
@@ -816,7 +826,7 @@ async function handleDeleteProduct(row) {
     ElMessage.success('商品删除成功')
     fetchProducts()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '删除失败')
     }
   }
@@ -847,7 +857,7 @@ async function handleBatchDelete() {
     selectedProducts.value = []
     fetchProducts()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '批量删除失败')
     }
   }

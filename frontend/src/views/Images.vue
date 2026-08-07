@@ -119,7 +119,7 @@ async function deleteImage(row) {
     ElMessage.success('图片删除成功')
     fetchImages()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error('删除失败')
     }
   }

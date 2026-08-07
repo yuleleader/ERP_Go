@@ -152,7 +152,7 @@ async function deleteCompany(row) {
     ElMessage.success('删除成功')
     fetchCompanies()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error('删除失败')
     }
   }

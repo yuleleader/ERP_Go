@@ -15,6 +15,7 @@ from typing import List, Optional
 from ..core.database import get_db
 from ..core.security import get_current_active_user, verify_password
 from ..core.config import TEMP_DIR, OFFICIAL_DIR
+from ..api.images import sanitize_path_component
 from ..models.models import Order, Shop, User, Image as ImageModel, OperationLog
 from ..schemas.schemas import OrderCreate, OrderUpdate, OrderResponse
 from ..utils.order_id_generator import order_id_generator
@@ -687,8 +688,13 @@ async def delete_order(
     
     await db.commit()
 
-    # 删除订单对应的文件夹
-    order_folder = OFFICIAL_DIR / order_id
+    # 删除订单对应的文件夹（先做路径净化与边界校验，防路径穿越）
+    safe_order_id = sanitize_path_component(order_id)
+    order_folder = (OFFICIAL_DIR / safe_order_id).resolve()
+    try:
+        order_folder.relative_to(OFFICIAL_DIR.resolve())
+    except ValueError:
+        order_folder = OFFICIAL_DIR  # 非法路径：不删除任何目录
     if order_folder.exists() and order_folder.is_dir():
         try:
             shutil.rmtree(order_folder)

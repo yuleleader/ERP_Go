@@ -85,6 +85,7 @@ const shopSubmitting = ref(false)
 const shopFormRef = ref(null)
 
 const shopForm = reactive({
+  shop_id: '',
   shop_name: '',
   shop_account: '',
   status: 'normal'
@@ -125,6 +126,7 @@ function showShopCreateDialog() {
 
 function editShop(row) {
   shopDialogMode.value = 'edit'
+  shopForm.shop_id = row.shop_id
   shopForm.shop_name = row.shop_name
   shopForm.shop_account = row.shop_account
   shopForm.status = row.status
@@ -141,7 +143,8 @@ async function submitShop() {
         await createShop(shopForm)
         ElMessage.success('网店创建成功')
       } else {
-        await updateShop(shopForm.shop_account, shopForm)
+        const { shop_id, ...shopPayload } = shopForm
+        await updateShop(shop_id, shopPayload)
         ElMessage.success('网店更新成功')
       }
       shopDialogVisible.value = false
@@ -174,7 +177,7 @@ async function handleDeleteShop(row) {
     ElMessage.success('网店删除成功')
     fetchShops()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '删除失败')
     }
   }

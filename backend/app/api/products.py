@@ -150,9 +150,9 @@ async def get_products(
         status=p.status,
         category_id=p.category_id,
         brand_id=p.brand_id,
-        cost_price=p.cost_price,
-        retail_price=p.retail_price,
-        min_price=p.min_price,
+        cost_price=p.cost_price if _can_see_price(current_user, "cost_price") else None,
+        retail_price=p.retail_price if _can_see_price(current_user, "retail_price") else None,
+        min_price=p.min_price if _can_see_price(current_user, "min_price") else None,
         remark1=p.remark1,
         remark2=p.remark2,
         remark3=p.remark3,
@@ -188,9 +188,9 @@ async def get_product(
         status=product.status,
         category_id=product.category_id,
         brand_id=product.brand_id,
-        cost_price=product.cost_price,
-        retail_price=product.retail_price,
-        min_price=product.min_price,
+        cost_price=product.cost_price if _can_see_price(current_user, "cost_price") else None,
+        retail_price=product.retail_price if _can_see_price(current_user, "retail_price") else None,
+        min_price=product.min_price if _can_see_price(current_user, "min_price") else None,
         remark1=product.remark1,
         remark2=product.remark2,
         remark3=product.remark3,
@@ -198,6 +198,14 @@ async def get_product(
         created_at=product.created_at,
         updated_at=product.updated_at
     )
+
+
+def _can_see_price(user, key: str) -> bool:
+    """按用户价格权限判断是否可见某价格字段（boss 恒可见；空权限=全掩码）。"""
+    if getattr(user, "role", None) == "boss":
+        return True
+    perms = [x for x in (getattr(user, "price_permissions", "") or "").split(",") if x]
+    return key in perms
 
 
 @router.put("/{product_code}", response_model=ProductResponse)
@@ -399,17 +407,36 @@ async def batch_delete_products(
 
 @router.get("/count/total")
 async def get_product_count(
+    keyword: str = Query(None, description="关键词（编码/名称模糊）"),
+    status: str = Query(None, description="状态筛选"),
+    category_id: int = Query(None, description="类别筛选"),
+    brand_id: int = Query(None, description="品牌筛选"),
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
     """
-    获取商品总数
+    获取商品总数（支持与列表一致的筛选条件，用于分页）
     权限要求：所有角色可查看
     """
-    result = await db.execute(select(func.count(Product.id)))
-    total = result.scalar()
+    count_query = select(func.count(Product.id))
+    if keyword:
+        count_query = count_query.where(
+            or_(
+                Product.product_code.like(f"%{keyword}%"),
+                Product.product_name.like(f"%{keyword}%")
+            )
+        )
+    if status:
+        count_query = count_query.where(Product.status == status)
+    if category_id is not None:
+        count_query = count_query.where(Product.category_id == category_id)
+    if brand_id is not None:
+        count_query = count_query.where(Product.brand_id == brand_id)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
     
-    # 获取各状态商品数量
+    # 获取各状态商品数量（全量口径，用于统计卡片）
     active_result = await db.execute(
         select(func.count(Product.id)).where(Product.status == "active")
     )

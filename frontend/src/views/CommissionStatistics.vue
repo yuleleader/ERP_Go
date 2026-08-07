@@ -142,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getTheoreticalCommission, getActualCommission, getCommissionByUser } from '@/api/statistics'
@@ -153,10 +153,10 @@ import { InfoFilled, User, Lock } from '@element-plus/icons-vue'
 const router = useRouter()
 const userStore = useUserStore()
 
-const isBoss = userStore.role === 'boss'
-const isSales = userStore.role === 'sales'
-const isFactory = userStore.role === 'factory'
-const isShipping = userStore.role === 'shipping'
+const isBoss = computed(() => userStore.role === 'boss')
+const isSales = computed(() => userStore.role === 'sales')
+const isFactory = computed(() => userStore.role === 'factory')
+const isShipping = computed(() => userStore.role === 'shipping')
 
 const commissionStats = reactive({
   theoretical: 0,

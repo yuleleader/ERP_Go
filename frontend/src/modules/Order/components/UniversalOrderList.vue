@@ -1321,7 +1321,7 @@ async function viewOrder(row) {
         .map(item => ({
           id: item.id,
           name: `sales_${item.id}`,
-          url: item.image_url,
+          url: imageUrlWithToken(item.image_url),
           temp_id: null
         }))
 
@@ -1330,7 +1330,7 @@ async function viewOrder(row) {
         .map(item => ({
           id: item.id,
           name: `factory_${item.id}`,
-          url: item.image_url,
+          url: imageUrlWithToken(item.image_url),
           temp_id: null
         }))
 
@@ -1339,7 +1339,7 @@ async function viewOrder(row) {
         .map(item => ({
           id: item.id,
           name: `shipping_${item.id}`,
-          url: item.image_url,
+          url: imageUrlWithToken(item.image_url),
           temp_id: null
         }))
     }
@@ -1416,7 +1416,7 @@ async function loadOrderImagesForEdit(orderId) {
         .map(item => ({
           id: item.id,
           name: `sales_${item.id}`,
-          url: item.image_url,
+          url: imageUrlWithToken(item.image_url),
           temp_id: null
         }))
 
@@ -1425,7 +1425,7 @@ async function loadOrderImagesForEdit(orderId) {
         .map(item => ({
           id: item.id,
           name: `factory_${item.id}`,
-          url: item.image_url,
+          url: imageUrlWithToken(item.image_url),
           temp_id: null
         }))
 
@@ -1434,7 +1434,7 @@ async function loadOrderImagesForEdit(orderId) {
         .map(item => ({
           id: item.id,
           name: `shipping_${item.id}`,
-          url: item.image_url,
+          url: imageUrlWithToken(item.image_url),
           temp_id: null
         }))
     }

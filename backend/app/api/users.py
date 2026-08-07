@@ -66,11 +66,14 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    if current_user.role != "boss":
-        if user_data.role is not None or user_data.is_active is not None:
-            raise HTTPException(status_code=403, detail="您没有权限修改此字段")
-
     update_data = user_data.model_dump(exclude_unset=True)
+
+    if current_user.role != "boss":
+        # 非老板端仅允许修改自己的真实姓名；其余字段（角色/状态/提成/价格权限/密码）一律拒绝
+        forbidden = set(update_data.keys()) - {"real_name"}
+        if forbidden:
+            raise HTTPException(status_code=403, detail=f"您没有权限修改字段: {', '.join(sorted(forbidden))}")
+
     changes = []
 
     # 密码单独处理：非空则直接重置（无需原密码），并移除以免 setattr 出错

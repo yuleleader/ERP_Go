@@ -213,7 +213,7 @@ const handlePaySingle = async (row) => {
       handleSearch()
     }
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '发放失败')
     }
   }
@@ -234,7 +234,7 @@ const handlePayAll = async () => {
       handleSearch()
     }
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '发放失败')
     }
   }

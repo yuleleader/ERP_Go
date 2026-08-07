@@ -310,7 +310,7 @@ async function resetUserPassword(row) {
     const res = await resetPassword(row.id)
     ElMessage.success(res?.new_password ? `密码已重置，新密码: ${res.new_password}（请告知用户）` : '密码已重置')
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error('重置密码失败')
     }
   }
@@ -327,7 +327,7 @@ async function handleDeleteUser(row) {
     await usersStore.deleteUserInfo(row.id)
     ElMessage.success('用户删除成功')
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error('删除用户失败')
     }
   }

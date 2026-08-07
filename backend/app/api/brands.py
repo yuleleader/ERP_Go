@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from typing import List
 from ..core.database import get_db
 from ..core.security import get_current_active_user
-from ..models.models import Brand, OperationLog
+from ..models.models import Brand, Product, OperationLog
 from ..schemas.schemas import BrandCreate, BrandUpdate, BrandResponse
 
 router = APIRouter(prefix="/api/brands", tags=["品牌管理"])
@@ -82,6 +82,11 @@ async def delete_brand(
     brand = result.scalar_one_or_none()
     if not brand:
         raise HTTPException(status_code=404, detail="品牌不存在")
+
+    # 检查是否有商品引用该品牌，防止产生孤儿数据
+    product_ref = await db.execute(select(Product.id).where(Product.brand_id == brand_id).limit(1))
+    if product_ref.scalars().first():
+        raise HTTPException(status_code=400, detail="该品牌下存在关联商品，无法删除。请先移除或转移商品")
 
     db.add(OperationLog(
         username=current_user.username,

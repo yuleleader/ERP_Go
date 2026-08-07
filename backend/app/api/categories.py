@@ -5,7 +5,7 @@ from sqlalchemy import select
 from typing import List
 from ..core.database import get_db
 from ..core.security import get_current_active_user
-from ..models.models import Category, OperationLog
+from ..models.models import Category, Product, OperationLog
 from ..schemas.schemas import CategoryCreate, CategoryUpdate, CategoryResponse
 
 router = APIRouter(prefix="/api/categories", tags=["类别管理"])
@@ -155,6 +155,11 @@ async def delete_category(
     child_result = await db.execute(select(Category.id).where(Category.parent_id == cat_id))
     if child_result.scalars().first():
         raise HTTPException(status_code=400, detail="该类别下存在子类别，请先删除子类别")
+
+    # 检查是否有商品引用该类别，防止产生孤儿数据
+    product_ref = await db.execute(select(Product.id).where(Product.category_id == cat_id).limit(1))
+    if product_ref.scalars().first():
+        raise HTTPException(status_code=400, detail="该类别下存在关联商品，无法删除。请先移除或转移商品")
 
     db.add(OperationLog(
         username=current_user.username,

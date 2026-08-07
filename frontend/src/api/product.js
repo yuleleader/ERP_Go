@@ -91,13 +91,15 @@ export function batchDeleteProducts(productCodes) {
 }
 
 /**
- * 获取商品统计信息
+ * 获取商品统计信息（支持与列表一致的筛选参数，用于分页总数）
+ * @param {Object} params - keyword/status/category_id/brand_id
  * @returns {Promise} 商品统计（总数、启用数、停用数）
  */
-export function getProductCount() {
+export function getProductCount(params = {}) {
   return request({
     url: '/products/count/total',
-    method: 'get'
+    method: 'get',
+    params
   })
 }
 

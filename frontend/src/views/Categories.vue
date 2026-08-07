@@ -418,7 +418,7 @@ async function confirmDelete() {
     selectedNode.value = null
     await refreshAll()
   } catch (e) {
-    if (e !== 'cancel') {
+    if (e !== 'cancel' && e !== 'close') {
       ElMessage.error(e.response?.data?.detail || '删除失败')
     }
   }

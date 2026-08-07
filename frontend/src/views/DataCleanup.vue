@@ -248,7 +248,7 @@ async function confirmCleanup() {
     await fetchCleanupConfig()
     await fetchCleanupRecords()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '清理失败')
     }
   }
@@ -310,7 +310,7 @@ async function confirmNotificationCleanup() {
     await fetchNotificationCleanupConfig()
     await fetchCleanupRecords()
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       ElMessage.error(error.response?.data?.detail || '清理失败')
     }
   }

@@ -308,7 +308,7 @@ const saveRecord = async () => {
     closeDialog()
     loadRecords()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.detail || '保存失败')
+    if (e !== 'cancel' && e !== 'close') ElMessage.error(e.response?.data?.detail || '保存失败')
   }
 }
 
@@ -319,7 +319,7 @@ const saveAndContinue = async () => {
     formData.remark = ''
     loadRecords()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.response?.data?.detail || '保存失败')
+    if (e !== 'cancel' && e !== 'close') ElMessage.error(e.response?.data?.detail || '保存失败')
   }
 }
 
@@ -330,7 +330,7 @@ const handleDelete = async (row) => {
     ElMessage.success('删除成功')
     loadRecords()
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error('删除失败')
+    if (e !== 'cancel' && e !== 'close') ElMessage.error('删除失败')
   }
 }
 

@@ -118,7 +118,7 @@
                 :key="index"
                 class="table-row"
               >
-                <span class="col-order clickable-order" :title="点击查看订单详情" @click="openDetail(item.order_id)">{{ item.order_id }}</span>
+                <span class="col-order clickable-order" title="点击查看订单详情" @click="openDetail(item.order_id)">{{ item.order_id }}</span>
                 <span class="col-status">
                   <span class="status-tag" :class="item.shipping_status">{{ item.shipping_status_text }}</span>
                 </span>
