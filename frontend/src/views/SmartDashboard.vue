@@ -84,7 +84,7 @@
       <aside class="panel panel-right">
         <!-- 网店销售排行 -->
         <div class="table-block shop-block">
-          <div class="block-title">网店销售排行TOP10</div>
+          <div class="block-title">网店销售排行TOP30</div>
           <div class="shop-list">
             <div
               v-for="(item, index) in shopRanking"
@@ -235,7 +235,7 @@ async function fetchData() {
       getOrderOverview(),
       getProductRanking({ limit: 10 }),
       getMonthlySales({ months: 24 }),
-      getShopRanking({ limit: 10 }),
+      getShopRanking({ limit: 30 }),
       getOverdueOrders({ limit: 20 }),
       getCountryDistribution()
     ]);
@@ -887,13 +887,41 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* 父容器 table-block 在右侧面板内限制高度时，本列表区自动滚动 */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  /* 自定义滚动条（WebKit） */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.4) transparent;
+}
+
+.shop-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shop-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shop-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.35);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.shop-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.6);
 }
 
 .shop-card {
   background: rgba(22, 27, 34, 0.8);
   border: 1px solid #30363d;
   border-radius: 8px;
-  padding: 12px 14px 10px;
+  padding: 10px 12px 8px;
+  flex-shrink: 0;
 }
 
 .shop-card-main {
