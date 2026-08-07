@@ -4,6 +4,15 @@
       <template #header>
         <div class="card-header">
           <span>运费统计</span>
+          <!-- 导出按钮位于标题所在行最右侧，响应式自适应 -->
+          <el-button
+            type="success"
+            plain
+            :disabled="!items.length"
+            @click="exportExcel"
+          >
+            导出 Excel
+          </el-button>
         </div>
       </template>
 
@@ -31,8 +40,6 @@
         </div>
         <el-button type="primary" @click="doQuery">查询</el-button>
         <el-button @click="resetQuery">重置</el-button>
-        <div class="filter-spacer"></div>
-        <el-button type="success" plain :disabled="!items.length" @click="exportExcel">导出 Excel</el-button>
       </div>
 
       <!-- 合计 -->
@@ -150,6 +157,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .filter-bar {
