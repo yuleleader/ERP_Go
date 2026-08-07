@@ -41,7 +41,7 @@
           </div>
           <div class="detail-info-row">
             <span class="detail-label">下单时间</span>
-            <span class="detail-value">{{ order.created_at ? String(order.created_at).split('T')[0] : '——' }}</span>
+            <span class="detail-value">{{ order.created_at ? formatDateTime(order.created_at) : '——' }}</span>
           </div>
           <div class="detail-info-row">
             <span class="detail-label">创建人</span>

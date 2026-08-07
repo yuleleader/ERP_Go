@@ -140,7 +140,7 @@
         </el-table-column>
         <el-table-column label="发货时间" width="120">
           <template #default="{ row }">
-            {{ row.shipping_time ? row.shipping_time.slice(0, 10) : '——' }}
+            {{ row.shipping_time ? formatDate(row.shipping_time) : '——' }}
           </template>
         </el-table-column>
         <el-table-column label="发放状态" width="100">
@@ -158,6 +158,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { commissionSettlementApi } from '@/api'
+import { formatDate } from '@/utils/format'
 
 const searchForm = reactive({
   dateRange: []

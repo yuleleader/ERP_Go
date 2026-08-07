@@ -39,7 +39,9 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="上传时间" width="180" />
+        <el-table-column prop="created_at" label="上传时间" width="180">
+          <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+        </el-table-column>
         <el-table-column label="操作" width="100">
           <template #default="{ row }">
             <el-button link type="danger" size="small" @click="deleteImage(row)">删除</el-button>
@@ -77,6 +79,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'
 import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
+import { formatDateTime } from '@/utils/format'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const loading = ref(false)

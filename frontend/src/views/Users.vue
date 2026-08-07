@@ -69,7 +69,9 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="180" />
+          <el-table-column prop="created_at" label="创建时间" width="180">
+            <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+          </el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="editUser(row)">编辑</el-button>
@@ -145,6 +147,7 @@ import { ref, reactive, computed } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { resetPassword } from '@/api/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 
 const usersStore = useUsersStore()
 const users = computed(() => usersStore.users)

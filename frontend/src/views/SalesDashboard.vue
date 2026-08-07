@@ -66,7 +66,9 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="180" />
+            <el-table-column prop="created_at" label="创建时间" width="180">
+              <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+            </el-table-column>
           </el-table>
         </el-card>
       </el-col>
@@ -79,6 +81,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { getOrders } from '@/api/order'
 import { ShoppingCart, Clock, Money, Wallet } from '@element-plus/icons-vue'
+import { formatDateTime } from '@/utils/format'
 
 const userStore = useUserStore()
 
