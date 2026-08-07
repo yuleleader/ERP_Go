@@ -107,16 +107,10 @@ const routes = [
         meta: { title: '销售统计' }
       },
       {
-        path: 'gross-profit-order',
-        name: 'GrossProfitOrder',
+        path: 'gross-profit-analysis',
+        name: 'GrossProfitAnalysis',
         component: () => import('@/views/GrossProfitAnalysis.vue'),
-        meta: { title: '毛利分析（按下单时间统计）' }
-      },
-      {
-        path: 'gross-profit-shipping',
-        name: 'GrossProfitShipping',
-        component: () => import('@/views/GrossProfitAnalysis.vue'),
-        meta: { title: '毛利分析（按发货时间统计）' }
+        meta: { title: '毛利分析' }
       },
       {
         path: 'freight-statistics',
