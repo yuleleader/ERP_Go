@@ -28,6 +28,8 @@ class UserUpdate(BaseModel):
     commission_rate: Optional[int] = Field(None, ge=1, le=100)
     price_permissions: Optional[str] = None
     is_active: Optional[bool] = None
+    # 编辑时可选修改密码：非空则重置为改密码（无需原密码）；留空/不传则不修改
+    password: Optional[str] = Field(None, min_length=6)
 
 class UserResponse(UserBase):
     id: int

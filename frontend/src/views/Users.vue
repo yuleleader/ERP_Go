@@ -92,8 +92,13 @@
             <el-form-item label="真实姓名" prop="real_name">
               <el-input v-model="userForm.real_name" placeholder="请输入真实姓名" />
             </el-form-item>
-            <el-form-item label="密码" prop="password" v-if="dialogMode === 'create'">
-              <el-input v-model="userForm.password" type="password" placeholder="请输入密码" show-password />
+            <el-form-item label="密码" prop="password">
+              <el-input
+                v-model="userForm.password"
+                type="password"
+                :placeholder="dialogMode === 'create' ? '请输入密码' : '留空则不修改密码'"
+                show-password
+              />
             </el-form-item>
             <el-form-item label="角色" prop="role">
               <el-select v-model="userForm.role" placeholder="请选择角色">
@@ -199,7 +204,9 @@ const userForm = reactive({
 
 const userRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }, { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }],
+  password: [
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+  ],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
 }
 
@@ -252,10 +259,20 @@ async function submitUser() {
       }
 
       if (dialogMode.value === 'create') {
+        // 创建：密码必填
+        if (!userForm.password) {
+          ElMessage.warning('请输入密码')
+          submitting.value = false
+          return
+        }
         data.password = userForm.password
         await usersStore.createUser(data)
         ElMessage.success('用户创建成功')
       } else {
+        // 编辑：密码留空则不修改；填写则直接重置（无需原密码）
+        if (userForm.password) {
+          data.password = userForm.password
+        }
         await usersStore.updateUserInfo(currentUserId.value, data)
         ElMessage.success('用户更新成功')
       }

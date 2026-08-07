@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from typing import List
 from ..core.database import get_db
-from ..core.security import get_current_active_user, require_role
+from ..core.security import get_current_active_user, require_role, get_password_hash
 from ..models.models import User, OperationLog
 from ..schemas.schemas import UserResponse, UserUpdate
 
@@ -72,6 +72,13 @@ async def update_user(
 
     update_data = user_data.model_dump(exclude_unset=True)
     changes = []
+
+    # 密码单独处理：非空则直接重置（无需原密码），并移除以免 setattr 出错
+    new_password = update_data.pop("password", None)
+    if new_password:
+        user.password_hash = get_password_hash(new_password)
+        changes.append("密码已重置")
+
     for field, value in update_data.items():
         old_value = getattr(user, field)
         if old_value != value:
