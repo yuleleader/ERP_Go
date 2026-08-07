@@ -984,3 +984,155 @@ async def get_sales_summary(
         i["gross_profit"] = round(i["gross_profit"], 2)
 
     return {"type": summary_type, "items": items, "totals": totals}
+
+
+# ==================== 毛利分析（按下单时间 / 按发货时间） ====================
+@router.get("/gross-profit/list")
+async def get_gross_profit_list(
+    time_type: str = Query("order", description="order=按下单时间 / shipping=按发货时间"),
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD"),
+    sales_person: str = Query(None, description="销售人员（真实姓名/用户名，模糊）"),
+    brand: str = Query(None, description="品牌名称（模糊）"),
+    category: str = Query(None, description="类别名称（模糊）"),
+    platform_order_no: str = Query(None, description="平台订单号（模糊）"),
+    product_name: str = Query(None, description="商品名称（模糊）"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """毛利分析明细：订单毛利 = 销售金额 - 商品成本价（orders.gross_profit）。
+    支持按下单时间（created_at）或发货时间（shipping_time）过滤。
+    筛选条件均支持模糊匹配（前端既可输入关键字，也可下拉选择后传入名称）。
+    仅老板端/工厂端可访问（毛利含成本信息）。
+    """
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    query = select(
+        Order.order_id,
+        Order.platform_order_no,
+        Order.product_name,
+        Order.gross_profit,
+        Order.created_by,
+        Order.created_at,
+        Order.shipping_time
+    )
+
+    # 退款单不计入毛利（已退货无利润）
+    query = query.where(Order.shipping_status != "refunded")
+
+    if time_type == "shipping":
+        # 按发货时间统计：仅统计已发货（有发货时间）的订单
+        query = query.where(Order.shipping_time.isnot(None))
+        if start_dt:
+            query = query.where(Order.shipping_time >= start_dt)
+        if end_dt:
+            query = query.where(Order.shipping_time < end_dt)
+    else:
+        if start_dt:
+            query = query.where(Order.created_at >= start_dt)
+        if end_dt:
+            query = query.where(Order.created_at < end_dt)
+
+    if platform_order_no:
+        query = query.where(Order.platform_order_no.like(f"%{platform_order_no.strip()}%"))
+    if product_name:
+        query = query.where(Order.product_name.like(f"%{product_name.strip()}%"))
+
+    rows = (await db.execute(query.limit(limit))).all()
+
+    # 名称映射：人员（真实姓名优先）、品牌、类别（订单商品名 → products → brand/category）
+    user_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_map[u.username] = u.real_name or u.username
+
+    brand_map = {}
+    for b in (await db.execute(select(Brand))).scalars().all():
+        brand_map[b.id] = b.brand_name
+    cat_map = {}
+    for c in (await db.execute(select(Category))).scalars().all():
+        cat_map[c.id] = c.category_name
+
+    prod_map = {}
+    for p in (await db.execute(select(Product))).scalars().all():
+        if p.product_name not in prod_map:
+            prod_map[p.product_name] = {
+                "brand": brand_map.get(p.brand_id) if p.brand_id is not None else None,
+                "category": cat_map.get(p.category_id) if p.category_id is not None else None
+            }
+
+    items = []
+    for r in rows:
+        pname = r.product_name or ""
+        pmeta = prod_map.get(pname) or {}
+        brand_name = pmeta.get("brand") or "未分类"
+        cat_name = pmeta.get("category") or "未分类"
+        person = user_map.get(r.created_by or "") or (r.created_by or "未知")
+
+        # 品牌/类别/人员模糊过滤（前端下拉选择传回名称，同样按名称过滤）
+        if brand and brand.strip().lower() not in (brand_name or "").lower():
+            continue
+        if category and category.strip().lower() not in (cat_name or "").lower():
+            continue
+        if sales_person and sales_person.strip().lower() not in (person or "").lower():
+            continue
+
+        items.append({
+            "order_id": r.order_id,
+            "platform_order_no": r.platform_order_no or "",
+            "product_name": pname,
+            "gross_profit": round(r.gross_profit or 0, 2) if r.gross_profit is not None else 0,
+            "sales_person": person,
+            "brand": brand_name,
+            "category": cat_name,
+            "order_time": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None,
+            "shipping_time": r.shipping_time.strftime("%Y-%m-%d %H:%M:%S") if r.shipping_time else None
+        })
+
+    total_profit = round(sum(i["gross_profit"] for i in items), 2)
+    return {
+        "time_type": time_type,
+        "items": items,
+        "total_gross_profit": total_profit,
+        "total_count": len(items)
+    }
+
+
+@router.get("/gross-profit/options")
+async def get_gross_profit_options(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """毛利分析下拉选项：销售人员（订单创建人）、品牌、类别（含二级）。"""
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    # 销售人员：订单创建人去重 → 真实姓名
+    order_creators = set()
+    for r in (await db.execute(select(Order.created_by).where(Order.created_by.isnot(None)))).all():
+        order_creators.add(r[0])
+    user_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_map[u.username] = u.real_name or u.username
+    persons = []
+    for c in sorted(order_creators):
+        persons.append(user_map.get(c) or c)
+
+    brands = [{"id": b.id, "name": b.brand_name} for b in (await db.execute(select(Brand))).scalars().all()]
+    cats = [{"id": c.id, "name": c.category_name} for c in (await db.execute(select(Category))).scalars().all()]
+
+    return {"sales_persons": persons, "brands": brands, "categories": cats}

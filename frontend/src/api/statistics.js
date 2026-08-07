@@ -104,3 +104,20 @@ export function getSalesSummary(params) {
     params
   })
 }
+
+// 毛利分析明细（time_type: order=按下单时间 / shipping=按发货时间）
+export function getGrossProfitList(params) {
+  return request({
+    url: '/statistics/gross-profit/list',
+    method: 'get',
+    params
+  })
+}
+
+// 毛利分析下拉选项（销售人员/品牌/类别）
+export function getGrossProfitOptions() {
+  return request({
+    url: '/statistics/gross-profit/options',
+    method: 'get'
+  })
+}

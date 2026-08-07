@@ -16,7 +16,7 @@ from ..core.database import get_db
 from ..core.security import get_current_active_user, verify_password
 from ..core.config import TEMP_DIR, OFFICIAL_DIR
 from ..api.images import sanitize_path_component
-from ..models.models import Order, Shop, User, Image as ImageModel, OperationLog
+from ..models.models import Order, Shop, User, Product, Image as ImageModel, OperationLog
 from ..schemas.schemas import OrderCreate, OrderUpdate, OrderResponse
 from ..utils.order_id_generator import order_id_generator
 from ..services.notification_service import NotificationService
@@ -94,6 +94,25 @@ async def generate_order_preview(
         headers={"Content-Disposition": f"inline; filename=qr_{order_id}.png"}
     )
 
+
+async def calc_order_gross_profit(product_name, sales_amount, db: AsyncSession):
+    """计算订单毛利 = 销售金额 - 商品成本价（products 表按商品名匹配，取第一条）。
+    商品未匹配或未填成本价按 0；销售金额为空/非数字按 0。返回 float 或 None。
+    """
+    try:
+        sales = float(sales_amount or 0)
+    except (TypeError, ValueError):
+        return None
+    try:
+        pr = await db.execute(
+            select(Product).where(Product.product_name == (product_name or "")).limit(1)
+        )
+        prod = pr.scalar_one_or_none()
+        cost = float(prod.cost_price) if prod and prod.cost_price is not None else 0.0
+    except Exception:
+        cost = 0.0
+    return round(sales - cost, 2)
+
 @router.post("/", response_model=OrderResponse)
 async def create_order(
     order_data: OrderCreate,
@@ -141,7 +160,12 @@ async def create_order(
         
         # 计算订单滞留天数（自然日计算）
         order_days_value = calculate_order_days(created_at_value)
-        
+
+        # 计算毛利 = 销售金额 - 商品成本价（products 按商品名匹配，未匹配/未填成本按 0）
+        gross_profit_value = await calc_order_gross_profit(
+            order_data.product_name, order_data.sales_amount, db
+        )
+
         new_order = Order(
             order_id=order_id,
             shop_id=order_data.shop_id,
@@ -156,7 +180,8 @@ async def create_order(
             commission_amount=commission_amount,
             created_by=current_user.username,
             created_at=created_at_value,
-            order_days=order_days_value
+            order_days=order_days_value,
+            gross_profit=gross_profit_value
         )
         db.add(new_order)
         await db.commit()
@@ -597,6 +622,12 @@ async def update_order(
     if "receiver_address" in update_data and update_data["receiver_address"] != old_receiver_address:
         order.detected_country = None
         changes.append("收货地址已变更，国家识别已重置（智慧大屏将重新识别）")
+
+    # 商品名或销售金额变化 → 重算毛利（内部统计字段，不在订单界面展示）
+    if "product_name" in update_data or "sales_amount" in update_data:
+        order.gross_profit = await calc_order_gross_profit(
+            order.product_name, order.sales_amount, db
+        )
 
     await db.commit()
     await db.refresh(order)
