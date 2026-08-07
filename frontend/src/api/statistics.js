@@ -121,3 +121,12 @@ export function getGrossProfitOptions() {
     method: 'get'
   })
 }
+
+// 运费统计（按下单时间筛选）
+export function getFreightList(params) {
+  return request({
+    url: '/statistics/freight-list',
+    method: 'get',
+    params
+  })
+}

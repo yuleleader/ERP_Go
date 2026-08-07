@@ -119,6 +119,12 @@ const routes = [
         meta: { title: '毛利分析（按发货时间统计）' }
       },
       {
+        path: 'freight-statistics',
+        name: 'FreightStatistics',
+        component: () => import('@/views/FreightStatistics.vue'),
+        meta: { title: '运费统计' }
+      },
+      {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('@/views/Notifications.vue'),

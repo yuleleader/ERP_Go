@@ -1136,3 +1136,81 @@ async def get_gross_profit_options(
     cats = [{"id": c.id, "name": c.category_name} for c in (await db.execute(select(Category))).scalars().all()]
 
     return {"sales_persons": persons, "brands": brands, "categories": cats}
+
+
+# ==================== 运费统计 ====================
+@router.get("/freight-list")
+async def get_freight_list(
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD（按下单时间）"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD（按下单时间）"),
+    platform_order_no: str = Query(None, description="平台订单号（模糊）"),
+    logistics_company: str = Query(None, description="快递公司（模糊）"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """运费统计明细：平台订单号 / 运单号1 / 运单号2 / 运费 / 快递公司。
+    按下单时间（created_at）时间段筛选；支持平台订单号、快递公司模糊查询。
+    退款单不计入。仅老板端/工厂端可访问。
+    """
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    query = select(
+        Order.order_id,
+        Order.platform_order_no,
+        Order.logistics_no,
+        Order.logistics_no_2,
+        Order.freight,
+        Order.logistics_company,
+        Order.created_at
+    )
+    if start_dt:
+        query = query.where(Order.created_at >= start_dt)
+    if end_dt:
+        query = query.where(Order.created_at < end_dt)
+    # 退款单不计入
+    query = query.where(Order.shipping_status != "refunded")
+    if platform_order_no:
+        query = query.where(Order.platform_order_no.like(f"%{platform_order_no.strip()}%"))
+    if logistics_company:
+        query = query.where(Order.logistics_company.like(f"%{logistics_company.strip()}%"))
+
+    rows = (await db.execute(query.limit(limit))).all()
+
+    items = []
+    total_freight = 0.0
+    for r in rows:
+        try:
+            freight = float(r.freight or 0)
+        except (TypeError, ValueError):
+            freight = 0.0
+        total_freight += freight
+        items.append({
+            "order_id": r.order_id,
+            "platform_order_no": r.platform_order_no or "",
+            "logistics_no": r.logistics_no or "",
+            "logistics_no_2": r.logistics_no_2 or "",
+            "freight": round(freight, 2),
+            "logistics_company": r.logistics_company or "",
+            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None
+        })
+
+    return {
+        "items": items,
+        "total_freight": round(total_freight, 2),
+        "total_count": len(items)
+    }
