@@ -62,6 +62,16 @@
         <el-form-item label="提成比例" prop="commission_rate" v-if="userForm.role === 'sales'">
           <el-input-number v-model="userForm.commission_rate" :min="1" :max="100" />
         </el-form-item>
+        <el-form-item label="价格权限">
+          <el-checkbox-group v-model="userForm.price_permissions">
+            <el-checkbox value="cost_price">成本价</el-checkbox>
+            <el-checkbox value="retail_price">零售价</el-checkbox>
+            <el-checkbox value="min_price">最低售价</el-checkbox>
+          </el-checkbox-group>
+          <div class="price-perm-tip">
+            未勾选的价格，该账号在商品档案中显示为「***」。老板端不受此限制。
+          </div>
+        </el-form-item>
         <el-form-item label="启用状态">
           <el-switch v-model="userForm.is_active" />
         </el-form-item>
@@ -97,6 +107,7 @@ const userForm = reactive({
   password: '',
   role: 'sales',
   commission_rate: 10,
+  price_permissions: ['cost_price', 'retail_price', 'min_price'],
   is_active: true
 })
 
@@ -128,6 +139,10 @@ function editUser(row) {
   userForm.real_name = row.real_name
   userForm.role = row.role
   userForm.commission_rate = row.commission_rate || 10
+  // 价格权限回显：后端逗号分隔字符串 → 数组；空/缺失视为全部可见
+  userForm.price_permissions = row.price_permissions
+    ? row.price_permissions.split(',').filter(Boolean)
+    : ['cost_price', 'retail_price', 'min_price']
   userForm.is_active = row.is_active
   userForm.password = ''
   dialogVisible.value = true
@@ -145,6 +160,8 @@ async function submitUser() {
         real_name: userForm.real_name,
         role: userForm.role,
         commission_rate: userForm.role === 'sales' ? userForm.commission_rate : null,
+        // 价格权限：数组 → 逗号分隔字符串；全选时传空串（=全部可见）也可以，但显式传更清晰
+        price_permissions: userForm.price_permissions.join(','),
         is_active: userForm.is_active
       }
 
@@ -175,6 +192,7 @@ function resetForm() {
   userForm.password = ''
   userForm.role = 'sales'
   userForm.commission_rate = 10
+  userForm.price_permissions = ['cost_price', 'retail_price', 'min_price']
   userForm.is_active = true
 }
 
@@ -225,5 +243,13 @@ usersStore.fetchUsers()
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.price-perm-tip {
+  width: 100%;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+  margin-top: 2px;
 }
 </style>

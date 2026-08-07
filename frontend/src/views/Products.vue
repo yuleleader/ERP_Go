@@ -100,7 +100,8 @@
           </el-table-column>
           <el-table-column label="售价" width="100">
             <template #default="{ row }">
-              <span v-if="row.retail_price != null">¥{{ Number(row.retail_price).toFixed(2) }}</span>
+              <span v-if="canSeePrice('retail_price') && row.retail_price != null">¥{{ Number(row.retail_price).toFixed(2) }}</span>
+              <span v-else>***</span>
             </template>
           </el-table-column>
           <el-table-column label="图片" width="60" align="center">
@@ -227,18 +228,18 @@
             <tr>
               <th class="th-label">成本价</th>
               <td class="td-value">
-                <el-input-number v-model="productForm.cost_price" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="0.00" />
+                <el-input-number v-model="productForm.cost_price" :min="0" :precision="2" :controls="false" :disabled="!canSeePrice('cost_price')" style="width: 100%;" placeholder="0.00" />
               </td>
               <th class="th-label">零售价</th>
               <td class="td-value">
-                <el-input-number v-model="productForm.retail_price" :min="0" :precision="2" :controls="false" style="width: 100%;" placeholder="0.00" />
+                <el-input-number v-model="productForm.retail_price" :min="0" :precision="2" :controls="false" :disabled="!canSeePrice('retail_price')" style="width: 100%;" placeholder="0.00" />
               </td>
             </tr>
 
             <tr>
               <th class="th-label">最低售价</th>
               <td class="td-value" colspan="3">
-                <el-input-number v-model="productForm.min_price" :min="0" :precision="2" :controls="false" style="width: 200px;" placeholder="0.00" />
+                <el-input-number v-model="productForm.min_price" :min="0" :precision="2" :controls="false" :disabled="!canSeePrice('min_price')" style="width: 200px;" placeholder="0.00" />
               </td>
             </tr>
 
@@ -330,13 +331,13 @@
             </tr>
             <tr>
               <th class="th-label">成本价</th>
-              <td class="td-value">¥{{ Number(currentProduct.cost_price || 0).toFixed(2) }}</td>
+              <td class="td-value">{{ maskedPrice(currentProduct.cost_price, 'cost_price') }}</td>
               <th class="th-label">零售价</th>
-              <td class="td-value">¥{{ Number(currentProduct.retail_price || 0).toFixed(2) }}</td>
+              <td class="td-value">{{ maskedPrice(currentProduct.retail_price, 'retail_price') }}</td>
             </tr>
             <tr>
               <th class="th-label">最低售价</th>
-              <td class="td-value" colspan="3">¥{{ Number(currentProduct.min_price || 0).toFixed(2) }}</td>
+              <td class="td-value" colspan="3">{{ maskedPrice(currentProduct.min_price, 'min_price') }}</td>
             </tr>
             <tr>
               <th class="th-label">备注1</th>
@@ -422,6 +423,26 @@ const canEditProducts = computed(() => ['boss', 'sales'].includes(userStore.user
 const canCreateProducts = computed(() => userStore.userInfo?.role === 'boss')
 // 仅老板端可删除（单选/批量）
 const canDeleteProducts = computed(() => userStore.userInfo?.role === 'boss')
+
+// ===== 价格权限掩码 =====
+// price_permissions 逗号分隔；boss 或字段为空(null/空串) = 全部可见（老用户兼容）
+const pricePermSet = computed(() => {
+  const info = userStore.userInfo || {}
+  if (info.role === 'boss') return null
+  const s = info.price_permissions
+  if (!s) return null
+  const set = new Set(String(s).split(',').filter(Boolean))
+  return set
+})
+function canSeePrice(key) {
+  const set = pricePermSet.value
+  if (!set) return true
+  return set.has(key)
+}
+function maskedPrice(value, key) {
+  if (canSeePrice(key)) return `¥${Number(value || 0).toFixed(2)}`
+  return '***'
+}
 
 // ===== 左侧导航 =====
 const leftMode = ref('category')
@@ -668,9 +689,10 @@ async function submitProduct() {
       product_remark: productForm.product_remark,
       category_id: productForm.category_id || null,
       brand_id: productForm.brand_id || null,
-      cost_price: productForm.cost_price ?? null,
-      retail_price: productForm.retail_price ?? null,
-      min_price: productForm.min_price ?? null,
+      // 无权限的价格字段不随表单提交（后端 exclude_unset 不更新）
+      ...(canSeePrice('cost_price') ? { cost_price: productForm.cost_price ?? null } : {}),
+      ...(canSeePrice('retail_price') ? { retail_price: productForm.retail_price ?? null } : {}),
+      ...(canSeePrice('min_price') ? { min_price: productForm.min_price ?? null } : {}),
       remark1: productForm.remark1 || '',
       remark2: productForm.remark2 || '',
       remark3: productForm.remark3 || ''

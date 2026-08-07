@@ -15,6 +15,8 @@ class UserBase(BaseModel):
     real_name: Optional[str] = None
     role: str = "sales"
     commission_rate: Optional[int] = Field(None, ge=1, le=100)
+    # 价格权限：逗号分隔，如 "cost_price,retail_price,min_price"；None/空=全部可见
+    price_permissions: Optional[str] = None
     is_active: bool = True
 
 class UserCreate(UserBase):
@@ -24,6 +26,7 @@ class UserUpdate(BaseModel):
     real_name: Optional[str] = None
     role: Optional[str] = None
     commission_rate: Optional[int] = Field(None, ge=1, le=100)
+    price_permissions: Optional[str] = None
     is_active: Optional[bool] = None
 
 class UserResponse(UserBase):

@@ -24,6 +24,9 @@ class User(Base):
     real_name = Column(String(100), nullable=True)
     role = Column(String(20), nullable=False, default="sales")
     commission_rate = Column(Integer, nullable=True)
+    # 价格权限：逗号分隔字符串，如 "cost_price,retail_price,min_price"
+    # None/空 = 全部可见（老用户向后兼容）；boss 角色恒可见全部
+    price_permissions = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
