@@ -39,10 +39,10 @@ async def create_product(
 ):
     """
     创建商品
-    权限要求：boss、sales
+    权限要求：boss（仅老板端可新建商品）
     """
-    # 权限检查：只有老板端和销售端可以创建商品
-    if current_user.role not in ["boss", "sales"]:
+    # 权限检查：只有老板端可以创建商品
+    if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="您没有权限创建商品")
 
     # 创建商品记录：先插入占位编码，flush 拿到自增 id 后回填唯一编码

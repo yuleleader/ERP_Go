@@ -70,7 +70,7 @@
           <el-button type="primary" @click="fetchProducts">搜索</el-button>
           <el-button @click="resetFilters">重置</el-button>
           <div class="toolbar-spacer"></div>
-          <el-button v-if="canEditProducts" type="primary" @click="showCreateDialog">新建商品</el-button>
+          <el-button v-if="canCreateProducts" type="primary" @click="showCreateDialog">新建商品</el-button>
         </div>
 
         <div class="batch-actions" v-if="canDeleteProducts && selectedProducts.length > 0">
@@ -416,8 +416,10 @@ const userStore = useUserStore()
 
 // 商品管理对所有人员开放查看
 const canManageProducts = computed(() => true)
-// 仅老板端/销售端可新增、编辑、上传图片
+// 仅老板端/销售端可编辑、上传图片
 const canEditProducts = computed(() => ['boss', 'sales'].includes(userStore.userInfo?.role))
+// 仅老板端可新建商品
+const canCreateProducts = computed(() => userStore.userInfo?.role === 'boss')
 // 仅老板端可删除（单选/批量）
 const canDeleteProducts = computed(() => userStore.userInfo?.role === 'boss')
 
