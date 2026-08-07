@@ -80,13 +80,29 @@ async def get_dashboard_overview(
     )
     virtual_result = await db.execute(virtual_query)
     virtual_orders = virtual_result.scalar() or 0
-    
+
+    # 已退款订单数
+    refunded_query = select(func.count(Order.id)).filter(
+        Order.shipping_status == "refunded",
+        Order.created_at >= start_date
+    )
+    refunded_result = await db.execute(refunded_query)
+    refunded_orders = refunded_result.scalar() or 0
+
+    # 退款金额合计（已退款订单的销售金额）
+    refunded_amount_query = select(func.sum(func.cast(Order.sales_amount, Float))).filter(
+        Order.shipping_status == "refunded",
+        Order.created_at >= start_date
+    )
+    refunded_amount_result = await db.execute(refunded_amount_query)
+    refunded_amount = round(refunded_amount_result.scalar() or 0, 2)
+
     # 计算发货率
     shipped_percentage = round((shipped_orders / total_orders) * 100, 1) if total_orders > 0 else 0
-    
+
     # 判断待发货预警（待发货超过100单触发预警）
     pending_warning = pending_orders > 100
-    
+
     return {
         "total_orders": total_orders,
         "total_sales": round(total_sales, 2),
@@ -94,6 +110,8 @@ async def get_dashboard_overview(
         "pending_orders": pending_orders,
         "producing_orders": producing_orders,
         "virtual_orders": virtual_orders,
+        "refunded_orders": refunded_orders,
+        "refunded_amount": refunded_amount,
         "shipped_percentage": shipped_percentage,
         "pending_warning": pending_warning,
         "update_time": beijing_now().isoformat()
