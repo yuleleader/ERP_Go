@@ -716,7 +716,8 @@ function printOrderDetail() {
 </head>
 <body>
 
-<button class="btn-print" onclick="window.print()">点击打印单据</button>
+<button class="btn-print" onclick="window.print();var d=new Date(),z=function(n){return(n<10?'0':'')+n},s=d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes())+':'+z(d.getSeconds());document.getElementById('printTimeDisplay').textContent='上次打印时间：'+s;">点击打印单据</button>
+<div id="printTimeDisplay" style="text-align:center;margin:10px auto 0;color:#666;font-size:14px;font-family:'Microsoft YaHei',sans-serif;"></div>
 
 <div class="a4-sheet">
 
