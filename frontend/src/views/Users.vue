@@ -83,41 +83,53 @@
       </el-card>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" @closed="resetForm">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="680px" @closed="resetForm">
       <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="100px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="userForm.username" placeholder="请输入用户名" :disabled="dialogMode === 'edit'" />
-        </el-form-item>
-        <el-form-item label="真实姓名" prop="real_name">
-          <el-input v-model="userForm.real_name" placeholder="请输入真实姓名" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password" v-if="dialogMode === 'create'">
-          <el-input v-model="userForm.password" type="password" placeholder="请输入密码" show-password />
-        </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="userForm.role" placeholder="请选择角色">
-            <el-option label="老板端" value="boss" />
-            <el-option label="销售端" value="sales" />
-            <el-option label="工厂端" value="factory" />
-            <el-option label="发货端" value="shipping" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="提成比例" prop="commission_rate" v-if="userForm.role === 'sales'">
-          <el-input-number v-model="userForm.commission_rate" :min="1" :max="100" />
-        </el-form-item>
-        <el-form-item label="价格权限">
-          <el-checkbox-group v-model="userForm.price_permissions">
-            <el-checkbox value="cost_price">成本价</el-checkbox>
-            <el-checkbox value="retail_price">零售价</el-checkbox>
-            <el-checkbox value="min_price">最低售价</el-checkbox>
-          </el-checkbox-group>
-          <div class="price-perm-tip">
-            未勾选的价格，该账号在商品档案中显示为「***」。老板端不受此限制。
+        <!-- 模块一：基础信息 -->
+        <div class="form-section">
+          <div class="form-section-title">基础信息</div>
+          <div class="form-section-body">
+            <el-form-item label="用户名" prop="username">
+              <el-input v-model="userForm.username" placeholder="请输入用户名" :disabled="dialogMode === 'edit'" />
+            </el-form-item>
+            <el-form-item label="真实姓名" prop="real_name">
+              <el-input v-model="userForm.real_name" placeholder="请输入真实姓名" />
+            </el-form-item>
+            <el-form-item label="密码" prop="password" v-if="dialogMode === 'create'">
+              <el-input v-model="userForm.password" type="password" placeholder="请输入密码" show-password />
+            </el-form-item>
+            <el-form-item label="角色" prop="role">
+              <el-select v-model="userForm.role" placeholder="请选择角色">
+                <el-option label="老板端" value="boss" />
+                <el-option label="销售端" value="sales" />
+                <el-option label="工厂端" value="factory" />
+                <el-option label="发货端" value="shipping" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="提成比例" prop="commission_rate" v-if="userForm.role === 'sales'">
+              <el-input-number v-model="userForm.commission_rate" :min="1" :max="100" />
+            </el-form-item>
+            <el-form-item label="启用状态">
+              <el-switch v-model="userForm.is_active" />
+            </el-form-item>
           </div>
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-switch v-model="userForm.is_active" />
-        </el-form-item>
+        </div>
+
+        <!-- 模块二：价格权限 -->
+        <div class="form-section">
+          <div class="form-section-title">价格权限</div>
+          <div class="form-section-body">
+            <el-checkbox-group v-model="userForm.price_permissions">
+              <el-checkbox value="cost_price">成本价</el-checkbox>
+              <el-checkbox value="retail_price">零售价</el-checkbox>
+              <el-checkbox value="min_price">最低售价</el-checkbox>
+            </el-checkbox-group>
+            <div class="price-perm-tip">
+              未勾选的价格，该账号在商品档案中显示为「***」；
+              老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
+            </div>
+          </div>
+        </div>
       </el-form>
 
       <template #footer>
@@ -193,7 +205,8 @@ const userForm = reactive({
   password: '',
   role: 'sales',
   commission_rate: 10,
-  price_permissions: ['cost_price', 'retail_price', 'min_price'],
+  // 新建用户：价格权限默认不勾选（全部价格显示为 ***）；编辑时由 editUser 回显
+  price_permissions: [],
   is_active: true
 })
 
@@ -225,10 +238,10 @@ function editUser(row) {
   userForm.real_name = row.real_name
   userForm.role = row.role
   userForm.commission_rate = row.commission_rate || 10
-  // 价格权限回显：后端逗号分隔字符串 → 数组；空/缺失视为全部可见
+  // 价格权限回显：后端逗号分隔字符串 → 数组；null/空=全不勾选（新行为）
   userForm.price_permissions = row.price_permissions
     ? row.price_permissions.split(',').filter(Boolean)
-    : ['cost_price', 'retail_price', 'min_price']
+    : []
   userForm.is_active = row.is_active
   userForm.password = ''
   dialogVisible.value = true
@@ -278,7 +291,7 @@ function resetForm() {
   userForm.password = ''
   userForm.role = 'sales'
   userForm.commission_rate = 10
-  userForm.price_permissions = ['cost_price', 'retail_price', 'min_price']
+  userForm.price_permissions = []
   userForm.is_active = true
 }
 
@@ -413,8 +426,47 @@ usersStore.fetchUsers()
   width: 100%;
   font-size: 12px;
   color: #909399;
-  line-height: 1.5;
-  margin-top: 2px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+/* 新建/编辑用户：两大模块分组布局 */
+.form-section {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+
+.form-section:last-child {
+  margin-bottom: 0;
+}
+
+.form-section-title {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  background: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  letter-spacing: 0.5px;
+}
+
+.form-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  background: #409eff;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+.form-section-body {
+  padding: 16px 16px 4px;
+  background: #fff;
 }
 
 @media (max-width: 900px) {
