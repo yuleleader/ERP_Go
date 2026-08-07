@@ -14,17 +14,27 @@
           :label="tab.label"
           :name="tab.key"
         >
-          <!-- 查询条件区（每个页签独立状态） -->
+          <!-- 查询条件区（每个页签独立状态；关键字支持下拉选择 + 自由输入模糊） -->
           <div class="filter-bar">
             <div class="filter-item">
               <span class="filter-label">{{ tab.nameLabel }}：</span>
-              <el-input
+              <el-select
                 v-model="tabState[tab.key].keyword"
-                :placeholder="'输入' + tab.nameLabel + '模糊查询'"
+                filterable
                 clearable
+                allow-create
+                default-first-option
+                :placeholder="'选择或输入' + tab.nameLabel"
                 style="width: 220px"
                 @keyup.enter="doQuery(tab.key)"
-              />
+              >
+                <el-option
+                  v-for="opt in tabOptions[tab.key]"
+                  :key="opt"
+                  :label="opt"
+                  :value="opt"
+                />
+              </el-select>
             </div>
             <div class="filter-item">
               <span class="filter-label">下单时间：</span>
@@ -80,7 +90,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
-import { getSalesSummary } from '@/api/statistics'
+import { getSalesSummary, getSalesSummaryOptions } from '@/api/statistics'
 import { ElMessage } from 'element-plus'
 
 /**
@@ -113,6 +123,26 @@ function makeTabState() {
 }
 const tabState = reactive({})
 tabs.forEach(t => { tabState[t.key] = makeTabState() })
+
+// 每个页签的下拉选项（按维度取自 /sales-summary/options）
+const tabOptions = reactive({
+  person: [],
+  category: [],
+  brand: [],
+  product: []
+})
+
+async function loadOptions() {
+  try {
+    const o = await getSalesSummaryOptions()
+    tabOptions.person = o.sales_persons || []
+    tabOptions.category = (o.categories || []).map(c => c.name)
+    tabOptions.brand = (o.brands || []).map(b => b.name)
+    tabOptions.product = o.products || []
+  } catch (e) {
+    /* 下拉选项加载失败不影响查询 */
+  }
+}
 
 function fmt(v) {
   const n = Number(v || 0)
@@ -182,6 +212,7 @@ function exportExcel(key) {
 }
 
 onMounted(() => {
+  loadOptions()
   doQuery('person')
 })
 </script>

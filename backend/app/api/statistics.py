@@ -1255,3 +1255,38 @@ async def get_sales_trend(
         result.append({"date": ds, "amount": amt})
 
     return {"items": result, "total_amount": round(total, 2), "days": days}
+
+
+# ==================== 销售统计下拉选项（人员/类别/品牌/商品） ====================
+@router.get("/sales-summary/options")
+async def get_sales_summary_options(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """销售统计查询条件下拉数据：销售人员（订单创建人）、类别、品牌、商品名称。"""
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    order_creators = set()
+    for r in (await db.execute(select(Order.created_by).where(Order.created_by.isnot(None)))).all():
+        order_creators.add(r[0])
+    user_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_map[u.username] = u.real_name or u.username
+    persons = sorted({user_map.get(c) or c for c in order_creators})
+
+    brands = [{"id": b.id, "name": b.brand_name} for b in (await db.execute(select(Brand))).scalars().all()]
+    cats = [{"id": c.id, "name": c.category_name} for c in (await db.execute(select(Category))).scalars().all()]
+
+    # 商品名称：已出现在订单中的商品（去重），优先按 orders 中出现过的
+    product_names = set()
+    for r in (await db.execute(select(Order.product_name).where(Order.product_name.isnot(None)))).all():
+        if r[0]:
+            product_names.add(r[0])
+
+    return {
+        "sales_persons": persons,
+        "brands": brands,
+        "categories": cats,
+        "products": sorted(product_names)
+    }

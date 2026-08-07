@@ -139,3 +139,11 @@ export function getSalesTrend(params) {
     params
   })
 }
+
+// 销售统计下拉选项（人员/类别/品牌/商品）
+export function getSalesSummaryOptions() {
+  return request({
+    url: '/statistics/sales-summary/options',
+    method: 'get'
+  })
+}
