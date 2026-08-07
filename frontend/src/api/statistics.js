@@ -147,3 +147,12 @@ export function getSalesSummaryOptions() {
     method: 'get'
   })
 }
+
+// 网店销售统计（按网店分组）
+export function getShopSalesSummary(params) {
+  return request({
+    url: '/statistics/shop-sales-summary',
+    method: 'get',
+    params
+  })
+}

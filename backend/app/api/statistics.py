@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, Float, desc
 from ..core.database import get_db
 from ..core.security import get_current_active_user
-from ..models.models import Order, User, Product, Category, Brand
+from ..models.models import Order, User, Product, Category, Brand, Shop
 from ..api.settings import read_setting
 
 router = APIRouter(prefix="/api/statistics", tags=["数据统计"])
@@ -1290,3 +1290,93 @@ async def get_sales_summary_options(
         "categories": cats,
         "products": sorted(product_names)
     }
+
+
+# ==================== 网店销售统计 ====================
+@router.get("/shop-sales-summary")
+async def get_shop_sales_summary(
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD（按下单时间）"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD（按下单时间）"),
+    shop_id: str = Query(None, description="网店ID（模糊）"),
+    creator: str = Query(None, description="创建者（模糊）"),
+    limit: int = Query(1000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """网店销售统计：按网店（shop_id）分组汇总。
+    列：网店ID / 创建者 / 销售金额 / 总订单数 / 退货金额 / 退订单数。
+    口径：销售金额=非退款单 sales_amount 合计；总订单数=全部订单数（含退款单）；
+    退货金额/退订单数=shipping_status=refunded 的订单。按下单时间过滤。
+    权限：仅老板端/工厂端。
+    """
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    query = select(Order.shop_id, Order.sales_amount, Order.shipping_status)
+    if start_dt:
+        query = query.where(Order.created_at >= start_dt)
+    if end_dt:
+        query = query.where(Order.created_at < end_dt)
+    rows = (await db.execute(query)).all()
+
+    # 网店创建者映射
+    shop_creator = {}
+    for s in (await db.execute(select(Shop))).scalars().all():
+        shop_creator[s.shop_id] = s.creator
+
+    groups = {}
+    for r in rows:
+        sid = r.shop_id or ""
+        key = sid or "未知网店"
+        try:
+            amt = float(r.sales_amount or 0)
+        except (TypeError, ValueError):
+            amt = 0.0
+        g = groups.get(key)
+        if g is None:
+            g = {"shop_id": sid, "creator": shop_creator.get(sid) or "未知",
+                 "sales_amount": 0.0, "total_orders": 0,
+                 "refund_amount": 0.0, "refund_count": 0}
+            groups[key] = g
+        g["total_orders"] += 1
+        if r.shipping_status == "refunded":
+            g["refund_count"] += 1
+            g["refund_amount"] += amt
+        else:
+            g["sales_amount"] += amt
+
+    items = list(groups.values())
+    # 筛选：网店ID / 创建者 模糊
+    if shop_id and shop_id.strip():
+        kw = shop_id.strip().lower()
+        items = [i for i in items if kw in (i["shop_id"] or "").lower()]
+    if creator and creator.strip():
+        kw = creator.strip().lower()
+        items = [i for i in items if kw in (i["creator"] or "").lower()]
+
+    items.sort(key=lambda x: x["sales_amount"], reverse=True)
+    items = items[:limit]
+    for i in items:
+        i["sales_amount"] = round(i["sales_amount"], 2)
+        i["refund_amount"] = round(i["refund_amount"], 2)
+
+    totals = {
+        "sales_amount": round(sum(i["sales_amount"] for i in items), 2),
+        "total_orders": sum(i["total_orders"] for i in items),
+        "refund_amount": round(sum(i["refund_amount"] for i in items), 2),
+        "refund_count": sum(i["refund_count"] for i in items)
+    }
+    return {"items": items, "totals": totals}

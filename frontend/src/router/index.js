@@ -119,6 +119,12 @@ const routes = [
         meta: { title: '运费统计' }
       },
       {
+        path: 'shop-sales-statistics',
+        name: 'ShopSalesStatistics',
+        component: () => import('@/views/ShopSalesStatistics.vue'),
+        meta: { title: '网店销售统计' }
+      },
+      {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('@/views/Notifications.vue'),

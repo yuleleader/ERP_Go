@@ -207,6 +207,7 @@ const menuGroups = computed(() => {
             { label: '销售统计', path: '/sales-statistics', desc: '人员/类别/品牌/商品销售汇总', show: isBoss },
             { label: '毛利分析', path: '/gross-profit-analysis', desc: '按下单/发货时间核算毛利', show: isBoss },
             { label: '运费统计', path: '/freight-statistics', desc: '按订单时间段统计运费', show: isBoss },
+            { label: '网店销售统计', path: '/shop-sales-statistics', desc: '按网店汇总销售与退货', show: isBoss },
             { label: '销售提成统计', path: '/commission-statistics', desc: '按发货时间核算销售提成', show: true }
           ])
         }
