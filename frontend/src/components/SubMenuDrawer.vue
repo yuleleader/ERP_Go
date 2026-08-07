@@ -33,7 +33,7 @@
                 :class="{ active: item.path === currentPath }"
                 @click="go(item)"
               >
-                <span class="item-label">{{ item.label }}</span>
+                <span class="item-label" :title="item.label">{{ item.label }}</span>
               </div>
             </div>
           </div>
