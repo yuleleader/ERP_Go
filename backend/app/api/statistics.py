@@ -1388,3 +1388,139 @@ async def get_shop_sales_summary(
         "refund_count": sum(i["refund_count"] for i in items)
     }
     return {"items": items, "totals": totals}
+
+
+# ==================== 汇总报表 → 订单明细钻取 ====================
+_ORDER_STATUS_TEXT = {
+    "pending": "待发货",
+    "shipped": "已发货",
+    "virtual": "虚拟发货",
+    "virtual_shipped": "已虚拟发货",
+    "refunded": "已退货/退款"
+}
+
+
+@router.get("/summary-order-details")
+async def get_summary_order_details(
+    mode: str = Query(..., description="shop=网店销售统计钻取 / sales=销售统计钻取"),
+    shop_id: str = Query(None, description="网店ID（mode=shop，精确匹配；空=未知网店）"),
+    only_refunded: bool = Query(False, description="mode=shop：true=仅退款单 / false=全部订单"),
+    summary_type: str = Query(None, description="mode=sales：person/category/brand/product"),
+    name: str = Query(None, description="mode=sales：点击行的分组名称（含 未分类/未知/未填商品名 特殊值）"),
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD（按下单时间）"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD（按下单时间）"),
+    limit: int = Query(2000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """汇总报表钻取明细：点击网店销售统计的总订单数/退订单数、销售统计的销售数量，
+    返回对应分组下的订单明细（平台订单号/商品名称/订单状态/订单金额）。
+    口径与汇总接口保持一致：sales 模式剔除退款单；shop 模式由 only_refunded 决定。
+    权限：仅老板端/工厂端。
+    """
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    query = select(
+        Order.platform_order_no,
+        Order.product_name,
+        Order.sales_amount,
+        Order.shipping_status,
+        Order.shop_id,
+        Order.created_by,
+        Order.created_at
+    )
+    if start_dt:
+        query = query.where(Order.created_at >= start_dt)
+    if end_dt:
+        query = query.where(Order.created_at < end_dt)
+
+    if mode == "shop":
+        # 网店销售统计钻取：按网店ID精确匹配（未知网店 = shop_id 为空）
+        sid = (shop_id or "").strip()
+        if sid:
+            query = query.where(Order.shop_id == sid)
+        else:
+            query = query.where((Order.shop_id.is_(None)) | (Order.shop_id == ""))
+        if only_refunded:
+            query = query.where(Order.shipping_status == "refunded")
+    elif mode == "sales":
+        # 销售统计钻取：销售金额/销售数量口径均剔除退款单
+        query = query.where(Order.shipping_status != "refunded")
+        name_key = (name or "").strip()
+        if summary_type == "person":
+            # 人员：created_by(用户名) → 真实姓名/用户名
+            user_rows = (await db.execute(
+                select(User.username, User.real_name)
+            )).all()
+            if name_key in ("", "未知"):
+                query = query.where((Order.created_by.is_(None)) | (Order.created_by == ""))
+            else:
+                usernames = [u.username for u in user_rows
+                             if (u.real_name or u.username) == name_key or u.username == name_key]
+                if not usernames:
+                    return {"mode": mode, "items": [], "total": 0}
+                query = query.where(Order.created_by.in_(usernames))
+        elif summary_type in ("category", "brand"):
+            # 类别/品牌：订单商品名 → 商品档案的 category_id/brand_id
+            prod_rows = (await db.execute(
+                select(Product.product_name, Product.category_id, Product.brand_id)
+            )).all()
+            if summary_type == "category":
+                meta_list = [(c.id, c.category_name) for c in (await db.execute(select(Category))).scalars().all()]
+                field = "category_id"
+            else:
+                meta_list = [(b.id, b.brand_name) for b in (await db.execute(select(Brand))).scalars().all()]
+                field = "brand_id"
+            id_name = {i: nm for i, nm in meta_list}
+            # 收集匹配目标商品名
+            match_names = set()
+            for pr in prod_rows:
+                meta = {"category_id": pr.category_id, "brand_id": pr.brand_id}
+                cid = meta.get(field)
+                if name_key == "未分类":
+                    if cid is None:
+                        match_names.add(pr.product_name)
+                elif cid in id_name and id_name[cid] == name_key:
+                    match_names.add(pr.product_name)
+            if not match_names:
+                return {"mode": mode, "items": [], "total": 0}
+            query = query.where(Order.product_name.in_(match_names))
+        else:  # product
+            if name_key in ("", "未填商品名"):
+                query = query.where((Order.product_name.is_(None)) | (Order.product_name == ""))
+            else:
+                query = query.where(Order.product_name == name_key)
+    else:
+        raise HTTPException(status_code=400, detail="mode 仅支持 shop / sales")
+
+    query = query.order_by(Order.created_at.desc()).limit(limit)
+    rows = (await db.execute(query)).all()
+
+    items = []
+    for r in rows:
+        try:
+            amt = round(float(r.sales_amount or 0), 2)
+        except (TypeError, ValueError):
+            amt = 0.0
+        items.append({
+            "platform_order_no": r.platform_order_no or "-",
+            "product_name": r.product_name or "-",
+            "shipping_status": r.shipping_status or "",
+            "shipping_status_text": _ORDER_STATUS_TEXT.get(r.shipping_status, r.shipping_status or "-"),
+            "sales_amount": amt
+        })
+    return {"mode": mode, "items": items, "total": len(items)}

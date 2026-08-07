@@ -156,3 +156,12 @@ export function getShopSalesSummary(params) {
     params
   })
 }
+
+// 汇总报表订单明细钻取（mode: shop=网店销售统计 / sales=销售统计）
+export function getSummaryOrderDetails(params) {
+  return request({
+    url: '/statistics/summary-order-details',
+    method: 'get',
+    params
+  })
+}

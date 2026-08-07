@@ -1,96 +1,129 @@
 <template>
   <div class="sales-statistics-container">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>销售统计</span>
-        </div>
-      </template>
+    <div class="body-wrap">
+      <div class="table-wrap" :class="{ 'with-detail': detailVisible }">
+        <el-card>
+          <template #header>
+            <div class="card-header">
+              <span>销售统计</span>
+            </div>
+          </template>
 
-      <el-tabs v-model="activeTab" type="border-card" @tab-change="handleTabChange">
-        <el-tab-pane
-          v-for="tab in tabs"
-          :key="tab.key"
-          :label="tab.label"
-          :name="tab.key"
-        >
-          <!-- 查询条件区（每个页签独立状态；关键字支持下拉选择 + 自由输入模糊） -->
-          <div class="filter-bar">
-            <div class="filter-item">
-              <span class="filter-label">{{ tab.nameLabel }}：</span>
-              <el-select
-                v-model="tabState[tab.key].keyword"
-                filterable
-                clearable
-                allow-create
-                default-first-option
-                :placeholder="'选择或输入' + tab.nameLabel"
-                style="width: 220px"
-                @keyup.enter="doQuery(tab.key)"
+          <el-tabs v-model="activeTab" type="border-card" @tab-change="handleTabChange">
+            <el-tab-pane
+              v-for="tab in tabs"
+              :key="tab.key"
+              :label="tab.label"
+              :name="tab.key"
+            >
+              <!-- 查询条件区（每个页签独立状态；关键字支持下拉选择 + 自由输入模糊） -->
+              <div class="filter-bar">
+                <div class="filter-item">
+                  <span class="filter-label">{{ tab.nameLabel }}：</span>
+                  <el-select
+                    v-model="tabState[tab.key].keyword"
+                    filterable
+                    clearable
+                    allow-create
+                    default-first-option
+                    :placeholder="'选择或输入' + tab.nameLabel"
+                    style="width: 220px"
+                    @keyup.enter="doQuery(tab.key)"
+                  >
+                    <el-option
+                      v-for="opt in tabOptions[tab.key]"
+                      :key="opt"
+                      :label="opt"
+                      :value="opt"
+                    />
+                  </el-select>
+                </div>
+                <div class="filter-item">
+                  <span class="filter-label">下单时间：</span>
+                  <el-date-picker
+                    v-model="tabState[tab.key].dateRange"
+                    type="daterange"
+                    range-separator="至"
+                    start-placeholder="开始日期"
+                    end-placeholder="结束日期"
+                    value-format="YYYY-MM-DD"
+                    style="width: 260px"
+                  />
+                </div>
+                <el-button type="primary" @click="doQuery(tab.key)">查询</el-button>
+                <el-button @click="resetQuery(tab.key)">重置</el-button>
+                <div class="filter-spacer"></div>
+                <el-button type="success" plain :disabled="!tabState[tab.key].items.length" @click="exportExcel(tab.key)">
+                  导出 Excel
+                </el-button>
+              </div>
+
+              <!-- 汇总合计 -->
+              <div class="totals-bar">
+                <span>合计：销售金额 <b>¥{{ fmt(tabState[tab.key].totals.sales_amount) }}</b></span>
+                <span>销售数量 <b>{{ tabState[tab.key].totals.sales_count }}</b></span>
+                <span>毛利 <b>¥{{ fmt(tabState[tab.key].totals.gross_profit) }}</b></span>
+              </div>
+
+              <!-- 数据表格 -->
+              <el-table
+                :data="tabState[tab.key].items"
+                v-loading="tabState[tab.key].loading"
+                border
+                style="width: 100%"
+                max-height="560"
               >
-                <el-option
-                  v-for="opt in tabOptions[tab.key]"
-                  :key="opt"
-                  :label="opt"
-                  :value="opt"
-                />
-              </el-select>
-            </div>
-            <div class="filter-item">
-              <span class="filter-label">下单时间：</span>
-              <el-date-picker
-                v-model="tabState[tab.key].dateRange"
-                type="daterange"
-                range-separator="至"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-                value-format="YYYY-MM-DD"
-                style="width: 260px"
-              />
-            </div>
-            <el-button type="primary" @click="doQuery(tab.key)">查询</el-button>
-            <el-button @click="resetQuery(tab.key)">重置</el-button>
-            <div class="filter-spacer"></div>
-            <el-button type="success" plain :disabled="!tabState[tab.key].items.length" @click="exportExcel(tab.key)">
-              导出 Excel
-            </el-button>
-          </div>
+                <el-table-column type="index" label="序号" width="70" align="center" />
+                <el-table-column :prop="tab.nameField" :label="tab.nameLabel" min-width="200" />
+                <el-table-column prop="sales_amount" label="销售金额" width="140" align="right">
+                  <template #default="{ row }">¥{{ fmt(row.sales_amount) }}</template>
+                </el-table-column>
+                <el-table-column prop="sales_count" label="销售数量" width="110" align="right">
+                  <template #default="{ row }">
+                    <a class="link-cell" @click="showSalesDetail(row)">{{ row.sales_count }}</a>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="gross_profit" label="毛利" width="140" align="right">
+                  <template #default="{ row }">¥{{ fmt(row.gross_profit) }}</template>
+                </el-table-column>
+              </el-table>
+            </el-tab-pane>
+          </el-tabs>
+        </el-card>
+      </div>
 
-          <!-- 汇总合计 -->
-          <div class="totals-bar">
-            <span>合计：销售金额 <b>¥{{ fmt(tabState[tab.key].totals.sales_amount) }}</b></span>
-            <span>销售数量 <b>{{ tabState[tab.key].totals.sales_count }}</b></span>
-            <span>毛利 <b>¥{{ fmt(tabState[tab.key].totals.gross_profit) }}</b></span>
+      <!-- 右侧抽屉：订单明细 -->
+      <transition name="slide-left">
+        <div v-if="detailVisible" class="detail-panel">
+          <div class="detail-header">
+            <span class="detail-title">{{ detailTitle }}</span>
+            <el-button text size="small" @click="closeDetail">✕</el-button>
           </div>
-
-          <!-- 数据表格 -->
           <el-table
-            :data="tabState[tab.key].items"
-            v-loading="tabState[tab.key].loading"
+            :data="detailItems"
+            v-loading="detailLoading"
             border
-            style="width: 100%"
-            max-height="560"
+            size="small"
+            max-height="calc(100vh - 220px)"
           >
-            <el-table-column type="index" label="序号" width="70" align="center" />
-            <el-table-column :prop="tab.nameField" :label="tab.nameLabel" min-width="200" />
-            <el-table-column prop="sales_amount" label="销售金额" width="140" align="right">
+            <el-table-column prop="platform_order_no" label="平台订单号" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="product_name" label="商品名称" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="shipping_status_text" label="订单状态" width="110" align="center" />
+            <el-table-column label="订单金额" width="110" align="right">
               <template #default="{ row }">¥{{ fmt(row.sales_amount) }}</template>
             </el-table-column>
-            <el-table-column prop="sales_count" label="销售数量" width="110" align="right" />
-            <el-table-column prop="gross_profit" label="毛利" width="140" align="right">
-              <template #default="{ row }">¥{{ fmt(row.gross_profit) }}</template>
-            </el-table-column>
           </el-table>
-        </el-tab-pane>
-      </el-tabs>
-    </el-card>
+          <div class="detail-footer">共 {{ detailTotal }} 单</div>
+        </div>
+      </transition>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
-import { getSalesSummary, getSalesSummaryOptions } from '@/api/statistics'
+import { getSalesSummary, getSalesSummaryOptions, getSummaryOrderDetails } from '@/api/statistics'
 import { ElMessage } from 'element-plus'
 
 /**
@@ -187,6 +220,43 @@ function handleTabChange(key) {
   }
 }
 
+// ==================== 订单明细钻取（右侧抽屉） ====================
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailItems = ref([])
+const detailTitle = ref('')
+const detailTotal = ref(0)
+
+async function showSalesDetail(row) {
+  const key = activeTab.value
+  const tab = tabs.find(t => t.key === key)
+  const st = tabState[key]
+  const params = { mode: 'sales', summary_type: tab.queryType, name: row.name || '' }
+  if (st.dateRange && st.dateRange.length === 2) {
+    params.start_date = st.dateRange[0]
+    params.end_date = st.dateRange[1]
+  }
+  detailVisible.value = true
+  detailLoading.value = true
+  detailItems.value = []
+  detailTitle.value = `${tab.nameLabel}：${row.name || '未分类'}`
+  try {
+    const res = await getSummaryOrderDetails(params)
+    detailItems.value = (res && res.items) || []
+    detailTotal.value = (res && res.total) || 0
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.detail || '明细加载失败')
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function closeDetail() {
+  detailVisible.value = false
+  detailItems.value = []
+  detailTotal.value = 0
+}
+
 // 导出当前页签筛选后的数据为 Excel（xlsx 前端生成）
 function exportExcel(key) {
   const tab = tabs.find(t => t.key === key)
@@ -220,6 +290,73 @@ onMounted(() => {
 <style scoped>
 .sales-statistics-container {
   padding: 20px;
+}
+
+.body-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.table-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.table-wrap.with-detail {
+  flex: none;
+  width: calc(100% - 480px);
+}
+
+.detail-panel {
+  flex: none;
+  width: 460px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.detail-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
+
+.detail-footer {
+  margin-top: 10px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.link-cell {
+  color: #409eff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link-cell:hover {
+  color: #66b1ff;
+}
+
+/* 抽屉滑入动画 */
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: all 0.25s ease;
+}
+
+.slide-left-enter-from,
+.slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(40px);
 }
 
 .card-header {
