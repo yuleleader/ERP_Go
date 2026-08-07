@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from typing import List
 from ..core.database import get_db
 from ..core.security import get_current_active_user, require_role
@@ -12,17 +12,29 @@ router = APIRouter(prefix="/api/users", tags=["用户管理"])
 
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
+    keyword: str = Query(None, description="按用户名/真实姓名模糊搜索"),
+    role: str = Query(None, description="按角色筛选（boss/sales/factory/shipping）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    """用户列表：支持关键字（用户名/真实姓名模糊）与角色筛选，二者可组合。"""
     if current_user.role == "boss":
-        result = await db.execute(select(User).order_by(User.created_at.desc()))
+        query = select(User)
     else:
-        result = await db.execute(
-            select(User).where(User.id == current_user.id).order_by(User.created_at.desc())
+        # 非老板端仅能查看自己
+        query = select(User).where(User.id == current_user.id)
+
+    if keyword:
+        like = f"%{keyword.strip()}%"
+        query = query.where(
+            or_(User.username.like(like), User.real_name.like(like))
         )
-    users = result.scalars().all()
-    return users
+    if role:
+        query = query.where(User.role == role)
+
+    query = query.order_by(User.created_at.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(

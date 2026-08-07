@@ -1,44 +1,87 @@
 <template>
   <div class="users-container">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>用户管理</span>
-          <el-button type="primary" @click="showCreateDialog">新建用户</el-button>
-        </div>
-      </template>
+    <!-- 左侧角色筛选面板 -->
+    <aside class="role-panel">
+      <div class="role-panel-title">角色筛选</div>
+      <div
+        class="role-item"
+        :class="{ active: activeRole === '' }"
+        @click="selectRole('')"
+      >
+        <span class="role-name">全部</span>
+        <span class="role-count">{{ allUsersCount }}</span>
+      </div>
+      <div
+        v-for="r in roleOptions"
+        :key="r.value"
+        class="role-item"
+        :class="{ active: activeRole === r.value }"
+        @click="selectRole(r.value)"
+      >
+        <span class="role-name">{{ r.label }}</span>
+        <span class="role-count">{{ roleCounts[r.value] || 0 }}</span>
+      </div>
+    </aside>
 
-      <el-table :data="users" v-loading="loading" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" />
-        <el-table-column prop="real_name" label="真实姓名" />
-        <el-table-column prop="role" label="角色" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getRoleType(row.role)">{{ getRoleText(row.role) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="commission_rate" label="提成比例" width="100">
-          <template #default="{ row }">
-            {{ row.commission_rate ? row.commission_rate + '%' : '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="is_active" label="状态" width="80">
-          <template #default="{ row }">
-            <el-tag :type="row.is_active ? 'success' : 'danger'">
-              {{ row.is_active ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="editUser(row)">编辑</el-button>
-            <el-button link type="warning" size="small" @click="resetUserPassword(row)">重置密码</el-button>
-            <el-button link type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- 右侧用户列表 -->
+    <div class="users-main">
+      <el-card>
+        <template #header>
+          <div class="card-header">
+            <span>用户管理</span>
+            <el-button type="primary" @click="showCreateDialog">新建用户</el-button>
+          </div>
+        </template>
+
+        <!-- 查询栏 -->
+        <div class="search-bar">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="输入用户名或真实姓名查询"
+            clearable
+            style="width: 260px;"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
+          />
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button @click="handleReset">重置</el-button>
+          <span v-if="activeRole" class="role-filter-tip">
+            当前筛选：{{ roleLabel(activeRole) }}
+          </span>
+        </div>
+
+        <el-table :data="users" v-loading="loading" style="width: 100%">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="username" label="用户名" />
+          <el-table-column prop="real_name" label="真实姓名" />
+          <el-table-column prop="role" label="角色" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getRoleType(row.role)">{{ getRoleText(row.role) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="commission_rate" label="提成比例" width="100">
+            <template #default="{ row }">
+              {{ row.commission_rate ? row.commission_rate + '%' : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="is_active" label="状态" width="80">
+            <template #default="{ row }">
+              <el-tag :type="row.is_active ? 'success' : 'danger'">
+                {{ row.is_active ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="创建时间" width="180" />
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="editUser(row)">编辑</el-button>
+              <el-button link type="warning" size="small" @click="resetUserPassword(row)">重置密码</el-button>
+              <el-button link type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" @closed="resetForm">
       <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="100px">
@@ -94,6 +137,49 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const usersStore = useUsersStore()
 const users = computed(() => usersStore.users)
 const loading = computed(() => usersStore.loading)
+
+// ===== 角色筛选 =====
+const roleOptions = [
+  { value: 'boss', label: '老板端' },
+  { value: 'sales', label: '销售端' },
+  { value: 'factory', label: '工厂端' },
+  { value: 'shipping', label: '发货端' }
+]
+const activeRole = ref('')
+const searchKeyword = ref('')
+
+// 各角色数量（基于当前全部用户计算；若已有筛选数据则基于该数据统计）
+const roleCounts = computed(() => {
+  const counts = { boss: 0, sales: 0, factory: 0, shipping: 0 }
+  for (const u of users.value) {
+    if (counts[u.role] !== undefined) counts[u.role] += 1
+  }
+  return counts
+})
+const allUsersCount = computed(() => users.value.length)
+
+function roleLabel(value) {
+  return roleOptions.find(r => r.value === value)?.label || value
+}
+
+function selectRole(value) {
+  activeRole.value = value
+  handleSearch()
+}
+
+function handleSearch() {
+  const params = {}
+  const kw = searchKeyword.value.trim()
+  if (kw) params.keyword = kw
+  if (activeRole.value) params.role = activeRole.value
+  usersStore.fetchUsers(params)
+}
+
+function handleReset() {
+  searchKeyword.value = ''
+  activeRole.value = ''
+  usersStore.fetchUsers()
+}
 
 const dialogVisible = ref(false)
 const dialogMode = ref('create')
@@ -237,6 +323,69 @@ usersStore.fetchUsers()
 <style scoped>
 .users-container {
   padding: 20px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* 左侧角色筛选面板 */
+.role-panel {
+  width: 200px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.role-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f2f5;
+  margin-bottom: 8px;
+}
+
+.role-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #303133;
+  transition: background-color 0.15s;
+}
+
+.role-item:hover {
+  background-color: #f5f7fa;
+}
+
+.role-item.active {
+  background-color: #ecf5ff;
+  color: #409eff;
+  font-weight: 600;
+}
+
+.role-count {
+  font-size: 11px;
+  color: #a8abb2;
+  background: #f0f2f5;
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.role-item.active .role-count {
+  background: #409eff;
+  color: #fff;
+}
+
+/* 右侧主区域 */
+.users-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .card-header {
@@ -245,11 +394,35 @@ usersStore.fetchUsers()
   align-items: center;
 }
 
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.role-filter-tip {
+  font-size: 12px;
+  color: #409eff;
+  background: #ecf5ff;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
 .price-perm-tip {
   width: 100%;
   font-size: 12px;
   color: #909399;
   line-height: 1.5;
   margin-top: 2px;
+}
+
+@media (max-width: 900px) {
+  .users-container {
+    flex-direction: column;
+  }
+  .role-panel {
+    width: 100%;
+  }
 }
 </style>

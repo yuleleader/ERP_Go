@@ -7,11 +7,11 @@ export const useUsersStore = defineStore('users', () => {
   const users = ref([])
   const loading = ref(false)
 
-  // 获取用户列表
-  async function fetchUsers() {
+  // 获取用户列表（支持 keyword 模糊搜索 / role 角色筛选，可组合）
+  async function fetchUsers(params = {}) {
     loading.value = true
     try {
-      users.value = await getUsers()
+      users.value = await getUsers(params)
     } catch (error) {
       console.error('获取用户列表失败', error)
     } finally {
