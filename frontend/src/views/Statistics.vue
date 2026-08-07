@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>数据统计</span>
+          <span>数据总览</span>
         </div>
       </template>
 

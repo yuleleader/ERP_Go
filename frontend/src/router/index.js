@@ -92,7 +92,7 @@ const routes = [
         path: 'statistics',
         name: 'Statistics',
         component: () => import('@/views/Statistics.vue'),
-        meta: { title: '数据统计' }
+        meta: { title: '数据总览' }
       },
       {
         path: 'commission-statistics',
