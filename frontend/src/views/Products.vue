@@ -394,6 +394,7 @@
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import {
   getProducts,
   getProductDetail,
@@ -417,12 +418,10 @@ const userStore = useUserStore()
 
 // 商品管理对所有人员开放查看
 const canManageProducts = computed(() => true)
-// 商品档案编辑/上传图片：仅老板端（其他角色只有查看权限）
-const canEditProducts = computed(() => userStore.userInfo?.role === 'boss')
-// 仅老板端可新建商品
-const canCreateProducts = computed(() => userStore.userInfo?.role === 'boss')
-// 仅老板端可删除（单选/批量）
-const canDeleteProducts = computed(() => userStore.userInfo?.role === 'boss')
+// 数据权限驱动：boss 恒全权，其他账号按 data_permissions.product 授权
+const canEditProducts = computed(() => checkDataPerm(userStore.userInfo, 'product', 'edit'))
+const canCreateProducts = computed(() => checkDataPerm(userStore.userInfo, 'product', 'add'))
+const canDeleteProducts = computed(() => checkDataPerm(userStore.userInfo, 'product', 'delete'))
 
 // ===== 价格权限掩码 =====
 // price_permissions 逗号分隔；boss 恒全部可见；

@@ -42,11 +42,11 @@
 
       <!-- 右：详情面板 -->
       <div class="right-panel">
-        <!-- 操作按钮组 -->
+        <!-- 操作按钮组（显示与否由账号数据权限控制） -->
         <div class="action-bar">
-          <el-button :disabled="!canAdd" type="primary" plain @click="showAddDialog">新增</el-button>
-          <el-button :disabled="!canModify" @click="showModifyDialog">修改</el-button>
-          <el-button :disabled="!canDelete" type="danger" plain @click="confirmDelete">删除</el-button>
+          <el-button v-if="permAdd" :disabled="!canAdd" type="primary" plain @click="showAddDialog">新增</el-button>
+          <el-button v-if="permModify" :disabled="!canModify" @click="showModifyDialog">修改</el-button>
+          <el-button v-if="permDelete" :disabled="!canDelete" type="danger" plain @click="confirmDelete">删除</el-button>
         </div>
 
         <!-- 搜索框 -->
@@ -133,6 +133,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
 import { getBrands, createBrand, updateBrand, deleteBrand } from '@/api/brand'
@@ -228,6 +229,11 @@ function resetQuery() {
 const canAdd = computed(() => true)          // 任何状态都可新增（未选=品牌 / 选中=商品）
 const canModify = computed(() => !!selectedBrand.value)
 const canDelete = computed(() => canModify.value)
+
+// ===== 账号数据权限（按钮是否显示；boss 恒显示） =====
+const permAdd = computed(() => checkDataPerm(userStore.userInfo, 'brand', 'add'))
+const permModify = computed(() => checkDataPerm(userStore.userInfo, 'brand', 'edit'))
+const permDelete = computed(() => checkDataPerm(userStore.userInfo, 'brand', 'delete'))
 
 // ===== 新增/修改 =====
 const dialogVisible = ref(false)

@@ -184,8 +184,8 @@ const menuGroups = computed(() => {
           title: '商品资料',
           items: pick([
             { label: '商品管理', path: '/products', desc: '商品资料与规格（所有人员可查看）', show: true },
-            { label: '类别管理', path: '/categories', desc: '两级类别与编码维护', show: isBoss },
-            { label: '品牌管理', path: '/brands', desc: '品牌编码与名称维护', show: isBoss }
+            { label: '类别管理', path: '/categories', desc: '两级类别与编码维护（操作按数据权限）', show: true },
+            { label: '品牌管理', path: '/brands', desc: '品牌编码与名称维护（操作按数据权限）', show: true }
           ])
         },
         {

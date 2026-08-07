@@ -19,7 +19,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Product, ProductImage, OperationLog
 
 router = APIRouter(prefix="/api/products", tags=["商品图片"])
@@ -85,8 +85,7 @@ async def upload_product_image(
     current_user=Depends(get_current_active_user),
 ):
     """上传一张商品图片。校验：商品存在 / 扩展名 / 大小 / 总数 ≤ 5。"""
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限上传商品图片")
+    ensure_data_permission(current_user, 'product', 'edit')
 
     safe_code = _sanitize_code(product_code)
 
@@ -184,8 +183,7 @@ async def delete_product_image(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_active_user),
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限删除商品图片")
+    ensure_data_permission(current_user, 'product', 'edit')
 
     row = (await db.execute(
         select(ProductImage).where(ProductImage.id == image_id)

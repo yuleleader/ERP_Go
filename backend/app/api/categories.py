@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Category, Product, OperationLog
 from ..schemas.schemas import CategoryCreate, CategoryUpdate, CategoryResponse
 
@@ -78,8 +78,7 @@ async def create_category(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限创建类别")
+    ensure_data_permission(current_user, 'category', 'add')
 
     parent = None
     if data.parent_id:
@@ -122,8 +121,7 @@ async def update_category(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限修改类别")
+    ensure_data_permission(current_user, 'category', 'edit')
 
     result = await db.execute(select(Category).where(Category.id == cat_id))
     cat = result.scalar_one_or_none()
@@ -144,8 +142,7 @@ async def delete_category(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限删除类别")
+    ensure_data_permission(current_user, 'category', 'delete')
 
     result = await db.execute(select(Category).where(Category.id == cat_id))
     cat = result.scalar_one_or_none()

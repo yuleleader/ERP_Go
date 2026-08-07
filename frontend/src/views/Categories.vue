@@ -37,11 +37,11 @@
 
       <!-- 右：详情面板 -->
       <div class="right-panel">
-        <!-- 操作按钮组 -->
+        <!-- 操作按钮组（显示与否由账号数据权限控制） -->
         <div class="action-bar">
-          <el-button :disabled="!canAdd" type="primary" plain @click="showAddDialog">新增</el-button>
-          <el-button :disabled="!canModify" @click="showModifyDialog">修改</el-button>
-          <el-button :disabled="!canDelete" type="danger" plain @click="confirmDelete">删除</el-button>
+          <el-button v-if="permAdd" :disabled="!canAdd" type="primary" plain @click="showAddDialog">新增</el-button>
+          <el-button v-if="permModify" :disabled="!canModify" @click="showModifyDialog">修改</el-button>
+          <el-button v-if="permDelete" :disabled="!canDelete" type="danger" plain @click="confirmDelete">删除</el-button>
         </div>
 
         <!-- 搜索框 -->
@@ -129,6 +129,7 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
@@ -265,6 +266,11 @@ function resetQuery() {
 const canAdd = computed(() => true)  // 任何层级都可新增
 const canModify = computed(() => selectedLevel.value === 1 || selectedLevel.value === 2)
 const canDelete = computed(() => canModify.value)
+
+// ===== 账号数据权限（按钮是否显示；boss 恒显示） =====
+const permAdd = computed(() => checkDataPerm(userStore.userInfo, 'category', 'add'))
+const permModify = computed(() => checkDataPerm(userStore.userInfo, 'category', 'edit'))
+const permDelete = computed(() => checkDataPerm(userStore.userInfo, 'category', 'delete'))
 
 // ===== 类别新增/编辑 =====
 const dialogVisible = ref(false)

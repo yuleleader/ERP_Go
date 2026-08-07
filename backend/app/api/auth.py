@@ -124,6 +124,7 @@ async def register(
         role=user_data.role,
         commission_rate=user_data.commission_rate,
         price_permissions=user_data.price_permissions,
+        data_permissions=user_data.data_permissions,
         is_active=user_data.is_active
     )
     db.add(new_user)

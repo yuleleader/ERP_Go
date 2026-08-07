@@ -17,6 +17,8 @@ class UserBase(BaseModel):
     commission_rate: Optional[int] = Field(None, ge=1, le=100)
     # 价格权限：逗号分隔，如 "cost_price,retail_price,min_price"；None/空=全部可见
     price_permissions: Optional[str] = None
+    # 数据权限：JSON 文本，如 {"category":["add"],"brand":["add","edit"],"product":["delete"]}；None/空=无权限；boss 恒全权
+    data_permissions: Optional[str] = None
     is_active: bool = True
 
 class UserCreate(UserBase):
@@ -27,6 +29,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     commission_rate: Optional[int] = Field(None, ge=1, le=100)
     price_permissions: Optional[str] = None
+    data_permissions: Optional[str] = None
     is_active: Optional[bool] = None
     # 编辑时可选修改密码：非空则重置为改密码（无需原密码）；留空/不传则不修改
     password: Optional[str] = Field(None, min_length=6)

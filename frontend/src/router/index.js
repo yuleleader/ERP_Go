@@ -56,13 +56,13 @@ const routes = [
         path: 'categories',
         name: 'Categories',
         component: () => import('@/views/Categories.vue'),
-        meta: { title: '类别管理', roles: ['boss'] }
+        meta: { title: '类别管理' }
       },
       {
         path: 'brands',
         name: 'Brands',
         component: () => import('@/views/Brands.vue'),
-        meta: { title: '品牌管理', roles: ['boss'] }
+        meta: { title: '品牌管理' }
       },
       {
         path: 'settings',

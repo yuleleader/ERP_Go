@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Brand, Product, OperationLog
 from ..schemas.schemas import BrandCreate, BrandUpdate, BrandResponse
 
@@ -26,8 +26,7 @@ async def create_brand(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限创建品牌")
+    ensure_data_permission(current_user, 'brand', 'add')
 
     # 三位数字编码自增（=当前最大编码 +1），在构造时即赋值以满足 NOT NULL 约束
     result = await db.execute(select(func.max(Brand.brand_code)))
@@ -53,8 +52,7 @@ async def update_brand(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限修改品牌")
+    ensure_data_permission(current_user, 'brand', 'edit')
 
     result = await db.execute(select(Brand).where(Brand.id == brand_id))
     brand = result.scalar_one_or_none()
@@ -75,8 +73,7 @@ async def delete_brand(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限删除品牌")
+    ensure_data_permission(current_user, 'brand', 'delete')
 
     result = await db.execute(select(Brand).where(Brand.id == brand_id))
     brand = result.scalar_one_or_none()

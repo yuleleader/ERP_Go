@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from typing import Optional, List
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Product, User, OperationLog
 from ..schemas.schemas import ProductCreate, ProductUpdate, ProductResponse
 from ..api.product_images import delete_product_images
@@ -42,8 +42,7 @@ async def create_product(
     权限要求：boss（仅老板端可新建商品）
     """
     # 权限检查：只有老板端可以创建商品
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限创建商品")
+    ensure_data_permission(current_user, 'product', 'add')
 
     # 创建商品记录：先插入占位编码，flush 拿到自增 id 后回填唯一编码
     # （编码=PLU-{id:06d}，与 id 绑定，从根上避免 max(id)+1 在并发下的重复问题）
@@ -220,8 +219,7 @@ async def update_product(
     权限要求：boss（仅老板端可编辑商品）
     """
     # 权限检查：只有老板端可以编辑商品
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限编辑商品")
+    ensure_data_permission(current_user, 'product', 'edit')
 
     result = await db.execute(
         select(Product).where(Product.product_code == product_code)
@@ -286,8 +284,7 @@ async def delete_product(
     删除限制：已被订单引用的商品不允许删除
     """
     # 权限检查：只有老板端可以删除商品
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限删除商品")
+    ensure_data_permission(current_user, 'product', 'delete')
 
     result = await db.execute(
         select(Product).where(Product.product_code == product_code)
@@ -345,8 +342,7 @@ async def batch_delete_products(
     删除限制：已被订单引用的商品不允许删除
     """
     # 权限检查：只有老板端可以批量删除商品
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="您没有权限批量删除商品")
+    ensure_data_permission(current_user, 'product', 'delete')
 
     if not product_codes:
         raise HTTPException(status_code=400, detail="请选择要删除的商品")

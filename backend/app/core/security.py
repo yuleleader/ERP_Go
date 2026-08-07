@@ -4,6 +4,7 @@ from typing import Optional
 from jose import JWTError, jwt
 import hashlib
 import secrets
+import json
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,3 +85,37 @@ def require_role(*roles):
             )
         return current_user
     return role_checker
+
+
+DATA_PERMISSION_MODULES = ("category", "brand", "product")
+DATA_PERMISSION_ACTIONS = ("add", "edit", "delete")
+
+
+def has_data_permission(current_user: User, module: str, action: str) -> bool:
+    """账号级数据权限校验（同步，读 current_user.data_permissions JSON）。
+    - 老板端恒有全部权限
+    - data_permissions 如 {"category":["add"],"brand":["add","edit"],"product":["delete"]}
+    - 未授权（空/缺失/不含该操作）一律 False
+    """
+    if current_user.role == "boss":
+        return True
+    if module not in DATA_PERMISSION_MODULES or action not in DATA_PERMISSION_ACTIONS:
+        return False
+    raw = getattr(current_user, "data_permissions", None)
+    if not raw:
+        return False
+    try:
+        perms = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    except Exception:
+        return False
+    actions = perms.get(module) or []
+    return action in actions
+
+
+def ensure_data_permission(current_user: User, module: str, action: str):
+    """接口内使用：无权限直接抛 403。"""
+    if not has_data_permission(current_user, module, action):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"您没有权限执行此操作（{module}.{action}）"
+        )

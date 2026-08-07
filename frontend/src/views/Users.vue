@@ -122,17 +122,43 @@
         <!-- 模块二：价格权限 -->
         <el-tab-pane label="价格权限" name="price">
           <div class="price-perm-block">
-            <el-checkbox-group v-model="userForm.price_permissions">
-              <el-checkbox value="cost_price">成本价</el-checkbox>
-              <el-checkbox value="retail_price">零售价</el-checkbox>
-              <el-checkbox value="min_price">最低售价</el-checkbox>
-            </el-checkbox-group>
-            <div class="price-perm-tip">
-              未勾选的价格，该账号在商品档案中显示为「***」；老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
+            <div class="price-perm-row">
+              <div class="price-perm-left">
+                <el-checkbox-group v-model="userForm.price_permissions">
+                  <el-checkbox value="cost_price">成本价</el-checkbox>
+                  <el-checkbox value="retail_price">零售价</el-checkbox>
+                  <el-checkbox value="min_price">最低售价</el-checkbox>
+                </el-checkbox-group>
+                <div class="price-perm-tip">
+                  未勾选的价格，该账号在商品档案中显示为「***」；老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
+                </div>
+              </div>
+              <div class="price-perm-right">
+                <el-button type="primary" plain @click="openDataPermissionDialog">数据权限</el-button>
+                <div class="price-perm-tip">配置类别 / 品牌 / 商品档案的增删改权限</div>
+              </div>
             </div>
           </div>
         </el-tab-pane>
       </el-tabs>
+
+      <!-- 数据权限配置弹窗 -->
+      <el-dialog v-model="dataPermDialogVisible" title="数据权限管理" width="560px">
+        <div class="dp-module" v-for="m in dataPermModules" :key="m.key">
+          <div class="dp-module-name">{{ m.label }}</div>
+          <el-checkbox-group v-model="dataPermForm[m.key]">
+            <el-checkbox value="add">新增</el-checkbox>
+            <el-checkbox value="edit">修改</el-checkbox>
+            <el-checkbox value="delete">删除</el-checkbox>
+          </el-checkbox-group>
+          <div class="dp-module-hint">{{ m.hint }}</div>
+        </div>
+        <div class="dp-tip">未勾选的操作，该账号在此模块看不到对应按钮、接口也会拒绝。老板端不受此限制。</div>
+        <template #footer>
+          <el-button @click="dataPermDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="dataPermDialogVisible = false">确定</el-button>
+        </template>
+      </el-dialog>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -205,6 +231,35 @@ const userForm = reactive({
   is_active: true
 })
 
+// ===== 数据权限（类别/品牌/商品档案 × 增删改） =====
+const dataPermModules = [
+  { key: 'category', label: '类别', hint: '类别管理页面的新增 / 修改 / 删除' },
+  { key: 'brand', label: '品牌', hint: '品牌管理页面的新增 / 修改 / 删除' },
+  { key: 'product', label: '商品档案', hint: '商品管理页面的新建 / 编辑 / 删除' }
+]
+const dataPermDialogVisible = ref(false)
+// 数据权限表单：{ category: [], brand: [], product: [] }
+const dataPermForm = reactive({ category: [], brand: [], product: [] })
+
+function openDataPermissionDialog() {
+  dataPermDialogVisible.value = true
+}
+
+// JSON 字符串 → 对象（编辑回显）
+function parseDataPermissions(raw) {
+  const out = { category: [], brand: [], product: [] }
+  if (!raw) return out
+  try {
+    const o = typeof raw === 'string' ? JSON.parse(raw) : (raw || {})
+    dataPermModules.forEach(m => {
+      out[m.key] = Array.isArray(o[m.key]) ? o[m.key] : []
+    })
+  } catch (e) {
+    /* 解析失败按无权限 */
+  }
+  return out
+}
+
 const userRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [
@@ -239,6 +294,11 @@ function editUser(row) {
   userForm.price_permissions = row.price_permissions
     ? row.price_permissions.split(',').filter(Boolean)
     : []
+  // 数据权限回显：JSON → 对象
+  const dp = parseDataPermissions(row.data_permissions)
+  dataPermForm.category = dp.category
+  dataPermForm.brand = dp.brand
+  dataPermForm.product = dp.product
   userForm.is_active = row.is_active
   userForm.password = ''
   dialogVisible.value = true
@@ -258,6 +318,12 @@ async function submitUser() {
         commission_rate: userForm.role === 'sales' ? userForm.commission_rate : null,
         // 价格权限：数组 → 逗号分隔字符串；全选时传空串（=全部可见）也可以，但显式传更清晰
         price_permissions: userForm.price_permissions.join(','),
+        // 数据权限：对象 → JSON 字符串（仅非空操作才写入；全空传空对象）
+        data_permissions: JSON.stringify({
+          category: dataPermForm.category,
+          brand: dataPermForm.brand,
+          product: dataPermForm.product
+        }),
         is_active: userForm.is_active
       }
 
@@ -299,6 +365,9 @@ function resetForm() {
   userForm.role = 'sales'
   userForm.commission_rate = 10
   userForm.price_permissions = []
+  dataPermForm.category = []
+  dataPermForm.brand = []
+  dataPermForm.product = []
   userForm.is_active = true
 }
 
@@ -422,6 +491,56 @@ usersStore.fetchUsers()
   color: #909399;
   line-height: 1.6;
   margin-top: 10px;
+}
+
+/* 价格权限区左右布局（勾选框 | 数据权限按钮） */
+.price-perm-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.price-perm-left {
+  flex: 1;
+  min-width: 220px;
+}
+
+.price-perm-right {
+  flex: 0 0 auto;
+  text-align: center;
+  padding-top: 4px;
+}
+
+/* 数据权限配置弹窗 */
+.dp-module {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: #fafbfc;
+}
+
+.dp-module-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.dp-module-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 6px;
+}
+
+.dp-tip {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+  background: #f5f7fa;
+  border-radius: 6px;
+  padding: 8px 12px;
 }
 
 /* 新建/编辑用户：两个平级模块（选项卡切换） */
