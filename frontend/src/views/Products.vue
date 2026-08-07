@@ -425,18 +425,18 @@ const canCreateProducts = computed(() => userStore.userInfo?.role === 'boss')
 const canDeleteProducts = computed(() => userStore.userInfo?.role === 'boss')
 
 // ===== 价格权限掩码 =====
-// price_permissions 逗号分隔；boss 或字段为空(null/空串) = 全部可见（老用户兼容）
+// price_permissions 逗号分隔；boss 恒全部可见；
+// 空(null/空串) = 全不勾选 = 全部价格掩码（与用户管理"默认不勾选"语义一致）
 const pricePermSet = computed(() => {
   const info = userStore.userInfo || {}
-  if (info.role === 'boss') return null
+  if (info.role === 'boss') return null // null 表示全部可见
   const s = info.price_permissions
-  if (!s) return null
-  const set = new Set(String(s).split(',').filter(Boolean))
-  return set
+  if (!s) return new Set() // 空集合 = 全部掩码
+  return new Set(String(s).split(',').filter(Boolean))
 })
 function canSeePrice(key) {
   const set = pricePermSet.value
-  if (!set) return true
+  if (!set) return true // boss 全部可见
   return set.has(key)
 }
 function maskedPrice(value, key) {
