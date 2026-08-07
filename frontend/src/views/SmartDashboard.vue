@@ -48,8 +48,7 @@
           </div>
           <div class="stat-card refund">
             <div class="stat-label">退款订单</div>
-            <div class="stat-value">{{ formatNumber(overview.refunded_orders) }}单</div>
-            <div class="stat-sub">退货金额 ¥{{ formatNumber(overview.refunded_amount) }}</div>
+            <div class="stat-value">{{ formatNumber(overview.refunded_orders) }}单 · ¥{{ formatNumber(overview.refunded_amount) }}</div>
           </div>
         </div>
 
@@ -657,22 +656,23 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: 12px;
   color: #94a3b8;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .stat-value {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: bold;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 /* 退款订单卡片（暖色调区分） */
@@ -691,15 +691,6 @@ onUnmounted(() => {
 
 .stat-card.refund .stat-value {
   color: #fecaca;
-}
-
-.stat-sub {
-  font-size: 10px;
-  color: #94a3b8;
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* 图表块（三等分中的第二段：等高） */
