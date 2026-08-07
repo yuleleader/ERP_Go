@@ -587,15 +587,14 @@
         <!-- 图片展示区 -->
         <div style="padding: 20px;">
           <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-            <!-- 显示前3张图片 -->
+            <!-- 显示前3张图片（点击打开预览弹窗，兼容手机触屏） -->
             <el-image
               v-for="(img, index) in currentTabImages.slice(0, 3)"
               :key="index"
               :src="img.url"
-              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee;"
+              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee; cursor: pointer;"
               fit="cover"
-              :preview-src-list="currentTabImages.map(i => i.url)"
-              :preview-index="index"
+              @click="previewTabImage(index)"
             />
 
             <!-- 更多图片提示 -->
@@ -1913,14 +1912,19 @@ function getFirstProductImageUrl() {
 /**
  * 预览所有图片
  */
+/**
+ * 预览当前标签页图片（点击缩略图 / "+N" 均走这里，打开预览弹窗）
+ */
+function previewTabImage(index) {
+  const urls = currentTabImages.value.map(i => i.url)
+  if (urls.length === 0) return
+  previewImageList.value = urls
+  previewImageIndex.value = Math.min(index || 0, urls.length - 1)
+  imagePreviewVisible.value = true
+}
+
 function previewAllImages() {
-  const images = currentTabImages.value
-  if (images.length > 0) {
-    const img = document.querySelector('.el-image')
-    if (img) {
-      img.click()
-    }
-  }
+  previewTabImage(0)
 }
 
 /**

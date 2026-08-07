@@ -259,10 +259,9 @@
                 v-for="(img, index) in orderTabImages.slice(0, 3)"
                 :key="index"
                 :src="img.url"
-                style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee;"
+                style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee; cursor: pointer;"
                 fit="cover"
-                :preview-src-list="orderTabImages.map(i => i.url)"
-                :preview-index="index"
+                @click="previewOrderImage(index)"
               />
               <div
                 v-if="orderTabImages.length > 3"
@@ -279,6 +278,14 @@
       </div>
     </el-dialog>
   </div>
+
+  <!-- 图片大图预览（显式打开，兼容手机触屏点击放大） -->
+  <el-image-viewer
+    v-if="orderPreviewVisible"
+    :url-list="orderPreviewUrls"
+    :initial-index="orderPreviewIndex"
+    @close="orderPreviewVisible = false"
+  />
 </template>
 
 <script setup>
@@ -532,12 +539,20 @@ async function generateOrderQRCode(orderId) {
   }
 }
 
-// 预览全部图片
+// 预览图片（点击缩略图 / "+N" 均打开大图预览，兼容手机触屏）
+const orderPreviewVisible = ref(false)
+const orderPreviewIndex = ref(0)
+const orderPreviewUrls = computed(() => orderTabImages.value.map(i => i.url))
+
+function previewOrderImage(index) {
+  const urls = orderPreviewUrls.value
+  if (urls.length === 0) return
+  orderPreviewIndex.value = Math.min(index || 0, urls.length - 1)
+  orderPreviewVisible.value = true
+}
+
 function previewOrderAllImages() {
-  const imgEls = document.querySelectorAll('.order-detail-content .el-image')
-  if (imgEls.length > 0) {
-    imgEls[0].click()
-  }
+  previewOrderImage(0)
 }
 
 // 获取第一张商品图片URL

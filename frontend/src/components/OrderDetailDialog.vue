@@ -132,15 +132,14 @@
         <!-- 图片展示区 -->
         <div style="padding: 20px;">
           <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-            <!-- 显示前3张图片 -->
+            <!-- 显示前3张图片（点击显式打开大图预览，兼容手机触屏） -->
             <el-image
               v-for="(img, index) in currentTabImages.slice(0, 3)"
               :key="index"
               :src="img.url"
-              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee;"
+              style="width: 120px; height: 120px; border-radius: 4px; border: 1px solid #eee; cursor: pointer;"
               fit="cover"
-              :preview-src-list="currentTabImages.map(i => i.url)"
-              :preview-index="index"
+              @click="previewImage(index)"
             />
 
             <!-- 更多图片提示 -->
@@ -165,6 +164,14 @@
       </div>
     </div>
   </el-dialog>
+
+  <!-- 图片大图预览（显式打开，兼容手机触屏点击放大） -->
+  <el-image-viewer
+    v-if="previewVisible"
+    :url-list="previewUrls"
+    :initial-index="previewIndex"
+    @close="previewVisible = false"
+  />
 </template>
 
 <script setup>
@@ -231,15 +238,18 @@ function getProduceStatusText(status) {
 }
 
 
-// 预览所有图片
+// 预览所有图片（点击 "+N" 打开大图预览，从第一张开始）
+const previewVisible = ref(false)
+const previewIndex = ref(0)
+const previewUrls = computed(() => currentTabImages.value.map(i => i.url))
+
+function previewImage(index) {
+  previewIndex.value = index || 0
+  previewVisible.value = true
+}
+
 function previewAllImages() {
-  const images = currentTabImages.value
-  if (images.length > 0) {
-    const img = document.querySelector('.el-image')
-    if (img) {
-      img.click()
-    }
-  }
+  previewImage(0)
 }
 
 // 修改生产进度
