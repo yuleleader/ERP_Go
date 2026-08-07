@@ -81,12 +81,11 @@
       </el-card>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="680px" @closed="resetForm">
-      <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="100px">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" @closed="resetForm">
+      <el-tabs v-model="activeFormTab" class="user-form-tabs">
         <!-- 模块一：基础信息 -->
-        <div class="form-section">
-          <div class="form-section-title">基础信息</div>
-          <div class="form-section-body">
+        <el-tab-pane label="基础信息" name="basic">
+          <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="100px">
             <el-form-item label="用户名" prop="username">
               <el-input v-model="userForm.username" placeholder="请输入用户名" :disabled="dialogMode === 'edit'" />
             </el-form-item>
@@ -110,25 +109,23 @@
             <el-form-item label="启用状态">
               <el-switch v-model="userForm.is_active" />
             </el-form-item>
-          </div>
-        </div>
+          </el-form>
+        </el-tab-pane>
 
         <!-- 模块二：价格权限 -->
-        <div class="form-section">
-          <div class="form-section-title">价格权限</div>
-          <div class="form-section-body">
+        <el-tab-pane label="价格权限" name="price">
+          <div class="price-perm-block">
             <el-checkbox-group v-model="userForm.price_permissions">
               <el-checkbox value="cost_price">成本价</el-checkbox>
               <el-checkbox value="retail_price">零售价</el-checkbox>
               <el-checkbox value="min_price">最低售价</el-checkbox>
             </el-checkbox-group>
             <div class="price-perm-tip">
-              未勾选的价格，该账号在商品档案中显示为「***」；
-              老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
+              未勾选的价格，该账号在商品档案中显示为「***」；老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
             </div>
           </div>
-        </div>
-      </el-form>
+        </el-tab-pane>
+      </el-tabs>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -185,6 +182,8 @@ const dialogVisible = ref(false)
 const dialogMode = ref('create')
 const submitting = ref(false)
 const currentUserId = ref(null)
+// 新建/编辑对话框内的模块切换：basic=基础信息 / price=价格权限
+const activeFormTab = ref('basic')
 
 const userFormRef = ref(null)
 const userForm = reactive({
@@ -402,46 +401,16 @@ usersStore.fetchUsers()
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
-/* 新建/编辑用户：两大模块分组布局 */
-.form-section {
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  background: #fafbfc;
-  overflow: hidden;
+/* 新建/编辑用户：两个平级模块（选项卡切换） */
+.user-form-tabs {
+  min-height: 260px;
 }
 
-.form-section:last-child {
-  margin-bottom: 0;
-}
-
-.form-section-title {
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-  background: #f5f7fa;
-  border-bottom: 1px solid #ebeef5;
-  letter-spacing: 0.5px;
-}
-
-.form-section-title::before {
-  content: '';
-  display: inline-block;
-  width: 3px;
-  height: 12px;
-  background: #409eff;
-  margin-right: 8px;
-  vertical-align: middle;
-  border-radius: 2px;
-}
-
-.form-section-body {
-  padding: 16px 16px 4px;
-  background: #fff;
+.price-perm-block {
+  padding: 20px 4px;
 }
 
 @media (max-width: 900px) {
