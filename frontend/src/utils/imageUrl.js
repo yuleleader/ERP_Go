@@ -16,4 +16,40 @@ export function imageUrlWithToken(url) {
   return `${url}${sep}token=${encodeURIComponent(token)}`
 }
 
-export default { imageUrlWithToken }
+/**
+ * 将图片保存到设备（手机端：点击"保存"触发下载）。
+ * - Android Chrome/Edge：blob + a[download] 直接保存到下载目录/相册
+ * - iOS Safari：保存到"文件"App（iOS 13+）；如需存相册可在预览界面长按图片
+ *   走系统菜单"存储图像"
+ * - 失败时降级：新窗口打开原图，用户可长按保存
+ * @param {string} url - 图片完整 URL（可含 ?token=）
+ * @returns {Promise<boolean>} 是否成功触发保存
+ */
+export async function saveImageByUrl(url) {
+  if (!url) return false
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) throw new Error(`fetch ${resp.status}`)
+    const blob = await resp.blob()
+    let ext = (blob.type || 'image/jpeg').split('/')[1] || 'jpg'
+    if (ext === 'jpeg') ext = 'jpg'
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `image_${Date.now()}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    return true
+  } catch (e) {
+    // 降级：新窗口打开原图（用户可长按/右键保存）
+    try {
+      window.open(url, '_blank')
+    } catch (e2) {
+      /* ignore */
+    }
+    return false
+  }
+}
+
+export default { imageUrlWithToken, saveImageByUrl }

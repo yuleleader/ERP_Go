@@ -659,6 +659,12 @@
           style="max-width: 100%; max-height: 75vh; object-fit: contain;"
           alt="商品图片"
         />
+        <div v-if="previewImageList.length > 0" class="image-save-bar">
+          <el-button size="small" type="primary" plain @click="savePreviewImage">
+            保存当前图片
+          </el-button>
+          <span class="image-save-hint">长按图片可调出系统保存菜单</span>
+        </div>
         <el-button
           v-if="previewImageList.length > 1"
           class="image-prev-btn"
@@ -709,7 +715,7 @@
 
 <script setup>
 import { formatDate, formatDateTime } from '@/utils/format'
-import { imageUrlWithToken } from '@/utils/imageUrl'
+import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 /**
  * 通用订单列表组件（多角色动态权限版）
  *
@@ -1955,6 +1961,20 @@ function nextImage() {
 }
 
 /**
+ * 保存当前预览图片到设备（手机端下载）
+ */
+async function savePreviewImage() {
+  const url = previewImageList.value[previewImageIndex.value]
+  if (!url) return
+  const ok = await saveImageByUrl(url)
+  if (ok) {
+    ElMessage.success('已开始保存图片')
+  } else {
+    ElMessage.info('已在新窗口打开原图，长按图片可保存')
+  }
+}
+
+/**
  * 预览二维码
  * @param {Object} row - 订单行数据
  */
@@ -2441,6 +2461,27 @@ defineExpose({ filterBy, setFilters })
   background: rgba(0, 0, 0, 0.3) !important;
   color: #fff !important;
   border: none !important;
+}
+
+/* 图片底部保存栏 */
+.image-save-bar {
+  position: absolute;
+  bottom: 46px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  z-index: 10;
+}
+
+.image-save-hint {
+  font-size: 12px;
+  color: #ccc;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 
 .image-prev-btn {

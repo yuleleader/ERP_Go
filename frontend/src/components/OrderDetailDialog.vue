@@ -165,18 +165,22 @@
     </div>
   </el-dialog>
 
-  <!-- 图片大图预览（显式打开，兼容手机触屏点击放大） -->
+  <!-- 图片大图预览（显式打开，兼容手机触屏点击放大；支持保存） -->
   <el-image-viewer
     v-if="previewVisible"
     :url-list="previewUrls"
     :initial-index="previewIndex"
     @close="previewVisible = false"
-  />
+  >
+    <template #toolbar>
+      <div class="viewer-save-btn" @click="savePreviewImage" title="保存图片">保存</div>
+    </template>
+  </el-image-viewer>
 </template>
 
 <script setup>
 import { formatDate, formatDateTime } from '@/utils/format'
-import { imageUrlWithToken } from '@/utils/imageUrl'
+import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ref, computed, watch } from 'vue'
 import { getOrder, updateOrder } from '@/api/order'
 import { getOrderImages } from '@/api/image'
@@ -250,6 +254,18 @@ function previewImage(index) {
 
 function previewAllImages() {
   previewImage(0)
+}
+
+// 保存当前预览图片到设备
+async function savePreviewImage() {
+  const url = previewUrls.value[previewIndex.value]
+  if (!url) return
+  const ok = await saveImageByUrl(url)
+  if (ok) {
+    ElMessage.success('已开始保存图片')
+  } else {
+    ElMessage.info('已在新窗口打开原图，长按图片可保存')
+  }
 }
 
 // 修改生产进度
@@ -374,5 +390,21 @@ function handleClosed() {
   color: #409eff !important;
   font-weight: bold;
   border-bottom: 2px solid #409eff;
+}
+
+/* 大图预览"保存"按钮（el-image-viewer toolbar 插槽） */
+.viewer-save-btn {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+.viewer-save-btn:active {
+  background: rgba(0, 0, 0, 0.55);
 }
 </style>

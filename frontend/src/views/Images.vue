@@ -33,10 +33,9 @@
           <template #default="{ row }">
             <el-image
               :src="imageUrlWithToken(row.image_url)"
-              style="width: 60px; height: 60px;"
+              style="width: 60px; height: 60px; cursor: pointer;"
               fit="cover"
-              :preview-src-list="[imageUrlWithToken(row.image_url)]"
-              preview-teleported
+              @click="previewImage(row)"
             />
           </template>
         </el-table-column>
@@ -60,16 +59,48 @@
       />
     </el-card>
   </div>
+
+  <!-- 大图预览（显式打开，兼容手机触屏） -->
+  <el-image-viewer
+    v-if="previewVisible"
+    :url-list="previewList"
+    :initial-index="0"
+    @close="previewVisible = false"
+  >
+    <template #toolbar>
+      <div class="viewer-save-btn" @click="savePreviewImage" title="保存图片">保存</div>
+    </template>
+  </el-image-viewer>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'
-import { imageUrlWithToken } from '@/utils/imageUrl'
+import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const loading = ref(false)
 const images = ref([])
+
+// 大图预览状态
+const previewVisible = ref(false)
+const previewList = ref([])
+
+function previewImage(row) {
+  previewList.value = [imageUrlWithToken(row.image_url)]
+  previewVisible.value = true
+}
+
+async function savePreviewImage() {
+  const url = previewList.value[0]
+  if (!url) return
+  const ok = await saveImageByUrl(url)
+  if (ok) {
+    ElMessage.success('已开始保存图片')
+  } else {
+    ElMessage.info('已在新窗口打开原图，长按图片可保存')
+  }
+}
 
 const filters = reactive({
   orderId: ''
@@ -137,5 +168,21 @@ onMounted(() => {
 
 .filter-form {
   margin-bottom: 20px;
+}
+
+/* 大图预览"保存"按钮（el-image-viewer toolbar 插槽） */
+.viewer-save-btn {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+.viewer-save-btn:active {
+  background: rgba(0, 0, 0, 0.55);
 }
 </style>
