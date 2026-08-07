@@ -142,7 +142,10 @@
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
           <span style="font-size: 16px; font-weight: bold;">订单详情</span>
-          <el-button type="primary" size="small" @click="printOrderDetail">打印</el-button>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <el-button type="primary" size="small" @click="printOrderDetail">打印</el-button>
+            <div class="last-print-time">{{ lastPrintText }}</div>
+          </div>
         </div>
       </template>
 
@@ -300,7 +303,7 @@ import { useRouter } from 'vue-router'
 import { Picture, Van, Bell, Box, Search, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification } from '@/api/notification'
-import { getOrder, updateOrder } from '@/api/order'
+import { getOrder, updateOrder, markOrderPrinted } from '@/api/order'
 import { getOrderImages } from '@/api/image'
 import { useUserStore } from '@/store/user'
 
@@ -332,6 +335,19 @@ const orderDetailVisible = ref(false)
 const orderDetailData = ref(null)
 const orderQrCodeUrl = ref('')
 const notifSelectedProduceStatus = ref('')
+
+// 当前站内信订单详情的上次打印时间显示
+const lastPrintText = computed(() => {
+  const t = orderDetailData.value?.last_print_at
+  if (!t) return '未打印'
+  try {
+    const d = new Date(t)
+    const pad = n => String(n).padStart(2, '0')
+    return `上次打印时间：${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch (e) {
+    return '上次打印时间：' + t
+  }
+})
 
 // 通知详情弹窗内"修改生产状态"是否可用：已发货/已虚拟发货不可改；销售仅可改自己创建的订单
 const canNotifChangeProduceStatus = computed(() => {
@@ -579,10 +595,21 @@ function getFirstOrderProductImage() {
   return ''
 }
 
-// 打印订单详情
-function printOrderDetail() {
+// 打印订单详情（先标记打印时间，再开打印窗口）
+async function printOrderDetail() {
   if (!orderDetailData.value) return
   const order = orderDetailData.value
+  // 标记打印（更新 last_print_at）
+  try {
+    const updated = await markOrderPrinted(order.order_id || order.orderId)
+    const data = updated?.data || updated
+    if (data) {
+      order.last_print_at = data.last_print_at
+    }
+  } catch (e) {
+    console.warn('标记打印时间失败：', e)
+  }
+
   const firstImg = getFirstOrderProductImage()
 
   const printContent = `<!DOCTYPE html>
@@ -1028,6 +1055,16 @@ onMounted(() => {
   gap: 20px;
   font-size: 14px;
   color: #666;
+}
+
+/* 站内信订单详情"打印"按钮下方的上次打印时间显示 */
+.last-print-time {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* 大图预览"保存"按钮（el-image-viewer toolbar 插槽） */

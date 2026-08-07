@@ -79,3 +79,15 @@ export function generateOrderPreview(shopId) {
     responseType: 'blob'
   })
 }
+
+/**
+ * 标记订单已打印（更新 last_print_at），返回最新的 OrderResponse
+ * @param {string} orderId
+ * @returns {Promise} 最新订单数据（含 last_print_at）
+ */
+export function markOrderPrinted(orderId) {
+  return request({
+    url: `/orders/${orderId}/mark-printed`,
+    method: 'post'
+  })
+}

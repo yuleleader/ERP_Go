@@ -129,6 +129,7 @@ class OrderResponse(OrderBase):
     produce_status: Optional[str] = None
     produce_status_update_at: Optional[datetime] = None
     produce_status_update_user: Optional[str] = None
+    last_print_at: Optional[datetime] = None  # 上次打印时间，NULL 表示未打印
 
     class Config:
         from_attributes = True

@@ -71,6 +71,7 @@ class Order(Base):
     produce_status = Column(String(20), default="unproduce", nullable=False)
     produce_status_update_at = Column(DateTime, nullable=True)
     produce_status_update_user = Column(String(50), nullable=True)
+    last_print_at = Column(DateTime, nullable=True)  # 上次打印时间（任一端点过打印按钮即更新）
     updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
 
 class Image(Base):

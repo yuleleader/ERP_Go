@@ -11,7 +11,10 @@
           ← 返回订单列表
         </el-button>
         <span style="font-size: 16px; font-weight: bold;">订单详情</span>
-        <span></span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <el-button type="text" @click="printOrder" style="font-size: 14px; padding: 0; color: #409EFF;">打印</el-button>
+          <div class="last-print-time">{{ lastPrintText }}</div>
+        </div>
       </div>
     </template>
 
@@ -182,7 +185,7 @@
 import { formatDate, formatDateTime } from '@/utils/format'
 import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ref, computed, watch } from 'vue'
-import { getOrder, updateOrder } from '@/api/order'
+import { getOrder, updateOrder, markOrderPrinted } from '@/api/order'
 import { getOrderImages } from '@/api/image'
 import { ElMessage } from 'element-plus'
 
@@ -269,6 +272,72 @@ async function savePreviewImage() {
 }
 
 // 修改生产进度
+// 上次打印时间显示（持久化字段，未打印显示"未打印"）
+const lastPrintText = computed(() => {
+  const t = order.value?.last_print_at
+  if (!t) return '未打印'
+  try {
+    const d = new Date(t)
+    const pad = n => String(n).padStart(2, '0')
+    return `上次打印时间：${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch (e) {
+    return '上次打印时间：' + t
+  }
+})
+
+// 打印订单：先标记打印时间，再打开打印预览窗口
+async function printOrder() {
+  const o = order.value
+  if (!o || !o.order_id) {
+    ElMessage.warning('订单未加载完成')
+    return
+  }
+  try {
+    const updated = await markOrderPrinted(o.order_id)
+    const data = updated?.data || updated
+    if (data && data.last_print_at) {
+      o.last_print_at = data.last_print_at
+    }
+  } catch (e) {
+    console.warn('标记打印时间失败：', e)
+  }
+  // 复用浏览器原生打印（与新建/编辑弹窗打开同源订单页场景一致）
+  try {
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    if (printWindow) {
+      printWindow.document.write(buildPrintHtml(o))
+      printWindow.document.close()
+    }
+  } catch (e) {
+    ElMessage.error('打开打印窗口失败')
+  }
+}
+
+// 构造 A4 打印预览 HTML（简化版：核心信息 + 二维码）
+function buildPrintHtml(o) {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>订单打印</title>
+<style>body{font-family:"SimSun","宋体",serif;padding:10mm;color:#000}
+.sheet{width:210mm;min-height:120mm;background:#fff;margin:0 auto;padding:10mm;border:1px solid #ddd}
+.title{text-align:center;font-size:20pt;font-weight:bold;letter-spacing:4pt;margin-bottom:8mm;padding-bottom:4mm;border-bottom:2pt solid #222}
+.row{display:flex;gap:10px;padding:6px 0;font-size:12pt}
+.row .k{flex:0 0 90px;color:#666}
+.row .v{flex:1;word-break:break-all}
+.btn{display:block;margin:0 auto 8mm;padding:8px 24px;border:0;background:#1a56a3;color:#fff;border-radius:4px;font-size:14pt;cursor:pointer}
+</style></head><body>
+<button class="btn" onclick="window.print()">点击打印单据</button>
+<div id="printTimeDisplay" style="text-align:center;margin:10px auto 0;color:#666;font-size:14px;font-family:'Microsoft YaHei',sans-serif;"></div>
+<div class="sheet">
+<div class="title">订 货 单 据</div>
+<div class="row"><span class="k">订单号</span><span class="v">${esc(o.order_id)}</span></div>
+<div class="row"><span class="k">平台订单号</span><span class="v">${esc(o.platform_order_no)}</span></div>
+<div class="row"><span class="k">商品名称</span><span class="v">${esc(o.product_name)}</span></div>
+<div class="row"><span class="k">收货地址</span><span class="v">${esc(o.receiver_address)}</span></div>
+<div class="row"><span class="k">物流公司</span><span class="v">${esc(o.logistics_company)}</span></div>
+<div class="row"><span class="k">运单号</span><span class="v">${esc(o.logistics_no)}</span></div>
+</div></body></html>`
+}
+
 async function handleUpdateProduceStatus(newStatus) {
   if (!newStatus || !order.value.order_id) return
   // 如果没变化则忽略
@@ -390,6 +459,16 @@ function handleClosed() {
   color: #409eff !important;
   font-weight: bold;
   border-bottom: 2px solid #409eff;
+}
+
+/* 订单详情弹窗"打印"按钮下方的上次打印时间显示 */
+.last-print-time {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* 大图预览"保存"按钮（el-image-viewer toolbar 插槽） */

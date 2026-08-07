@@ -310,7 +310,8 @@ async def get_orders(
             "order_days": order.order_days,
             "produce_status": order.produce_status,
             "produce_status_update_at": order.produce_status_update_at,
-            "produce_status_update_user": order.produce_status_update_user
+            "produce_status_update_user": order.produce_status_update_user,
+            "last_print_at": order.last_print_at,
         }
 
         if order.created_by:
@@ -369,7 +370,8 @@ async def get_order(
         "order_days": order.order_days,
         "produce_status": order.produce_status,
         "produce_status_update_at": order.produce_status_update_at,
-        "produce_status_update_user": order.produce_status_update_user
+        "produce_status_update_user": order.produce_status_update_user,
+        "last_print_at": order.last_print_at,
     }
 
     if order.created_by:
@@ -620,7 +622,8 @@ async def update_order(
         "order_days": order.order_days,
         "produce_status": order.produce_status,
         "produce_status_update_at": order.produce_status_update_at,
-        "produce_status_update_user": order.produce_status_update_user
+        "produce_status_update_user": order.produce_status_update_user,
+        "last_print_at": order.last_print_at,
     }
 
     if order.created_by:
@@ -632,6 +635,39 @@ async def update_order(
         order_dict["creator_real_name"] = None
 
     return OrderResponse(**order_dict)
+
+
+@router.post("/{order_id}/mark-printed", response_model=OrderResponse)
+async def mark_order_printed(
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """点击"打印"按钮时调用，将订单的 last_print_at 设为当前时间（beijing）。
+    无论是否真的打出纸张，只要点了打印按钮即视为"打印过"并记录。
+    """
+    result = await db.execute(select(Order).where(Order.order_id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    order.last_print_at = beijing_now()
+    await db.commit()
+    await db.refresh(order)
+
+    # 操作日志
+    db.add(OperationLog(
+        username=current_user.username,
+        operation_type="订单打印",
+        operation_content=f"标记订单 {order.order_id} 已打印"
+    ))
+    await db.commit()
+
+    # 构造响应（复用 update_order 的字段补全逻辑，保持与列表/详情一致）
+    order_dict = {c.key: getattr(order, c.key) for c in order.__table__.columns}
+    if "creator_real_name" not in order_dict or order_dict.get("creator_real_name") is None:
+        order_dict["creator_real_name"] = None
+    return OrderResponse(**order_dict)
+
 
 @router.delete("/{order_id}", status_code=200)
 async def delete_order(

@@ -488,7 +488,7 @@
             ← 返回订单列表
           </el-button>
           <span style="font-size: 16px; font-weight: bold;">订单详情</span>
-          <div style="display: flex; gap: 16px;">
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
             <el-button
               type="text"
               @click="printOrder"
@@ -496,6 +496,7 @@
             >
               打印
             </el-button>
+            <div class="last-print-time">{{ lastPrintText }}</div>
           </div>
         </div>
       </template>
@@ -734,7 +735,7 @@ import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { getOrders, createOrder, updateOrder, deleteOrder, getOrder } from '@/api/order'
+import { getOrders, createOrder, updateOrder, deleteOrder, getOrder, markOrderPrinted } from '@/api/order'
 import { getUsers } from '@/api/user'
 import { getShops } from '@/api/shop'
 import { migrateImage, getOrderImages, deleteImage } from '@/api/image'
@@ -794,6 +795,20 @@ const qrPreviewUrl = ref('')
 // 当前操作的订单
 const currentOrder = ref({})
 const currentDeleteOrder = ref(null)
+
+// 当前订单的上次打印时间显示（点击打印后实时刷新）
+const lastPrintText = computed(() => {
+  const t = currentOrder.value?.last_print_at
+  if (!t) return '未打印'
+  // t 形如 "2026-08-07T17:30:00" 或 ISO 字符串，转本地友好格式
+  try {
+    const d = new Date(t)
+    const pad = n => String(n).padStart(2, '0')
+    return `上次打印时间：${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch (e) {
+    return '上次打印时间：' + t
+  }
+})
 
 // 生产状态对话框
 const produceStatusDialogVisible = ref(false)
@@ -1702,8 +1717,9 @@ async function handleDeleteOrder() {
 /**
  * 打印订单详情 - A4纸张商品单据格式
  * 严格按照设计模板：标题 + 左侧信息（层级字号） + 右侧二维码 + 分隔线 + 商品大图
+ * 点击打印按钮时先调 markOrderPrinted 写入 last_print_at，再打开打印窗口。
  */
-function printOrder() {
+async function printOrder() {
   if (!currentOrder.value || !currentOrder.value.order_id) {
     ElMessage.error('请先选择订单')
     return
@@ -1711,6 +1727,18 @@ function printOrder() {
 
   const order = currentOrder.value
   const firstProductImage = getFirstProductImageUrl()
+
+  // 1. 先标记打印（更新 last_print_at 为当前时间），拿到最新订单数据
+  try {
+    const updated = await markOrderPrinted(order.order_id)
+    const data = updated?.data || updated
+    if (data) {
+      order.last_print_at = data.last_print_at
+    }
+  } catch (e) {
+    // 标记失败也不阻塞打印（避免打印流程被网络问题卡住），仅提示
+    console.warn('标记打印时间失败：', e)
+  }
 
   const printContent = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -2496,6 +2524,16 @@ defineExpose({ filterBy, setFilters })
 :deep(.image-prev-btn:hover),
 :deep(.image-next-btn:hover) {
   background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 订单详情弹窗"打印"按钮下方的上次打印时间显示 */
+.last-print-time {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* 图片计数器样式 */
