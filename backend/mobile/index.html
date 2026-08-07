@@ -33,9 +33,25 @@
   video { width:100%; display:block; }
   .scan-close { position:absolute; top:10px; right:10px; background:rgba(0,0,0,.5); color:#fff; border:0; border-radius:8px; padding:6px 12px; }
   .img-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-  .img-card { position:relative; aspect-ratio:1/1; background:#f8fafc; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .img-card { position:relative; aspect-ratio:1/1; background:#f8fafc; border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; }
   .img-card img { width:100%; height:100%; object-fit:cover; }
   .img-card .tag { position:absolute; left:0; bottom:0; background:rgba(0,0,0,.55); color:#fff; font-size:11px; padding:2px 6px; border-top-right-radius:8px; }
+
+  /* 全屏图片预览层（点击缩略图放大；原生长按可调出系统保存菜单） */
+  .viewer { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.94);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  .viewer img { max-width:94vw; max-height:88vh; object-fit:contain; -webkit-user-drag:none; }
+  .viewer-close { position:absolute; top:14px; right:14px; width:40px; height:40px; border-radius:50%;
+    background:rgba(255,255,255,.15); color:#fff; border:0; font-size:22px; line-height:1; cursor:pointer; }
+  .viewer-nav { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:60px;
+    background:rgba(255,255,255,.12); color:#fff; border:0; border-radius:10px; font-size:30px; cursor:pointer; }
+  .viewer-prev { left:8px; }
+  .viewer-next { right:8px; }
+  .viewer-count { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#ddd;
+    font-size:14px; letter-spacing:1px; }
+  .viewer-hint { position:absolute; bottom:52px; left:0; right:0; text-align:center; color:#999;
+    font-size:12px; }
+
   .toast { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,.82); color:#fff; padding:12px 20px; border-radius:10px; font-size:15px; z-index:99; opacity:0; transition:opacity .2s; pointer-events:none; }
   .toast.show { opacity:1; }
   .field-hint { font-size:12px; color:var(--muted); margin-top:4px; }
@@ -131,6 +147,16 @@
 
   <div id="toast" class="toast"></div>
   <input id="qrFileInput" type="file" accept="image/*" style="display:none">
+
+  <!-- 全屏图片预览层 -->
+  <div id="viewer" class="viewer hidden">
+    <button id="viewerClose" class="viewer-close" aria-label="关闭">✕</button>
+    <button id="viewerPrev" class="viewer-nav viewer-prev" aria-label="上一张">‹</button>
+    <img id="viewerImg" src="" alt="预览图片">
+    <button id="viewerNext" class="viewer-nav viewer-next" aria-label="下一张">›</button>
+    <div class="viewer-hint">长按图片可保存到相册</div>
+    <div id="viewerCount" class="viewer-count"></div>
+  </div>
 </div>
 
 <script src="jsQR.js"></script>
@@ -161,7 +187,7 @@
     ["commission_amount","佣金"]
   ];
 
-  const state = { token:null, user:null, orderId:null, order:null, stream:null, raf:null, logisticsCompanies:[] };
+  const state = { token:null, user:null, orderId:null, order:null, stream:null, raf:null, logisticsCompanies:[], imageUrls:[], viewerIndex:0 };
 
   const $ = (id) => document.getElementById(id);
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -425,14 +451,17 @@
     try{
       const resp=await api("/api/images/list/"+encodeURIComponent(state.orderId));
       const list=resp.data||[];
-      let html="";
-      (list||[]).forEach(img=>{
-        const tag = img.layer ? (LAYER_LABEL[img.layer]||img.layer) : "";
+      // 保存当前订单图片 URL 数组（全屏预览用）
+      state.imageUrls = (list||[]).map(img=>{
         const url = img.image_url || "";
         // 图片接口需登录鉴权（?token=），img 标签无法带请求头，故在 URL 上附带登录令牌
         const t = localStorage.getItem("m_token");
-        const imgUrl = url && t ? url + (url.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(t) : url;
-        html+='<div class="img-card"><img src="'+esc(imgUrl)+'" alt=""><span class="tag">'+esc(tag)+'</span></div>';
+        return url && t ? url + (url.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(t) : url;
+      });
+      let html="";
+      (list||[]).forEach((img, idx)=>{
+        const tag = img.layer ? (LAYER_LABEL[img.layer]||img.layer) : "";
+        html+='<div class="img-card" data-index="'+idx+'"><img src="'+esc(state.imageUrls[idx])+'" alt=""><span class="tag">'+esc(tag)+'</span></div>';
       });
       $("images").innerHTML = html || '<div class="muted">暂无图片</div>';
     }catch(err){ $("images").innerHTML='<div class="muted">图片加载失败</div>'; }
@@ -448,6 +477,36 @@
       toast("上传成功");
     }catch(err){ toast(err.message); }
     $("uploadInput").value="";
+  }
+
+  // ---------- 全屏图片预览 ----------
+  function openViewer(idx){
+    if(!state.imageUrls || !state.imageUrls.length) return;
+    state.viewerIndex = Math.max(0, Math.min(idx||0, state.imageUrls.length-1));
+    renderViewer();
+    $("viewer").classList.remove("hidden");
+  }
+  function renderViewer(){
+    const i = state.viewerIndex;
+    $("viewerImg").src = state.imageUrls[i] || "";
+    $("viewerCount").textContent = (i+1) + " / " + state.imageUrls.length;
+    const multi = state.imageUrls.length > 1;
+    $("viewerPrev").style.display = multi ? "" : "none";
+    $("viewerNext").style.display = multi ? "" : "none";
+  }
+  function closeViewer(){
+    $("viewer").classList.add("hidden");
+    $("viewerImg").src = "";
+  }
+  function viewerPrev(){
+    const n = state.imageUrls.length;
+    state.viewerIndex = (state.viewerIndex - 1 + n) % n;
+    renderViewer();
+  }
+  function viewerNext(){
+    const n = state.imageUrls.length;
+    state.viewerIndex = (state.viewerIndex + 1) % n;
+    renderViewer();
   }
 
   // ---------- 初始化 ----------
@@ -469,6 +528,20 @@
     $("backBtn").addEventListener("click", ()=>show("view-home"));
     $("saveBtn").addEventListener("click", saveEdit);
     $("uploadInput").addEventListener("change", doUpload);
+
+    // 图片网格点击 → 全屏预览（事件委托）
+    $("images").addEventListener("click", (e)=>{
+      const card = e.target.closest ? e.target.closest(".img-card") : null;
+      if(!card) return;
+      openViewer(parseInt(card.getAttribute("data-index")||"0", 10));
+    });
+    // 预览层操作
+    $("viewerClose").addEventListener("click", closeViewer);
+    $("viewerPrev").addEventListener("click", viewerPrev);
+    $("viewerNext").addEventListener("click", viewerNext);
+    $("viewer").addEventListener("click", (e)=>{
+      if(e.target && e.target.id === "viewer") closeViewer();  // 点空白处关闭
+    });
 
     const t=localStorage.getItem("m_token");
     if(t){
