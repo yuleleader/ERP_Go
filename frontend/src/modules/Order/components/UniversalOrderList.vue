@@ -32,7 +32,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="创建人" v-if="isBoss">
-          <el-select v-model="filters.createdBy" placeholder="全部" clearable @change="fetchOrders" style="width: 180px;">
+          <el-select v-model="filters.createdBy" placeholder="全部" clearable @change="fetchOrders" style="width: 130px;">
             <el-option label="全部" value="" />
             <el-option
               v-for="u in userOptions"
@@ -43,7 +43,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="关键词">
-          <el-input v-model="filters.keyword" placeholder="追溯码/商品名称" clearable @change="fetchOrders" />
+          <el-input v-model="filters.keyword" placeholder="追溯码/商品名称" clearable class="keyword-input" @change="fetchOrders" />
         </el-form-item>
         <el-form-item v-if="filters.overdue">
           <el-tag type="warning" closable @close="clearOverdueFilter">
@@ -2198,10 +2198,25 @@ defineExpose({ filterBy, setFilters })
 
 .filter-form {
   margin-bottom: 20px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filter-form .el-form-item {
+  margin-right: 0;
+  margin-bottom: 0;
 }
 
 .filter-form .el-select {
-  width: 150px;
+  width: 130px;
+}
+
+.filter-form .keyword-input {
+  width: 170px;
 }
 
 .filter-form .el-select :deep(.el-input__wrapper) {
