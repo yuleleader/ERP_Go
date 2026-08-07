@@ -1332,10 +1332,18 @@ async def get_shop_sales_summary(
         query = query.where(Order.created_at < end_dt)
     rows = (await db.execute(query)).all()
 
-    # 网店创建者映射
+    # 网店创建者映射（用户名 → 真实姓名）
     shop_creator = {}
     for s in (await db.execute(select(Shop))).scalars().all():
         shop_creator[s.shop_id] = s.creator
+    user_name_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_name_map[u.username] = u.real_name or u.username
+
+    def creator_display(username):
+        if not username:
+            return "未知"
+        return user_name_map.get(username) or username
 
     groups = {}
     for r in rows:
@@ -1347,7 +1355,7 @@ async def get_shop_sales_summary(
             amt = 0.0
         g = groups.get(key)
         if g is None:
-            g = {"shop_id": sid, "creator": shop_creator.get(sid) or "未知",
+            g = {"shop_id": sid, "creator": creator_display(shop_creator.get(sid)),
                  "sales_amount": 0.0, "total_orders": 0,
                  "refund_amount": 0.0, "refund_count": 0}
             groups[key] = g
