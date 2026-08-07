@@ -106,10 +106,10 @@
             size="small"
             max-height="calc(100vh - 220px)"
           >
-            <el-table-column prop="platform_order_no" label="平台订单号" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="product_name" label="商品名称" min-width="160" show-overflow-tooltip />
-            <el-table-column prop="shipping_status_text" label="订单状态" width="110" align="center" />
-            <el-table-column label="订单金额" width="110" align="right">
+            <el-table-column prop="platform_order_no" label="平台订单号" width="130" show-overflow-tooltip />
+            <el-table-column prop="product_name" label="商品名称" width="105" show-overflow-tooltip />
+            <el-table-column prop="shipping_status_text" label="订单状态" width="90" align="center" />
+            <el-table-column label="订单金额" width="95" align="right">
               <template #default="{ row }">¥{{ fmt(row.sales_amount) }}</template>
             </el-table-column>
           </el-table>
