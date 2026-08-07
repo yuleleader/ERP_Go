@@ -122,43 +122,33 @@
         <!-- 模块二：价格权限 -->
         <el-tab-pane label="价格权限" name="price">
           <div class="price-perm-block">
-            <div class="price-perm-row">
-              <div class="price-perm-left">
-                <el-checkbox-group v-model="userForm.price_permissions">
-                  <el-checkbox value="cost_price">成本价</el-checkbox>
-                  <el-checkbox value="retail_price">零售价</el-checkbox>
-                  <el-checkbox value="min_price">最低售价</el-checkbox>
-                </el-checkbox-group>
-                <div class="price-perm-tip">
-                  未勾选的价格，该账号在商品档案中显示为「***」；老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
-                </div>
-              </div>
-              <div class="price-perm-right">
-                <el-button type="primary" plain @click="openDataPermissionDialog">数据权限</el-button>
-                <div class="price-perm-tip">配置类别 / 品牌 / 商品档案的增删改权限</div>
-              </div>
+            <el-checkbox-group v-model="userForm.price_permissions">
+              <el-checkbox value="cost_price">成本价</el-checkbox>
+              <el-checkbox value="retail_price">零售价</el-checkbox>
+              <el-checkbox value="min_price">最低售价</el-checkbox>
+            </el-checkbox-group>
+            <div class="price-perm-tip">
+              未勾选的价格，该账号在商品档案中显示为「***」；老板端不受此限制；新建用户默认不勾选（即默认全部价格不可见）。
             </div>
           </div>
         </el-tab-pane>
-      </el-tabs>
 
-      <!-- 数据权限配置弹窗 -->
-      <el-dialog v-model="dataPermDialogVisible" title="数据权限管理" width="560px">
-        <div class="dp-module" v-for="m in dataPermModules" :key="m.key">
-          <div class="dp-module-name">{{ m.label }}</div>
-          <el-checkbox-group v-model="dataPermForm[m.key]">
-            <el-checkbox value="add">新增</el-checkbox>
-            <el-checkbox value="edit">修改</el-checkbox>
-            <el-checkbox value="delete">删除</el-checkbox>
-          </el-checkbox-group>
-          <div class="dp-module-hint">{{ m.hint }}</div>
-        </div>
-        <div class="dp-tip">未勾选的操作，该账号在此模块看不到对应按钮、接口也会拒绝。老板端不受此限制。</div>
-        <template #footer>
-          <el-button @click="dataPermDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="dataPermDialogVisible = false">确定</el-button>
-        </template>
-      </el-dialog>
+        <!-- 模块三：数据权限（与价格权限平级；红色字体提示注意） -->
+        <el-tab-pane label="数据权限" name="dataPermission">
+          <div class="data-perm-block">
+            <div class="data-perm-module" v-for="m in dataPermModules" :key="m.key">
+              <div class="data-perm-module-name">{{ m.label }}</div>
+              <el-checkbox-group v-model="dataPermForm[m.key]">
+                <el-checkbox value="add">新增</el-checkbox>
+                <el-checkbox value="edit">修改</el-checkbox>
+                <el-checkbox value="delete">删除</el-checkbox>
+              </el-checkbox-group>
+              <div class="data-perm-module-hint">{{ m.hint }}</div>
+            </div>
+            <div class="data-perm-tip">未勾选的操作，该账号在此模块看不到对应按钮、接口也会拒绝；老板端不受此限制；新建用户默认不勾选（即默认无任何数据权限）。</div>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -216,7 +206,7 @@ const dialogVisible = ref(false)
 const dialogMode = ref('create')
 const submitting = ref(false)
 const currentUserId = ref(null)
-// 新建/编辑对话框内的模块切换：basic=基础信息 / price=价格权限
+// 新建/编辑对话框内的模块切换：basic=基础信息 / price=价格权限 / dataPermission=数据权限
 const activeFormTab = ref('basic')
 
 const userFormRef = ref(null)
@@ -237,13 +227,9 @@ const dataPermModules = [
   { key: 'brand', label: '品牌', hint: '品牌管理页面的新增 / 修改 / 删除' },
   { key: 'product', label: '商品档案', hint: '商品管理页面的新建 / 编辑 / 删除' }
 ]
-const dataPermDialogVisible = ref(false)
 // 数据权限表单：{ category: [], brand: [], product: [] }
+// 新建账号时默认全空（用户要求"默认不勾选"，任何勾选都必须由创建者显式打开）
 const dataPermForm = reactive({ category: [], brand: [], product: [] })
-
-function openDataPermissionDialog() {
-  dataPermDialogVisible.value = true
-}
 
 // JSON 字符串 → 对象（编辑回显）
 function parseDataPermissions(raw) {
@@ -258,6 +244,13 @@ function parseDataPermissions(raw) {
     /* 解析失败按无权限 */
   }
   return out
+}
+
+// 把数据权限三个数组归零（新建账号时使用）
+function resetDataPermissions() {
+  dataPermForm.category = []
+  dataPermForm.brand = []
+  dataPermForm.product = []
 }
 
 const userRules = {
@@ -280,12 +273,25 @@ function getRoleText(role) {
 
 function showCreateDialog() {
   dialogMode.value = 'create'
+  currentUserId.value = null
+  // 新建账号：重置全部表单字段为默认值，确保价格权限 / 数据权限"默认不勾选"
+  // （如果不重置，会沿用上次编辑账号时残留的勾选）
+  userForm.username = ''
+  userForm.real_name = ''
+  userForm.password = ''
+  userForm.role = 'sales'
+  userForm.commission_rate = 10
+  userForm.price_permissions = []
+  userForm.is_active = true
+  resetDataPermissions()
+  activeFormTab.value = 'basic'
   dialogVisible.value = true
 }
 
 function editUser(row) {
   dialogMode.value = 'edit'
   currentUserId.value = row.id
+  activeFormTab.value = 'basic'
   userForm.username = row.username
   userForm.real_name = row.real_name
   userForm.role = row.role
@@ -493,54 +499,51 @@ usersStore.fetchUsers()
   margin-top: 10px;
 }
 
-/* 价格权限区左右布局（勾选框 | 数据权限按钮） */
-.price-perm-row {
+/* 数据权限（独立 tab，与价格权限平级） */
+.data-perm-block {
   display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.price-perm-left {
-  flex: 1;
-  min-width: 220px;
-}
-
-.price-perm-right {
-  flex: 0 0 auto;
-  text-align: center;
-  padding-top: 4px;
-}
-
-/* 数据权限配置弹窗 */
-.dp-module {
+.data-perm-module {
   border: 1px solid #ebeef5;
   border-radius: 8px;
   padding: 14px 16px;
-  margin-bottom: 14px;
   background: #fafbfc;
 }
 
-.dp-module-name {
+.data-perm-module-name {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
   margin-bottom: 8px;
 }
 
-.dp-module-hint {
+.data-perm-module-hint {
   font-size: 12px;
   color: #909399;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
-.dp-tip {
+.data-perm-tip {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
-  background: #f5f7fa;
-  border-radius: 6px;
-  padding: 8px 12px;
+  margin-top: 4px;
+}
+
+/* 第三个 tab"数据权限"红色字体（与价格权限平级，提醒注意） */
+.user-form-tabs .el-tabs__item:nth-child(3) {
+  color: #f56c6c;
+}
+
+.user-form-tabs .el-tabs__item:nth-child(3):hover {
+  color: #f56c6c;
+}
+
+.user-form-tabs .el-tabs__item:nth-child(3).is-active {
+  color: #f56c6c;
 }
 
 /* 新建/编辑用户：两个平级模块（选项卡切换） */
