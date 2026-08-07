@@ -417,8 +417,8 @@ const userStore = useUserStore()
 
 // 商品管理对所有人员开放查看
 const canManageProducts = computed(() => true)
-// 仅老板端/销售端可编辑、上传图片
-const canEditProducts = computed(() => ['boss', 'sales'].includes(userStore.userInfo?.role))
+// 商品档案编辑/上传图片：仅老板端（其他角色只有查看权限）
+const canEditProducts = computed(() => userStore.userInfo?.role === 'boss')
 // 仅老板端可新建商品
 const canCreateProducts = computed(() => userStore.userInfo?.role === 'boss')
 // 仅老板端可删除（单选/批量）
