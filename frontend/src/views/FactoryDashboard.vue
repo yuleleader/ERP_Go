@@ -54,6 +54,8 @@ const stats = reactive({
  * all → 清空所有筛选
  * pending/shipped → 按发货状态筛选
  * unproduce/producing/produced → 按生产状态筛选
+ * 注意：一次点击只触发一次查询（合并设置发货+生产状态后统一刷新），
+ * 避免连续两次 filterBy 产生并发请求导致"第一次显示旧数据"。
  */
 function filterCard(type) {
   activeCard.value = type
@@ -61,22 +63,19 @@ function filterCard(type) {
   if (!orderListRef.value) return
 
   if (type === 'all') {
-    orderListRef.value.filterBy('shippingStatus', '')
-    orderListRef.value.filterBy('produceStatus', '')
+    orderListRef.value.setFilters({ shippingStatus: '', produceStatus: '' })
     return
   }
 
   // 待发货 / 已发货 → 发货状态筛选，清空生产状态
   if (type === 'pending' || type === 'shipped') {
-    orderListRef.value.filterBy('produceStatus', '')
-    orderListRef.value.filterBy('shippingStatus', type)
+    orderListRef.value.setFilters({ shippingStatus: type, produceStatus: '' })
     return
   }
 
   // 未生产 / 生产中 / 生产完成 → 生产状态筛选，清空发货状态
   if (type === 'unproduce' || type === 'producing' || type === 'produced') {
-    orderListRef.value.filterBy('shippingStatus', '')
-    orderListRef.value.filterBy('produceStatus', type)
+    orderListRef.value.setFilters({ shippingStatus: '', produceStatus: type })
     return
   }
 }

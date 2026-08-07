@@ -1069,7 +1069,12 @@ function canDeleteOrder(row) {
 /**
  * 获取订单列表
  */
+// 请求竞态保护：只应用“最新一次”查询的结果，丢弃过期响应
+// （工作台卡片连续触发筛选时会产生并发请求，防止旧条件结果覆盖新条件结果）
+let orderRequestSeq = 0
+
 async function fetchOrders() {
+  const reqSeq = ++orderRequestSeq
   loading.value = true
   try {
     const params = {
@@ -1083,6 +1088,8 @@ async function fetchOrders() {
     if (filters.overdue) params.overdue = true
 
     const response = await getOrders(params)
+    // 已过期响应直接丢弃
+    if (reqSeq !== orderRequestSeq) return
     orders.value = response.data || response
     pagination.total = response.total || orders.value.length
 
@@ -2103,7 +2110,21 @@ function filterBy(field, value) {
   fetchOrders()
 }
 
-defineExpose({ filterBy })
+/**
+ * 原子化设置多个筛选条件后统一查询（一次点击只触发一次请求，
+ * 避免连续 filterBy 产生并发请求导致竞态显示旧数据）。
+ * @param {Object} newFilters e.g. { shippingStatus: 'pending', produceStatus: '' }
+ */
+function setFilters(newFilters) {
+  pagination.page = 1
+  if (newFilters && typeof newFilters === 'object') {
+    if ('shippingStatus' in newFilters) filters.shippingStatus = newFilters.shippingStatus
+    if ('produceStatus' in newFilters) filters.produceStatus = newFilters.produceStatus
+  }
+  fetchOrders()
+}
+
+defineExpose({ filterBy, setFilters })
 </script>
 
 <style scoped>
