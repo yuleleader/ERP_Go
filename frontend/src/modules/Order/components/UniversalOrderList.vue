@@ -299,7 +299,8 @@
           <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="备注">
-                <el-input v-model="orderForm.remark" type="textarea" :rows="2" placeholder="请输入备注信息" class="w-full" :disabled="isFieldReadonly('remark')" />
+                <!-- 发货端平时不可编辑备注；但状态选为"已退货/退款"时解锁，可填写退货原因 -->
+                <el-input v-model="orderForm.remark" type="textarea" :rows="2" placeholder="请输入备注信息" class="w-full" :disabled="isFieldReadonly('remark') && orderForm.shipping_status !== 'refunded'" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -1621,14 +1622,16 @@ async function submitOrder() {
     try {
       const isShippingRole = userStore.role === 'shipping'
 
-      // 发货端仅允许编辑发货状态、物流公司、运单号1、运单号2、运费，禁止发送其他字段
+      // 发货端仅允许编辑发货状态、物流公司、运单号1、运单号2、运费，禁止发送其他字段；
+      // 例外：状态选为"已退货/退款"时允许提交备注（退货原因）
       const data = isShippingRole
         ? {
             shipping_status: orderForm.shipping_status,
             logistics_company: orderForm.logistics_company,
             logistics_no: orderForm.logistics_no,
             logistics_no_2: orderForm.logistics_no_2,
-            freight: orderForm.freight ?? ''
+            freight: orderForm.freight ?? '',
+            ...(orderForm.shipping_status === 'refunded' ? { remark: orderForm.remark ?? '' } : {})
           }
         : {
             shop_id: orderForm.shop_id,
