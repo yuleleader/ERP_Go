@@ -98,7 +98,7 @@
     :title="activeGroup.title"
     :groups="activeGroup.groups"
     :sidebar-width="200"
-    width="320"
+    width="720"
   />
 </template>
 

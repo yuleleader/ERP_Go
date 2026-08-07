@@ -34,7 +34,6 @@
                 @click="go(item)"
               >
                 <span class="item-label">{{ item.label }}</span>
-                <span v-if="item.desc" class="item-desc">{{ item.desc }}</span>
               </div>
             </div>
           </div>
@@ -168,17 +167,18 @@ function go(item) {
 }
 
 .group-items {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
 }
 
 .menu-item {
-  display: inline-flex;
-  flex-direction: column;
-  min-width: 90px;
-  max-width: 100%;
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 40px;
+  padding: 0 8px;
   border: 1px solid #e4e7ed;
   border-radius: 6px;
   background: #fff;
@@ -203,22 +203,8 @@ function go(item) {
   font-weight: 500;
   line-height: 1.4;
   white-space: nowrap;
-}
-
-.item-desc {
-  margin-top: 4px;
-  font-size: 11px;
-  color: #909399;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.menu-item:hover .item-desc,
-.menu-item.active .item-desc {
-  color: #79bbff;
+  text-overflow: ellipsis;
 }
 
 /* 动画 */
