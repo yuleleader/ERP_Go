@@ -13,6 +13,16 @@ import threading
 import queue
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+
+# 系统托盘（pystray + Pillow）：用于无边框窗口最小化后的找回入口
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+    _HAS_TRAY = True
+except ImportError:
+    pystray = None
+    Image = ImageDraw = None
+    _HAS_TRAY = False
 import json
 import shutil
 import sqlite3
@@ -2169,6 +2179,8 @@ class WindowsLauncherApp:
         self.animation_running = False
         self.pulse_running = False
         self._stop_backup_scheduler()
+        # 先关掉托盘图标（避免残留系统托盘条目）
+        self._stop_tray_icon()
         # 检测端口占用而不仅是进程对象，覆盖非本启动器启动的服务
         if is_port_open(8000) or is_port_open(5173) or self.backend_process or self.frontend_process:
             if messagebox.askokcancel("退出确认", "服务正在运行中，确定要退出吗？\n退出时将自动停止所有相关进程。"):
@@ -2279,21 +2291,85 @@ class WindowsLauncherApp:
         self._my = e.y_root
 
     def _on_minimize(self):
-        # 无边框窗口(overrideredirect)不支持 Tk 的 iconify()，会抛
-        # "can't iconify: override-redirect flag is set"；
-        # 改用 Win32 ShowWindow(SW_MINIMIZE) 最小化（窗口已在任务栏有按钮，可从任务栏恢复）。
+        # 无边框窗口(overrideredirect)不支持 Tk 的 iconify()，且 ShowWindow(SW_MINIMIZE)
+        # 经常导致任务栏按钮不出现（窗口彻底"消失"在屏幕外，找不回）。
+        # 改用"隐藏主窗口 + 显示系统托盘图标"方案：用户从系统托盘右键/双击恢复窗口。
         try:
-            self.root.iconify()
+            self.root.withdraw()  # 先隐藏主窗口（最小化外观）
+        except Exception:
+            pass
+        self._show_tray_icon()
+
+    def _create_tray_image(self):
+        """生成托盘图标图像（青色方块底 + 白色 ERP 标志）。"""
+        img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([4, 4, 60, 60], radius=10, fill='#00d4ff')
+        d.rectangle([18, 18, 46, 46], fill='white')
+        d.rectangle([24, 24, 40, 40], fill='#00d4ff')
+        return img
+
+    def _show_tray_icon(self):
+        """创建并显示系统托盘图标（首次调用时初始化，后续复用）。"""
+        if not _HAS_TRAY:
+            self.add_log("系统托盘不可用（缺少 pystray/Pillow），请安装后重试最小化", 'warning')
+            # 退化方案：尝试 Win32 最小化
+            try:
+                from ctypes import windll
+                windll.user32.ShowWindow(self.root.winfo_id(), 6)  # SW_MINIMIZE
+            except Exception:
+                pass
             return
-        except Exception:
-            pass
+        if getattr(self, '_tray_icon', None):
+            # 已显示：确保图标可见
+            try:
+                self._tray_icon.visible = True
+            except Exception:
+                pass
+            return
         try:
-            from ctypes import windll
-            SW_MINIMIZE = 6
-            hwnd = self.root.winfo_id()
-            windll.user32.ShowWindow(hwnd, SW_MINIMIZE)
+            self._tray_icon = pystray.Icon(
+                name='erp_go_launcher',
+                icon=self._create_tray_image(),
+                title='ERP_GO 订单管理系统 启动器',
+                menu=pystray.Menu(
+                    pystray.MenuItem('恢复启动器', self._on_tray_show, default=True),
+                    pystray.MenuItem('退出启动器', self._on_tray_quit)
+                )
+            )
+            # pystray.run() 会阻塞当前线程，放到独立 daemon 线程中
+            threading.Thread(target=self._tray_icon.run, daemon=True).start()
+            self.add_log("最小化到系统托盘（右键托盘图标可恢复窗口）", 'system')
+        except Exception as e:
+            self.add_log(f"系统托盘创建失败: {e}", 'warning')
+            self._tray_icon = None
+
+    def _on_tray_show(self, icon=None, item=None):
+        # pystray 菜单回调在托盘线程执行，操作 Tk 需切回主线程
+        self._to_ui(self._restore_from_tray)
+
+    def _on_tray_quit(self, icon=None, item=None):
+        self._to_ui(self._on_close)
+
+    def _restore_from_tray(self):
+        try:
+            self.root.deiconify()
+            self.root.lift()
+            # 抢焦点（短暂置顶再取消，确保从托盘恢复后窗口可见）
+            self.root.attributes('-topmost', True)
+            self.root.after(80, lambda: self.root.attributes('-topmost', False))
         except Exception:
             pass
+
+    def _stop_tray_icon(self):
+        ti = getattr(self, '_tray_icon', None)
+        if not ti:
+            return
+        try:
+            ti.stop()
+        except Exception:
+            pass
+        self._tray_icon = None
 
     def _on_zoom(self):
         try:
