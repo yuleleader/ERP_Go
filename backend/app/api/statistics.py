@@ -1214,3 +1214,44 @@ async def get_freight_list(
         "total_freight": round(total_freight, 2),
         "total_count": len(items)
     }
+
+
+# ==================== 销售趋势（按下单时间按天汇总金额） ====================
+@router.get("/sales-trend")
+async def get_sales_trend(
+    days: int = Query(30, ge=1, le=365, description="统计最近 N 天，默认 30"),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """按天汇总销售金额（按下单时间 created_at），用于数据总览折线图。
+    X 轴=日期，Y 轴=当日销售金额汇总。缺失日期补 0；退款单不计入。
+    销售端仅统计本人创建的订单，其他角色统计全部订单。
+    """
+    start = beijing_now() - timedelta(days=days - 1)
+    start = datetime(start.year, start.month, start.day)
+
+    query = select(
+        func.date(Order.created_at).label("d"),
+        func.sum(func.cast(Order.sales_amount, Float)).label("amt")
+    )
+    query = query.where(Order.created_at >= start)
+    query = query.where(Order.shipping_status != "refunded")
+    if current_user.role == "sales":
+        query = query.where(Order.created_by == current_user.username)
+    query = query.group_by(func.date(Order.created_at))
+    query = query.order_by(func.date(Order.created_at))
+
+    rows = (await db.execute(query)).all()
+    amount_map = {r[0]: round(float(r[1] or 0), 2) for r in rows}
+
+    # 补齐缺失日期（含今天）
+    result = []
+    total = 0.0
+    for i in range(days):
+        day = start + timedelta(days=i)
+        ds = day.strftime("%Y-%m-%d")
+        amt = amount_map.get(ds, 0.0)
+        total += amt
+        result.append({"date": ds, "amount": amt})
+
+    return {"items": result, "total_amount": round(total, 2), "days": days}

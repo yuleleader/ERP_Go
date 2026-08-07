@@ -130,3 +130,12 @@ export function getFreightList(params) {
     params
   })
 }
+
+// 销售趋势（按下单时间按天汇总金额）
+export function getSalesTrend(params) {
+  return request({
+    url: '/statistics/sales-trend',
+    method: 'get',
+    params
+  })
+}

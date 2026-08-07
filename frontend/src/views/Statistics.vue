@@ -13,69 +13,55 @@
       </div>
 
       <template v-else>
-        <!-- 老板端统计 -->
+        <!-- 老板端统计：5 个卡片压缩至一行 -->
         <template v-if="isBoss">
-          <el-row :gutter="20" style="margin-bottom: 20px;">
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-icon total-sales">
-                  <el-icon><Money /></el-icon>
-                </div>
-                <div class="stat-content">
-                  <div class="stat-value">¥{{ statistics.totalSales.toLocaleString() }}</div>
-                  <div class="stat-label">订单总金额</div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-icon order-count">
-                  <el-icon><ShoppingCart /></el-icon>
-                </div>
-                <div class="stat-content">
-                  <div class="stat-value">{{ statistics.totalOrders }}</div>
-                  <div class="stat-label">总订单数</div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-icon shipped">
-                  <el-icon><CircleCheck /></el-icon>
-                </div>
-                <div class="stat-content">
-                  <div class="stat-value">{{ statistics.shippedOrders }}</div>
-                  <div class="stat-label">已发货订单</div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-icon pending">
-                  <el-icon><Clock /></el-icon>
-                </div>
-                <div class="stat-content">
-                  <div class="stat-value">{{ statistics.pendingOrders }}</div>
-                  <div class="stat-label">待发货订单</div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-
-          <!-- 平均发货时长 -->
-          <el-row :gutter="20" style="margin-bottom: 20px;">
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-icon avg-shipping">
-                  <el-icon><Timer /></el-icon>
-                </div>
-                <div class="stat-content">
-                  <div class="stat-value">{{ avgShippingTime.avg_days }}天</div>
-                  <div class="stat-label">平均发货时长</div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+          <div class="stat-cards-row">
+            <el-card class="stat-card">
+              <div class="stat-icon total-sales">
+                <el-icon><Money /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">¥{{ statistics.totalSales.toLocaleString() }}</div>
+                <div class="stat-label">订单总金额</div>
+              </div>
+            </el-card>
+            <el-card class="stat-card">
+              <div class="stat-icon order-count">
+                <el-icon><ShoppingCart /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">{{ statistics.totalOrders }}</div>
+                <div class="stat-label">总订单数</div>
+              </div>
+            </el-card>
+            <el-card class="stat-card">
+              <div class="stat-icon shipped">
+                <el-icon><CircleCheck /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">{{ statistics.shippedOrders }}</div>
+                <div class="stat-label">已发货订单</div>
+              </div>
+            </el-card>
+            <el-card class="stat-card">
+              <div class="stat-icon pending">
+                <el-icon><Clock /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">{{ statistics.pendingOrders }}</div>
+                <div class="stat-label">待发货订单</div>
+              </div>
+            </el-card>
+            <el-card class="stat-card">
+              <div class="stat-icon avg-shipping">
+                <el-icon><Timer /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">{{ avgShippingTime.avg_days }}天</div>
+                <div class="stat-label">平均发货时长</div>
+              </div>
+            </el-card>
+          </div>
         </template>
 
         <!-- 销售端统计 -->
@@ -108,7 +94,7 @@
 
         <!-- 工厂端和发货端统计 -->
         <template v-if="isFactory || isShipping">
-          <el-row :gutter="20">
+          <el-row :gutter="20" style="margin-bottom: 20px;">
             <el-col :span="8">
               <el-card class="stat-card">
                 <div class="stat-icon order-count">
@@ -143,23 +129,31 @@
               </el-card>
             </el-col>
           </el-row>
-          <div style="text-align: center; padding: 40px; color: #999;">
-            <el-icon size="48" style="margin-bottom: 10px;"><PieChart /></el-icon>
-            <p>暂无更多统计数据</p>
-          </div>
         </template>
+
+        <!-- 销售金额趋势折线图（X 轴=下单时间，Y 轴=金额汇总） -->
+        <el-card class="trend-card">
+          <template #header>
+            <div class="trend-header">
+              <span>销售金额趋势（近 {{ trendDays }} 天，按下单时间）</span>
+              <div class="trend-total">累计 ¥{{ trendTotal.toLocaleString() }}</div>
+            </div>
+          </template>
+          <div ref="trendChartRef" class="trend-chart"></div>
+        </el-card>
       </template>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/store/user';
-import { getOverviewStatistics, getAvgShippingTime } from '@/api/statistics';
+import { getOverviewStatistics, getAvgShippingTime, getSalesTrend } from '@/api/statistics';
 import { ElMessage } from 'element-plus';
-import { Money, ShoppingCart, CircleCheck, Clock, Box, PieChart, Loading, Timer } from '@element-plus/icons-vue';
+import { Money, ShoppingCart, CircleCheck, Clock, Box, Loading, Timer } from '@element-plus/icons-vue';
+import * as echarts from 'echarts';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -183,6 +177,57 @@ const avgShippingTime = reactive({
   avg_hours: 0
 });
 
+// 销售趋势折线图
+const trendChartRef = ref(null);
+let trendChart = null;
+const trendDays = ref(30);
+const trendTotal = ref(0);
+
+async function loadTrend() {
+  try {
+    const res = await getSalesTrend({ days: trendDays.value })
+    const data = res || {}
+    const items = data.items || []
+    trendTotal.value = data.total_amount || 0
+    await nextTick()
+    if (!trendChartRef.value) return
+    if (!trendChart) {
+      trendChart = echarts.init(trendChartRef.value)
+    }
+    trendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 70, right: 30, top: 30, bottom: 50 },
+      xAxis: {
+        type: 'category',
+        data: items.map(i => i.date),
+        axisLabel: { rotate: 40 }
+      },
+      yAxis: { type: 'value', name: '金额(¥)' },
+      series: [{
+        name: '销售金额',
+        type: 'line',
+        smooth: true,
+        symbolSize: 6,
+        data: items.map(i => i.amount),
+        lineStyle: { width: 2.5, color: '#409EFF' },
+        itemStyle: { color: '#409EFF' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(64, 158, 255, 0.25)' },
+            { offset: 1, color: 'rgba(64, 158, 255, 0.02)' }
+          ])
+        }
+      }]
+    })
+  } catch (e) {
+    console.error('加载销售趋势失败', e)
+  }
+}
+
+function handleResize() {
+  if (trendChart) trendChart.resize()
+}
+
 const fetchStatistics = async () => {
   loading.value = true;
   try {
@@ -196,6 +241,8 @@ const fetchStatistics = async () => {
     const avgTime = await getAvgShippingTime();
     avgShippingTime.avg_days = avgTime.avg_days || 0;
     avgShippingTime.avg_hours = avgTime.avg_hours || 0;
+
+    loadTrend();
   } catch (error) {
     console.error('获取统计数据失败:', error);
     if (error.response && error.response.status === 401) {
@@ -229,7 +276,16 @@ const initPage = async () => {
 };
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize);
   initPage();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+  if (trendChart) {
+    trendChart.dispose();
+    trendChart = null;
+  }
 });
 </script>
 
@@ -268,6 +324,61 @@ onMounted(() => {
   display: flex;
   align-items: center;
   padding: 20px;
+}
+
+/* 老板端 5 个卡片压缩至一行 */
+.stat-cards-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-cards-row .stat-card {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 12px;
+}
+
+.stat-cards-row .stat-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.stat-cards-row .stat-value {
+  font-size: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-cards-row .stat-label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 销售趋势折线图 */
+.trend-card {
+  margin-top: 20px;
+}
+
+.trend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trend-total {
+  font-size: 14px;
+  color: #409eff;
+  font-weight: 600;
+}
+
+.trend-chart {
+  width: 100%;
+  height: 360px;
 }
 
 .stat-icon {
