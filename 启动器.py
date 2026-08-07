@@ -2301,7 +2301,20 @@ class WindowsLauncherApp:
         self._show_tray_icon()
 
     def _create_tray_image(self):
-        """生成托盘图标图像（青色方块底 + 白色 ERP 标志）。"""
+        """生成托盘图标：优先加载项目 logo 图片（frontend/src/assets/img/logo.png），
+        缺失或加载失败时回退到程序绘制的青色图标。"""
+        try:
+            logo_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                'frontend', 'src', 'assets', 'img', 'logo.png'
+            )
+            if os.path.exists(logo_path):
+                img = Image.open(logo_path).convert('RGBA')
+                img = img.resize((64, 64), Image.LANCZOS)
+                return img
+        except Exception:
+            pass
+        # 回退：程序绘制（青色方块底 + 白色 ERP 标志）
         img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
         d.rounded_rectangle([4, 4, 60, 60], radius=10, fill='#00d4ff')
