@@ -385,11 +385,23 @@
     $("editBox").classList.add("hidden");                // 隐藏修改信息卡
     $("images").innerHTML='<div class="muted">加载中…</div>';
     try{
-      state.order = await api("/api/orders/"+encodeURIComponent(id));
+      // 1) 先按系统订单号（order_id）查；2) 失败再按平台订单号（platform_order_no）查
+      let order = null;
+      try{
+        order = await api("/api/orders/"+encodeURIComponent(id));
+      }catch(e){
+        if(e && e.message === "订单不存在"){
+          order = await api("/api/orders/by-platform/"+encodeURIComponent(id));
+        } else {
+          throw e;
+        }
+      }
+      state.order = order;
+      state.orderId = order.order_id || id;
       renderOrder();
     }catch(err){
       const m=(err&&err.message)?err.message:"加载失败";
-      $("info").innerHTML='<div class="muted">已识别二维码内容：<b>'+esc(id)+'</b>，但'+esc(m)+'。请确认这是本系统的订单二维码（微信/支付/名片码无法识别）。</div>';
+      $("info").innerHTML='<div class="muted">未找到该订单：<b>'+esc(id)+'</b>（'+esc(m)+'）。请确认是系统订单号或平台订单号。</div>';
       // 失败时清空下方各区域，避免残留上一次订单的字段/图片
       $("editForm").innerHTML='';
       $("editBox").classList.add("hidden");

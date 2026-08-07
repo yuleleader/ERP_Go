@@ -333,20 +333,8 @@ async def get_orders(
 
     return {"data": order_responses, "total": total}
 
-@router.get("/{order_id}", response_model=OrderResponse)
-async def get_order(
-    order_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_active_user)
-):
-    result = await db.execute(select(Order).where(Order.order_id == order_id))
-    order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
-
-    if current_user.role == "sales" and str(order.created_by) != str(current_user.username):
-        raise HTTPException(status_code=403, detail="您没有权限查看此订单")
-
+async def _serialize_order(order, db: AsyncSession, current_user):
+    """将 Order 模型序列化为 OrderResponse（含创建人姓名与财务字段权限控制）。"""
     order_dict = {
         "id": order.id,
         "order_id": order.order_id,
@@ -390,6 +378,43 @@ async def get_order(
         order_dict["creator_real_name"] = None
 
     return OrderResponse(**order_dict)
+
+
+@router.get("/by-platform/{platform_order_no}", response_model=OrderResponse)
+async def get_order_by_platform_order_no(
+    platform_order_no: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """按平台订单号（platform_order_no，唯一）精确查询订单。
+    供手机端手动输入平台订单号查单使用。
+    """
+    result = await db.execute(select(Order).where(Order.platform_order_no == platform_order_no))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    if current_user.role == "sales" and str(order.created_by) != str(current_user.username):
+        raise HTTPException(status_code=403, detail="您没有权限查看此订单")
+
+    return await _serialize_order(order, db, current_user)
+
+
+@router.get("/{order_id}", response_model=OrderResponse)
+async def get_order(
+    order_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    result = await db.execute(select(Order).where(Order.order_id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    if current_user.role == "sales" and str(order.created_by) != str(current_user.username):
+        raise HTTPException(status_code=403, detail="您没有权限查看此订单")
+
+    return await _serialize_order(order, db, current_user)
 
 PRODUCE_STATUS_MAP = {
     "unproduce": "未生产",
