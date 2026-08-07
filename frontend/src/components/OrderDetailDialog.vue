@@ -169,6 +169,7 @@
 
 <script setup>
 import { formatDate, formatDateTime } from '@/utils/format'
+import { imageUrlWithToken } from '@/utils/imageUrl'
 import { ref, computed, watch } from 'vue'
 import { getOrder, updateOrder } from '@/api/order'
 import { getOrderImages } from '@/api/image'
@@ -286,13 +287,13 @@ async function loadDetail(id) {
       if (result && result.code === 200 && result.data) {
         salesProductImages.value = result.data
           .filter(item => item.layer === 'sales')
-          .map(item => ({ id: item.id, name: `sales_${item.id}`, url: item.image_url, temp_id: null }))
+          .map(item => ({ id: item.id, name: `sales_${item.id}`, url: imageUrlWithToken(item.image_url), temp_id: null }))
         factoryProductionImages.value = result.data
           .filter(item => item.layer === 'factory')
-          .map(item => ({ id: item.id, name: `factory_${item.id}`, url: item.image_url, temp_id: null }))
+          .map(item => ({ id: item.id, name: `factory_${item.id}`, url: imageUrlWithToken(item.image_url), temp_id: null }))
         shippingDeliveryImages.value = result.data
           .filter(item => item.layer === 'shipping')
-          .map(item => ({ id: item.id, name: `shipping_${item.id}`, url: item.image_url, temp_id: null }))
+          .map(item => ({ id: item.id, name: `shipping_${item.id}`, url: imageUrlWithToken(item.image_url), temp_id: null }))
       }
     } catch (error) {
       console.error('加载订单图片失败:', error)

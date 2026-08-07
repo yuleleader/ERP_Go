@@ -710,6 +710,7 @@
 
 <script setup>
 import { formatDate, formatDateTime } from '@/utils/format'
+import { imageUrlWithToken } from '@/utils/imageUrl'
 /**
  * 通用订单列表组件（多角色动态权限版）
  *
@@ -1099,8 +1100,8 @@ async function fetchOrders() {
             if (result.code === 200 && result.data) {
               const salesImages = result.data.filter(item => item.layer === 'sales')
               if (salesImages.length > 0) {
-                order.product_image_url = salesImages[0].image_url
-                order.product_image_urls = salesImages.map(item => item.image_url)
+                order.product_image_url = imageUrlWithToken(salesImages[0].image_url)
+                order.product_image_urls = salesImages.map(item => imageUrlWithToken(item.image_url))
               }
             }
           })

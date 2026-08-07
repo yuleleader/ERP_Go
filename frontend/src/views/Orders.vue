@@ -338,6 +338,7 @@
 
 <script setup>
 import { formatDate, formatDateTime, toBeijingDate } from '@/utils/format'
+import { imageUrlWithToken } from '@/utils/imageUrl'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { getOrders, createOrder, updateOrder, deleteOrder, getOrder } from '@/api/order'
@@ -664,19 +665,19 @@ function createImageUploadHandler(imageType, layer) {
     if (layer === 'sales') {
       salesProductImages.value.push({
         name: uploadFile.name,
-        url: response.image_url,
+        url: imageUrlWithToken(response.image_url),
         temp_id: tempId
       })
     } else if (layer === 'factory') {
       factoryProductionImages.value.push({
         name: uploadFile.name,
-        url: response.image_url,
+        url: imageUrlWithToken(response.image_url),
         temp_id: tempId
       })
     } else if (layer === 'shipping') {
       shippingDeliveryImages.value.push({
         name: uploadFile.name,
-        url: response.image_url,
+        url: imageUrlWithToken(response.image_url),
         temp_id: tempId
       })
     }
