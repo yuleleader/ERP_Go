@@ -133,18 +133,18 @@
           </template>
         </el-table-column>
 
-        <!-- 6. 已下单时长（全局公共字段，所有角色不隐藏、默认展示） -->
-        <el-table-column label="下单时长" width="100" sortable :sort-by="(row) => row.order_days || 0" align="center">
+        <!-- 6. 已下单时长（全局公共字段，所有角色不隐藏、默认展示；未发货实时增长，发货/退款后冻结） -->
+        <el-table-column label="下单时长" width="100" sortable :sort-by="(row) => displayDays(row)" align="center">
           <template #default="{ row }">
             <span
-              v-if="row.order_days !== null && row.order_days !== undefined"
+              v-if="displayDays(row) !== null && displayDays(row) !== undefined"
               :class="{
-                'days-normal': row.order_days < 7,
-                'days-warning': row.order_days >= 7 && row.order_days < 14,
-                'days-danger': row.order_days >= 14
+                'days-normal': displayDays(row) < 7,
+                'days-warning': displayDays(row) >= 7 && displayDays(row) < 14,
+                'days-danger': displayDays(row) >= 14
               }"
             >
-              {{ row.order_days }}天
+              {{ displayDays(row) }}天
             </span>
             <span v-else>-</span>
           </template>
@@ -978,6 +978,31 @@ function getStatusText(status) {
   return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货', refunded: '已退货/退款' }[status] || status
 }
 
+// ====================== 下单时长（实时计算 / 发货退款后冻结） ======================
+const daysTick = ref(0) // 定时器 tick：触发下单时长自动刷新
+let daysTimer = null
+
+/**
+ * 计算某行订单的"下单时长"展示天数：
+ * - 已发货 / 已退款：返回冻结值（后端保存的数值），不再随时间变化；
+ * - 其他状态（未发货等）：按下单时间实时计算，随时间推移自动增长。
+ * @param {Object} row - 订单行数据
+ * @returns {number} 天数
+ */
+function displayDays(row) {
+  void daysTick.value // 建立响应式依赖：定时器 tick 时自动重算，保证数字随时间变化
+  if (row.shipping_status === 'shipped' || row.shipping_status === 'refunded') {
+    return row.order_days != null ? Number(row.order_days) : 0
+  }
+  if (!row.created_at) return Number(row.order_days || 0)
+  const created = new Date(String(row.created_at).replace(' ', 'T'))
+  if (isNaN(created.getTime())) return Number(row.order_days || 0)
+  const now = new Date()
+  const d0 = new Date(created.getFullYear(), created.getMonth(), created.getDate())
+  const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.max(0, Math.round((d1 - d0) / 86400000))
+}
+
 /**
  * 获取生产状态类型
  * @param {string} status - 生产状态
@@ -1411,7 +1436,7 @@ async function editOrder(row) {
     orderForm.shipping_time = ''
   }
   orderForm.created_at = row.created_at ? (row.created_at.split('T')[0]) : ''
-  orderForm.order_days = row.order_days || 0
+  orderForm.order_days = displayDays(row)
   orderForm.produce_status = row.produce_status || 'unproduce'
   orderForm.produce_status_update_at = row.produce_status_update_at || ''
   orderForm.produce_status_update_user = row.produce_status_update_user || ''
@@ -2043,7 +2068,7 @@ function exportOrders() {
         '订单状态': getStatusText(row.shipping_status) || '',
         '生产状态': getProduceStatusText(row.produce_status) || '',
         '下单时间': formatDate(row.created_at) || '',
-        '已下单时长': row.order_days ? `${row.order_days}天` : '',
+        '已下单时长': displayDays(row) ? `${displayDays(row)}天` : '',
         '发货时间': formatDate(row.shipping_time) || '',
         '物流平台': row.logistics_company || '',
         '运单号1': row.logistics_no || '',
@@ -2141,10 +2166,19 @@ onMounted(async () => {
       Authorization: `Bearer ${token}`
     }
   }
+
+  // 下单时长自动刷新：每分钟 tick 一次，跨天后数字自动变化（无需刷新页面）
+  daysTimer = setInterval(() => {
+    daysTick.value++
+  }, 60000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', calculateTableHeight)
+  if (daysTimer) {
+    clearInterval(daysTimer)
+    daysTimer = null
+  }
 })
 
 // ====================== 对外暴露方法 ======================

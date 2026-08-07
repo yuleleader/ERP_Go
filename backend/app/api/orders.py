@@ -45,6 +45,27 @@ def calculate_order_days(order_date: datetime) -> int:
     days_diff = (today_start - order_date_start).days
     return max(0, days_diff)
 
+# 已发货 / 已退款后，下单时长冻结不再变化
+_FROZEN_DAYS_STATUSES = ("shipped", "refunded")
+
+def effective_order_days(order) -> int:
+    """
+    下单时长（滞留天数）展示值：
+    - 未发货（pending/virtual/virtual_shipped 等）：实时计算，随日期推移自动增长；
+    - 已发货 / 已退款：返回冻结值（数据库保存的数值），不再随时间变化。
+    """
+    if getattr(order, "shipping_status", None) in _FROZEN_DAYS_STATUSES:
+        return order.order_days if order.order_days is not None else 0
+    created = getattr(order, "created_at", None)
+    if created is None:
+        return order.order_days or 0
+    if isinstance(created, str):
+        try:
+            created = datetime.fromisoformat(str(created).replace("Z", "+00:00").split("+")[0])
+        except ValueError:
+            return order.order_days or 0
+    return calculate_order_days(created)
+
 async def generate_order_id(username: str, shop_account: str, platform_order_no: str) -> str:
     date_str = beijing_now().strftime("%Y%m%d")
     random_num = order_id_generator.get_random_number()
@@ -220,7 +241,7 @@ async def create_order(
             "created_by": str(new_order.created_by) if new_order.created_by else None,
             "creator_real_name": current_user.real_name or current_user.username,
             "created_at": new_order.created_at,
-            "order_days": new_order.order_days
+            "order_days": effective_order_days(new_order)
         }
         
         try:
@@ -306,7 +327,9 @@ async def get_orders(
     count_result = await db.execute(count_query)
     total = count_result.scalar()
 
-    query = query.order_by(Order.order_days.desc().nullslast(), Order.created_at.desc()).offset(skip).limit(limit)
+    # 下单时长实时化后无法用存库值排序：按下单时间升序（下单越早=滞留越久，排越前），
+    # 与"超期订单"实时计算口径一致；同日订单按存库时长降序保持稳定
+    query = query.order_by(Order.created_at.asc(), Order.order_days.desc().nullslast()).offset(skip).limit(limit)
     result = await db.execute(query)
     orders = result.scalars().all()
 
@@ -332,7 +355,7 @@ async def get_orders(
             "commission_amount": order.commission_amount,
             "created_by": str(order.created_by) if order.created_by else None,
             "created_at": order.created_at,
-            "order_days": order.order_days,
+            "order_days": effective_order_days(order),
             "produce_status": order.produce_status,
             "produce_status_update_at": order.produce_status_update_at,
             "produce_status_update_user": order.produce_status_update_user,
@@ -380,7 +403,7 @@ async def _serialize_order(order, db: AsyncSession, current_user):
         "commission_amount": order.commission_amount,
         "created_by": str(order.created_by) if order.created_by else None,
         "created_at": order.created_at,
-        "order_days": order.order_days,
+        "order_days": effective_order_days(order),
         "produce_status": order.produce_status,
         "produce_status_update_at": order.produce_status_update_at,
         "produce_status_update_user": order.produce_status_update_user,
@@ -617,6 +640,13 @@ async def update_order(
             order.created_at = dt.fromisoformat(order.created_at.split('T')[0])
         order.order_days = calculate_order_days(order.created_at)
         changes.append(f"滞留时长: 更新为 {order.order_days} 天")
+
+    # 状态变为已发货/已退款：冻结下单时长（此后读取时不再随时间变化）
+    if "shipping_status" in update_data:
+        new_status = update_data["shipping_status"]
+        if new_status in _FROZEN_DAYS_STATUSES and old_shipping_status not in _FROZEN_DAYS_STATUSES:
+            order.order_days = calculate_order_days(order.created_at)
+            changes.append(f"下单时长: 冻结为 {order.order_days} 天")
     
     # 收货地址发生变更 → 重置国家识别结果，智慧大屏下次刷新会按新地址重新识别
     if "receiver_address" in update_data and update_data["receiver_address"] != old_receiver_address:
@@ -675,7 +705,7 @@ async def update_order(
         "commission_amount": order.commission_amount,
         "created_by": str(order.created_by) if order.created_by else None,
         "created_at": order.created_at,
-        "order_days": order.order_days,
+        "order_days": effective_order_days(order),
         "produce_status": order.produce_status,
         "produce_status_update_at": order.produce_status_update_at,
         "produce_status_update_user": order.produce_status_update_user,
