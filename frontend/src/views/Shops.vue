@@ -37,7 +37,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="order_count" label="关联订单数" width="120" />
-        <el-table-column prop="create_time" label="创建时间" width="180" />
+        <el-table-column prop="create_time" label="创建时间" width="180">
+          <template #default="{ row }">{{ formatDateTime(row.create_time) }}</template>
+        </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="editShop(row)">编辑</el-button>
@@ -76,6 +78,7 @@
 import { ref, reactive, computed } from 'vue'
 import { getShops, createShop, updateShop, deleteShop } from '@/api/shop'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 
 const shopLoading = ref(false)
 const shops = ref([])
