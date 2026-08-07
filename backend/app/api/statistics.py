@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, Float, desc
 from ..core.database import get_db
 from ..core.security import get_current_active_user
-from ..models.models import Order, User, Product
+from ..models.models import Order, User, Product, Category, Brand
 from ..api.settings import read_setting
 
 router = APIRouter(prefix="/api/statistics", tags=["数据统计"])
@@ -840,3 +840,147 @@ async def get_overdue_orders(
         "producing_overdue": producing,
         "update_time": beijing_now().isoformat()
     }
+
+
+# ==================== 销售统计（人员/类别/品牌/商品 汇总） ====================
+@router.get("/sales-summary")
+async def get_sales_summary(
+    summary_type: str = Query("product", description="person/category/brand/product"),
+    keyword: str = Query(None, description="名称模糊查询（人员/类别/品牌/商品）"),
+    category_id: int = Query(None, description="按类别（二级）过滤"),
+    brand_id: int = Query(None, description="按品牌过滤"),
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD（按下单时间）"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD（按下单时间）"),
+    limit: int = Query(1000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """销售汇总报表数据源。
+    维度：person=人员 / category=二级类别 / brand=品牌 / product=商品。
+    指标：销售金额（sum(sales_amount)）、销售数量（订单数，系统无数量字段按 1 计）、
+          毛利（销售金额 - 商品成本价；成本价取自 products 表按商品名匹配，无匹配或未填按 0）。
+    说明：订单与商品按 product_name 文本匹配（订单无商品编码字段），商品重名时取其一成本。
+    权限：仅老板端与工厂端可访问。
+    """
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    # ---- 1. 日期范围（下单时间）----
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    # ---- 2. 拉取订单明细（仅需要的字段；内网轻量数据量，内存聚合避免 join 膨胀）----
+    order_query = select(
+        Order.product_name,
+        Order.sales_amount,
+        Order.created_by,
+        Order.created_at
+    )
+    if start_dt:
+        order_query = order_query.where(Order.created_at >= start_dt)
+    if end_dt:
+        order_query = order_query.where(Order.created_at < end_dt)
+
+    # 退款单不计入销售（shipping_status=refunded 属退货）
+    order_query = order_query.where(Order.shipping_status != "refunded")
+
+    rows = (await db.execute(order_query)).all()
+
+    # ---- 3. 商品成本/类别/品牌映射（product_name -> 取第一条）----
+    prod_result = await db.execute(select(Product))
+    prod_map = {}
+    for p in prod_result.scalars().all():
+        if p.product_name not in prod_map:
+            prod_map[p.product_name] = {
+                "category_id": p.category_id,
+                "brand_id": p.brand_id,
+                "cost_price": p.cost_price if isinstance(p.cost_price, (int, float)) else 0.0
+            }
+
+    # 类别名映射
+    cat_map = {}
+    for c in (await db.execute(select(Category))).scalars().all():
+        cat_map[c.id] = c.category_name
+
+    # 品牌名映射
+    brand_map = {}
+    for b in (await db.execute(select(Brand))).scalars().all():
+        brand_map[b.id] = b.brand_name
+
+    # 人员名映射（真实姓名优先）
+    user_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_map[u.username] = u.real_name or u.username
+
+    # ---- 4. 分组聚合 ----
+    groups = {}
+    for r in rows:
+        product_name = r.product_name or ""
+        pmeta = prod_map.get(product_name) or {"category_id": None, "brand_id": None, "cost_price": 0.0}
+        cat_id = pmeta["category_id"]
+        brd_id = pmeta["brand_id"]
+
+        # 构造分组 key 与名称
+        if summary_type == "person":
+            key = str(r.created_by or "")
+            name = user_map.get(key) or key or "未知"
+        elif summary_type == "category":
+            key = str(cat_id)
+            name = cat_map.get(cat_id) if cat_id is not None else "未分类"
+        elif summary_type == "brand":
+            key = str(brd_id)
+            name = brand_map.get(brd_id) if brd_id is not None else "未分类"
+        else:  # product
+            key = product_name
+            name = product_name or "未填商品名"
+
+        if not key:
+            key = "unknown"
+
+        # keyword 过滤（名称模糊）
+        if keyword:
+            kw = keyword.strip().lower()
+            if kw and kw not in (name or "").lower():
+                continue
+
+        # category/brand 过滤
+        if category_id is not None and cat_id != category_id:
+            continue
+        if brand_id is not None and brd_id != brand_id:
+            continue
+
+        try:
+            amount = float(r.sales_amount or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+
+        g = groups.get(key)
+        if g is None:
+            g = {"name": name, "sales_amount": 0.0, "sales_count": 0, "gross_profit": 0.0}
+            groups[key] = g
+        g["sales_amount"] += amount
+        g["sales_count"] += 1
+        g["gross_profit"] += amount - pmeta["cost_price"]
+
+    # ---- 5. 排序（销售金额降序）并输出 ----
+    items = sorted(groups.values(), key=lambda x: x["sales_amount"], reverse=True)[:limit]
+    totals = {
+        "sales_amount": round(sum(i["sales_amount"] for i in groups.values()), 2),
+        "sales_count": sum(i["sales_count"] for i in groups.values()),
+        "gross_profit": round(sum(i["gross_profit"] for i in groups.values()), 2)
+    }
+    for i in items:
+        i["sales_amount"] = round(i["sales_amount"], 2)
+        i["gross_profit"] = round(i["gross_profit"], 2)
+
+    return {"type": summary_type, "items": items, "totals": totals}

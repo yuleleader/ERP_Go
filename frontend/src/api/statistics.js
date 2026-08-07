@@ -94,3 +94,13 @@ export function getOverdueOrders() {
     method: 'get'
   })
 }
+
+// 销售汇总报表（人员/类别/品牌/商品）
+// type: person/category/brand/product
+export function getSalesSummary(params) {
+  return request({
+    url: '/statistics/sales-summary',
+    method: 'get',
+    params
+  })
+}

@@ -204,6 +204,7 @@ const menuGroups = computed(() => {
           title: '统计报表',
           items: pick([
             { label: '数据总览', path: '/statistics', desc: '销售、订单与发货综合统计', show: true },
+            { label: '销售统计', path: '/sales-statistics', desc: '人员/类别/品牌/商品销售汇总', show: isBoss },
             { label: '销售提成统计（按发货时间统计）', path: '/commission-statistics', desc: '按发货时间核算销售提成', show: true }
           ])
         }
