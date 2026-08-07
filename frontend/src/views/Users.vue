@@ -9,7 +9,6 @@
         @click="selectRole('')"
       >
         <span class="role-name">全部</span>
-        <span class="role-count">{{ allUsersCount }}</span>
       </div>
       <div
         v-for="r in roleOptions"
@@ -19,7 +18,6 @@
         @click="selectRole(r.value)"
       >
         <span class="role-name">{{ r.label }}</span>
-        <span class="role-count">{{ roleCounts[r.value] || 0 }}</span>
       </div>
     </aside>
 
@@ -159,16 +157,6 @@ const roleOptions = [
 ]
 const activeRole = ref('')
 const searchKeyword = ref('')
-
-// 各角色数量（基于当前全部用户计算；若已有筛选数据则基于该数据统计）
-const roleCounts = computed(() => {
-  const counts = { boss: 0, sales: 0, factory: 0, shipping: 0 }
-  for (const u of users.value) {
-    if (counts[u.role] !== undefined) counts[u.role] += 1
-  }
-  return counts
-})
-const allUsersCount = computed(() => users.value.length)
 
 function roleLabel(value) {
   return roleOptions.find(r => r.value === value)?.label || value
@@ -380,19 +368,6 @@ usersStore.fetchUsers()
   background-color: #ecf5ff;
   color: #409eff;
   font-weight: 600;
-}
-
-.role-count {
-  font-size: 11px;
-  color: #a8abb2;
-  background: #f0f2f5;
-  border-radius: 10px;
-  padding: 1px 8px;
-}
-
-.role-item.active .role-count {
-  background: #409eff;
-  color: #fff;
 }
 
 /* 右侧主区域 */
