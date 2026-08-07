@@ -626,43 +626,21 @@ onUnmounted(() => {
   border-radius: 2px;
 }
 
-/* 统计卡片（三等分中的第一段：等高；高度不足时内部滚动保证 6 张全部可见） */
+/* 统计卡片（三等分中的第一段：等高填满，6 张卡片全部可见，不滚动） */
 .stats-cards {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-auto-rows: minmax(56px, auto);
-  align-content: start;
-  gap: 10px;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 212, 255, 0.4) transparent;
-}
-
-.stats-cards::-webkit-scrollbar {
-  width: 6px;
-}
-
-.stats-cards::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.stats-cards::-webkit-scrollbar-thumb {
-  background: rgba(0, 212, 255, 0.35);
-  border-radius: 3px;
-}
-
-.stats-cards::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 212, 255, 0.6);
+  grid-auto-rows: 1fr;
+  gap: 8px;
 }
 
 .stat-card {
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(0, 212, 255, 0.15);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -678,9 +656,9 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #94a3b8;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -688,7 +666,7 @@ onUnmounted(() => {
 }
 
 .stat-value {
-  font-size: 17px;
+  font-size: 14px;
   font-weight: bold;
   color: #fff;
   white-space: nowrap;
