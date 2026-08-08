@@ -305,11 +305,30 @@ class WindowsLauncherApp:
         # Logo 区
         logo_frame = tk.Frame(sidebar, bg=self.colors['sidebar_bg'])
         logo_frame.pack(fill=tk.X, padx=14, pady=(18, 22))
-        cv_logo = tk.Canvas(logo_frame, width=32, height=32, bg=self.colors['sidebar_bg'],
+        # 优先加载项目内的 logo.png（前端 assets）；加载失败时回退到绿色 ERP 圆形
+        self.logo_image = None
+        try:
+            from pathlib import Path
+            _logo = Path(__file__).resolve().parent / "frontend" / "src" / "assets" / "img" / "logo.png"
+            if _logo.exists():
+                _img = tk.PhotoImage(file=str(_logo))
+                # 自动缩放到 ≤32px（subsample 仅支持整数倍）
+                _w, _h = _img.width(), _img.height()
+                _target = 32
+                if max(_w, _h) > _target:
+                    _factor = max(1, max(_w, _h) // _target)
+                    _img = _img.subsample(_factor)
+                self.logo_image = _img
+        except Exception:
+            self.logo_image = None
+        cv_logo = tk.Canvas(logo_frame, width=36, height=36, bg=self.colors['sidebar_bg'],
                             highlightthickness=0)
         cv_logo.pack(side=tk.LEFT)
-        self._draw_rounded_rect(cv_logo, 2, 2, 30, 30, 8, fill=self.colors['green'], outline='')
-        cv_logo.create_text(16, 17, text='ERP', fill='#ffffff', font=('微软雅黑', 9, 'bold'))
+        if self.logo_image is not None:
+            cv_logo.create_image(18, 18, image=self.logo_image)
+        else:
+            self._draw_rounded_rect(cv_logo, 2, 2, 34, 34, 8, fill=self.colors['green'], outline='')
+            cv_logo.create_text(18, 18, text='ERP', fill='#ffffff', font=('微软雅黑', 9, 'bold'))
         title_frame = tk.Frame(logo_frame, bg=self.colors['sidebar_bg'])
         title_frame.pack(side=tk.LEFT, padx=(10, 0), fill=tk.Y)
         tk.Label(title_frame, text='牛蛙产销协同系统', font=('微软雅黑', 10, 'bold'),
