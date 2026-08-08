@@ -232,7 +232,7 @@
                   class="w-full"
                   filterable
                   default-first-option
-                  :disabled="isFieldReadonly('product_name')"
+                  :disabled="isFieldReadonly('product_name') || isShippedLocked"
                 >
                   <el-option
                     v-for="product in products"
@@ -245,16 +245,16 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="销售金额" prop="sales_amount" v-if="isFullFieldRole">
-                <el-input v-model="orderForm.sales_amount" type="number" placeholder="请输入销售金额" :min="0" step="0.01" class="w-full" :disabled="isFieldReadonly('sales_amount')" />
+                <el-input v-model="orderForm.sales_amount" type="number" placeholder="请输入销售金额" :min="0" step="0.01" class="w-full" :disabled="isFieldReadonly('sales_amount') || isShippedLocked" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
               <el-form-item label="状态">
                 <el-select v-model="orderForm.shipping_status" placeholder="请选择状态" class="w-full" :disabled="isFieldReadonly('shipping_status')" @change="onStatusChange">
-                  <!-- 已发货/已虚拟发货后不允许改回未发货；已发货仅可改为已退货/退款 -->
-                  <el-option v-if="orderForm.shipping_status !== 'shipped' && orderForm.shipping_status !== 'virtual'" label="未发货" value="pending" />
+                  <!-- 已发货/已虚拟发货后不允许改回未发货；已发货仅可改为已退货/退款；已发货锁定单只显示这两个选项 -->
+                  <el-option v-if="!isShippedLocked && orderForm.shipping_status !== 'shipped' && orderForm.shipping_status !== 'virtual'" label="未发货" value="pending" />
                   <el-option label="已发货" value="shipped" />
-                  <el-option v-if="orderForm.shipping_status === 'pending' || orderForm.shipping_status === 'virtual'" label="虚拟发货" value="virtual" />
+                  <el-option v-if="!isShippedLocked && (orderForm.shipping_status === 'pending' || orderForm.shipping_status === 'virtual')" label="虚拟发货" value="virtual" />
                   <el-option label="已退货/退款" value="refunded" />
                 </el-select>
               </el-form-item>
@@ -268,7 +268,7 @@
                   type="date"
                   placeholder="请选择下单时间（默认今天）"
                   :disabled-date="disabledFutureDate"
-                  :disabled="isFieldReadonly('created_at')"
+                  :disabled="isFieldReadonly('created_at') || isShippedLocked"
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
                   class="w-full"
@@ -284,7 +284,7 @@
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
                   class="w-full"
-                  :disabled="orderForm.shipping_status !== 'shipped'"
+                  :disabled="orderForm.shipping_status !== 'shipped' || isShippedLocked"
                 />
               </el-form-item>
             </el-col>
@@ -292,15 +292,15 @@
           <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="收货地址" prop="receiver_address">
-                <el-input v-model="orderForm.receiver_address" type="textarea" :rows="2" placeholder="请输入收货地址（含收件人姓名、联系电话、详细地址）" class="w-full" :disabled="isFieldReadonly('receiver_address')" />
+                <el-input v-model="orderForm.receiver_address" type="textarea" :rows="2" placeholder="请输入收货地址（含收件人姓名、联系电话、详细地址）" class="w-full" :disabled="isFieldReadonly('receiver_address') || isShippedLocked" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="备注">
-                <!-- 发货端平时不可编辑备注；但状态选为"已退货/退款"时解锁，可填写退货原因 -->
-                <el-input v-model="orderForm.remark" type="textarea" :rows="2" placeholder="请输入备注信息" class="w-full" :disabled="isFieldReadonly('remark') && orderForm.shipping_status !== 'refunded'" />
+                <!-- 已发货订单整单锁定（仅可改状态为已退货）；发货端平时不可编辑备注，选已退货时解锁 -->
+                <el-input v-model="orderForm.remark" type="textarea" :rows="2" placeholder="请输入备注信息" class="w-full" :disabled="isShippedLocked || (isFieldReadonly('remark') && orderForm.shipping_status !== 'refunded')" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -369,23 +369,23 @@
           <div class="compact-row">
             <div class="compact-item" style="flex: 1;">
               <span class="compact-label">发货平台：</span>
-              <el-select v-model="orderForm.logistics_company" placeholder="请选择" style="width: 150px;" size="small">
+              <el-select v-model="orderForm.logistics_company" placeholder="请选择" style="width: 150px;" size="small" :disabled="isShippedLocked">
                 <el-option v-for="company in logisticsCompanies" :key="company.id" :label="company.company_name" :value="company.company_name" />
               </el-select>
             </div>
             <div class="compact-item" style="flex: 1;">
               <span class="compact-label">运费：</span>
-              <el-input v-model="orderForm.freight" placeholder="请输入运费" style="width: 200px;" size="small" type="number" :min="0" step="0.01" :disabled="isFieldReadonly('freight')" />
+              <el-input v-model="orderForm.freight" placeholder="请输入运费" style="width: 200px;" size="small" type="number" :min="0" step="0.01" :disabled="isFieldReadonly('freight') || isShippedLocked" />
             </div>
           </div>
           <div class="compact-row" style="margin-top: 10px;">
             <div class="compact-item" style="flex: 1;">
               <span class="compact-label">运单号1：</span>
-              <el-input v-model="orderForm.logistics_no" placeholder="请输入运单号1（选填）" style="width: 200px;" size="small" />
+              <el-input v-model="orderForm.logistics_no" placeholder="请输入运单号1（选填）" style="width: 200px;" size="small" :disabled="isShippedLocked" />
             </div>
             <div class="compact-item" style="flex: 1;">
               <span class="compact-label">运单号2：</span>
-              <el-input v-model="orderForm.logistics_no_2" placeholder="请输入运单号2（选填）" style="width: 200px;" size="small" />
+              <el-input v-model="orderForm.logistics_no_2" placeholder="请输入运单号2（选填）" style="width: 200px;" size="small" :disabled="isShippedLocked" />
             </div>
           </div>
         </div>
@@ -863,6 +863,11 @@ const isFactory = computed(() => userStore.role === 'factory')
  * 判断是否为发货角色
  */
 const isShipping = computed(() => userStore.role === 'shipping')
+
+// 已发货订单锁定：原发货状态为 shipped 时，整单除"状态下拉 + 退款备注"外全部只读，
+// 仅允许把状态改为"已退货/退款"（并填写必填的退款备注）
+const origShippingStatus = ref('')
+const isShippedLocked = computed(() => origShippingStatus.value === 'shipped')
 
 /**
  * 判断是否为销售或老板角色
@@ -1423,6 +1428,8 @@ async function editOrder(row) {
   }
   currentOrder.value = row
   dialogMode.value = 'edit'
+  // 记录原始发货状态：原状态为已发货时整单锁定，仅允许改状态为已退货/退款（并填退款备注）
+  origShippingStatus.value = row.shipping_status || 'pending'
   orderForm.order_id = row.order_id
   orderForm.shop_id = row.shop_id
   orderForm.platform_order_no = row.platform_order_no
@@ -1702,6 +1709,7 @@ async function submitOrder() {
  */
 function resetForm() {
   orderFormRef.value?.resetFields()
+  origShippingStatus.value = ''
   orderForm.shop_id = ''
   orderForm.platform_order_no = ''
   orderForm.product_name = ''

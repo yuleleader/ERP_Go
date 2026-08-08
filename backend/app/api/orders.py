@@ -575,6 +575,12 @@ async def update_order(
             )
 
     old_shipping_status = order.shipping_status
+
+    # 已发货订单锁定：仅允许修改状态为"已退货/退款"（及配套的退款备注），其他字段一律忽略
+    if order.shipping_status == "shipped":
+        update_data = {k: v for k, v in update_data.items() if k in ("shipping_status", "refund_note")}
+        if "shipping_status" in update_data and update_data["shipping_status"] not in ("shipped", "refunded"):
+            raise HTTPException(status_code=400, detail="已发货订单仅可改为已退货/退款")
     
     if "produce_status" in update_data:
         new_produce_status = update_data["produce_status"]
