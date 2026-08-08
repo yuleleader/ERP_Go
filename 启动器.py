@@ -219,7 +219,7 @@ class GaugeWidget(QWidget):
         self._progress = 0
         self._state = 'off'
         self._color = TEXT3
-        self.setMinimumWidth(160)
+        self.setMinimumWidth(70)
 
     def set_progress(self, width, state, color):
         self._progress = max(0, min(180, width))
@@ -233,8 +233,8 @@ class GaugeWidget(QWidget):
         w = self.width()
         bar_c = {'running': GREEN, 'error': ORANGE, 'starting': BLUE, 'off': '#c7c7cc'}.get(self._state, '#c7c7cc')
         # 顶部均衡器波形
-        heights = [5, 9, 6, 11, 7, 13, 8, 12, 6, 10, 7, 14, 9, 11, 6, 8, 10, 7, 12, 6, 9, 5]
-        bw, gap = 3, 4
+        heights = [4, 7, 5, 9, 6, 10, 6, 9, 5, 8, 6, 11, 7, 9, 5, 6, 8, 5, 9, 5, 7, 4]
+        bw, gap = 2, 3
         n = min(len(heights), w // (bw + gap))
         x0 = max(0, (w - n * (bw + gap)) // 2)
         p.setPen(Qt.NoPen)
@@ -242,17 +242,17 @@ class GaugeWidget(QWidget):
         for i in range(n):
             x = x0 + i * (bw + gap)
             hh = heights[i % len(heights)]
-            p.drawRoundedRect(x, (12 - hh) // 2, bw, hh, 1.5, 1.5)
+            p.drawRoundedRect(x, (11 - hh) // 2, bw, hh, 1.0, 1.0)
         # 进度轨道
         p.setBrush(QBrush(QColor('#e5e5ea')))
-        p.drawRoundedRect(0, 18, w, 6, 3, 3)
+        p.drawRoundedRect(0, 13, w, 4, 2, 2)
         if self._state in ('running', 'error', 'starting') and self._progress > 0:
             fw = int(self._progress / 180 * w)
             p.setBrush(QBrush(QColor(self._color)))
-            p.drawRoundedRect(0, 18, fw, 6, 3, 3)
-            kx = max(3, min(fw, w - 3))
+            p.drawRoundedRect(0, 13, fw, 4, 2, 2)
+            kx = max(2, min(fw, w - 2))
             p.setBrush(QBrush(QColor('#ffffff')))
-            p.drawEllipse(kx - 6, 18, 12, 12)
+            p.drawEllipse(kx - 4, 13, 8, 8)
         p.end()
 
 
@@ -265,75 +265,75 @@ class ServiceTile(QFrame):
         self._color = accent
         self._state = 'off'
         root = QHBoxLayout(self)
-        root.setContentsMargins(18, 16, 18, 16)
-        root.setSpacing(16)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(9)
 
         # 左侧图标
         self.icon_lbl = QLabel()
-        self.icon_lbl.setFixedSize(60, 60)
+        self.icon_lbl.setFixedSize(38, 38)
         self._draw_icon()
         root.addWidget(self.icon_lbl, alignment=Qt.AlignVCenter)
 
         # 中间信息列
         info = QVBoxLayout()
-        info.setSpacing(6)
+        info.setSpacing(1)
         info.setAlignment(Qt.AlignVCenter)
         if srv_tag:
             self.tag_lbl = QLabel(srv_tag)
-            self.tag_lbl.setStyleSheet(f"color:{BLUE}; font: bold 10px {FONT};")
+            self.tag_lbl.setStyleSheet(f"color:{BLUE}; font: bold 8px {FONT};")
             info.addWidget(self.tag_lbl)
         self.name_lbl = QLabel(name)
-        self.name_lbl.setStyleSheet(f"font: bold 16px {FONT}; color:{TEXT};")
+        self.name_lbl.setStyleSheet(f"font: bold 11px {FONT}; color:{TEXT};")
         info.addWidget(self.name_lbl)
         self.status_lbl = QLabel("未启动")
-        self.status_lbl.setStyleSheet(f"color:{TEXT3}; font: 12px {FONT};")
+        self.status_lbl.setStyleSheet(f"color:{TEXT3}; font: 9px {FONT};")
         info.addWidget(self.status_lbl)
         root.addLayout(info, 1)
 
         # 右侧控制列
         ctrl = QVBoxLayout()
-        ctrl.setSpacing(10)
+        ctrl.setSpacing(5)
         ctrl.setAlignment(Qt.AlignVCenter)
         self.gauge = GaugeWidget()
-        self.gauge.setFixedHeight(28)
-        self.gauge.setMinimumWidth(160)
+        self.gauge.setFixedHeight(20)
+        self.gauge.setMinimumWidth(70)
         ctrl.addWidget(self.gauge)
         self.toggle = QLabel()
-        self.toggle.setFixedSize(44, 22)
+        self.toggle.setFixedSize(32, 16)
         ctrl.addWidget(self.toggle, alignment=Qt.AlignRight)
         root.addLayout(ctrl, 1)
         self._draw_toggle(TEXT3)
 
     def _draw_icon(self):
-        pix = QPixmap(60, 60)
+        pix = QPixmap(38, 38)
         pix.fill(Qt.transparent)
         p = QPainter(pix)
         p.setRenderHint(QPainter.Antialiasing)
         p.setBrush(QBrush(QColor('#f2f2f7')))
         p.setPen(QPen(QColor(CARD_BORDER)))
-        p.drawRoundedRect(1, 1, 58, 58, 16, 16)
-        p.drawPixmap((60 - 30) // 2, (60 - 30) // 2, svg_icon(self.glyph, self._color, 30))
+        p.drawRoundedRect(1, 1, 36, 36, 10, 10)
+        p.drawPixmap((38 - 20) // 2, (38 - 20) // 2, svg_icon(self.glyph, self._color, 20))
         p.end()
         self.icon_lbl.setPixmap(pix)
 
     def _draw_toggle(self, fg):
         on = fg in (GREEN, ORANGE, BLUE)
-        pix = QPixmap(44, 22)
+        pix = QPixmap(32, 16)
         pix.fill(Qt.transparent)
         p = QPainter(pix)
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
         p.setBrush(QBrush(QColor(GREEN if on else '#e9e9ea')))
-        p.drawRoundedRect(0, 0, 44, 22, 11, 11)
-        kx = 33 if on else 11
+        p.drawRoundedRect(0, 0, 32, 16, 8, 8)
+        kx = 24 if on else 8
         p.setBrush(QBrush(QColor('#ffffff')))
-        p.drawEllipse(kx - 8, 11 - 8, 16, 16)
+        p.drawEllipse(kx - 6, 8 - 6, 12, 12)
         p.end()
         self.toggle.setPixmap(pix)
 
     def set_state(self, word, fg):
         self.status_lbl.setText(word)
-        self.status_lbl.setStyleSheet(f"color:{fg}; font: 12px {FONT};")
+        self.status_lbl.setStyleSheet(f"color:{fg}; font: 9px {FONT};")
         self._draw_toggle(fg)
 
     def set_progress(self, width, state, color):
@@ -356,7 +356,7 @@ class ActionButton(QWidget):
         self._press = False
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(4)
+        lay.setSpacing(2)
         lay.setAlignment(Qt.AlignCenter)
         self.icon_lbl = QLabel()
         self.icon_lbl.setAlignment(Qt.AlignCenter)
@@ -365,7 +365,7 @@ class ActionButton(QWidget):
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.text_lbl)
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(96)
+        self.setMinimumHeight(48)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._render()
 
@@ -384,9 +384,9 @@ class ActionButton(QWidget):
     def _render(self):
         bg = self._bg()
         fg = self._fg()
-        self.setStyleSheet(f"background:{bg}; border-radius:14px; border:none;")
-        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 34))
-        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 15px {FONT}; background:transparent;")
+        self.setStyleSheet(f"background:{bg}; border-radius:9px; border:none;")
+        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 20))
+        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 11px {FONT}; background:transparent;")
 
     def set_enabled(self, e):
         self._enabled = e
@@ -434,19 +434,19 @@ class NavItem(QWidget):
         self._active = False
         self._hover = False
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(12, 0, 14, 0)
-        lay.setSpacing(10)
+        lay.setContentsMargins(7, 0, 8, 0)
+        lay.setSpacing(6)
         self.indicator = QFrame()
-        self.indicator.setFixedWidth(4)
+        self.indicator.setFixedWidth(3)
         self.icon_lbl = QLabel()
         self.text_lbl = QLabel(text)
-        self.text_lbl.setStyleSheet(f"font: bold 14px {FONT};")
+        self.text_lbl.setStyleSheet(f"font: bold 11px {FONT};")
         lay.addWidget(self.indicator, alignment=Qt.AlignVCenter)
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.text_lbl)
         lay.addStretch()
         self.setCursor(Qt.PointingHandCursor)
-        self.setMinimumHeight(52)
+        self.setMinimumHeight(32)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._render()
 
@@ -457,11 +457,11 @@ class NavItem(QWidget):
             bg, fg, ind = '#f2f2f7', TEXT, 'transparent'
         else:
             bg, fg, ind = 'transparent', '#3f4248', 'transparent'
-        self.setStyleSheet(f"background:{bg}; border-radius:10px;")
-        self.indicator.setStyleSheet(f"background:{ind}; border-radius:2px; border:none;")
-        self.indicator.setFixedHeight(22 if self._active else 0)
-        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 22))
-        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 14px {FONT}; background:transparent;")
+        self.setStyleSheet(f"background:{bg}; border-radius:7px;")
+        self.indicator.setStyleSheet(f"background:{ind}; border-radius:1px; border:none;")
+        self.indicator.setFixedHeight(14 if self._active else 0)
+        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 15))
+        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 11px {FONT}; background:transparent;")
 
     def set_active(self, a):
         self._active = a
@@ -493,13 +493,13 @@ class TitleBar(QFrame):
         super().__init__(parent)
         self._parent = parent
         self._drag_pos = None
-        self.setFixedHeight(40)
+        self.setFixedHeight(30)
         self.setStyleSheet(f"background:{BG}; border: none;")
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         title = QLabel("ERP_GO 订单管理系统")
-        title.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; padding-left:16px;")
+        title.setStyleSheet(f"font: bold 11px {FONT}; color:{TEXT}; padding-left:10px;")
         title.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         lay.addWidget(title, alignment=Qt.AlignVCenter)
         lay.addStretch()
@@ -509,14 +509,14 @@ class TitleBar(QFrame):
 
     def _add_btn(self, icon_name, cmd, close=False):
         btn = QPushButton()
-        btn.setFixedSize(46, 40)
+        btn.setFixedSize(36, 30)
         btn.setCursor(Qt.PointingHandCursor)
         hover = RED if close else '#e8e8ed'
         btn.setStyleSheet(
             f"QPushButton{{background:{BG}; border:none;}}"
             f"QPushButton:hover{{background:{hover};}}"
         )
-        btn.setIcon(svg_icon(icon_name, TEXT if not close else TEXT, 16))
+        btn.setIcon(svg_icon(icon_name, TEXT if not close else TEXT, 13))
         btn.clicked.connect(cmd)
         self.layout().addWidget(btn)
         return btn
@@ -546,8 +546,8 @@ class LauncherApp(QWidget):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_StyledBackground, True)
-        self.setMinimumSize(980, 680)
-        self.resize(1240, 880)
+        self.setMinimumSize(620, 440)
+        self.resize(620, 440)
         self.setStyleSheet(f"LauncherApp{{background:{BG}; border:1px solid #c9c9cf;}}")
 
         self.bridge = Bridge()
@@ -630,65 +630,66 @@ class LauncherApp(QWidget):
 
     def _build_sidebar(self):
         self.sidebar = QWidget()
-        self.sidebar.setFixedWidth(220)
+        self.sidebar.setFixedWidth(132)
         self.sidebar.setStyleSheet(f"background:{SIDEBAR}; border:none;")
         v = QVBoxLayout(self.sidebar)
-        v.setContentsMargins(14, 20, 14, 16)
-        v.setSpacing(6)
+        v.setContentsMargins(8, 10, 8, 8)
+        v.setSpacing(3)
 
         # Logo 区
         logo_frame = QHBoxLayout()
-        logo_frame.setSpacing(10)
+        logo_frame.setSpacing(6)
         logo_lbl = QLabel()
-        logo_lbl.setFixedSize(40, 40)
-        pm = QPixmap(40, 40)
+        logo_lbl.setFixedSize(26, 26)
+        pm = QPixmap(26, 26)
         pm.fill(Qt.transparent)
         p = QPainter(pm)
         p.setRenderHint(QPainter.Antialiasing)
         logo_path = Path(__file__).resolve().parent / "frontend" / "src" / "assets" / "img" / "logo.png"
         if logo_path.exists():
-            p.drawPixmap(0, 0, QPixmap(str(logo_path)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            p.drawPixmap(0, 0, QPixmap(str(logo_path)).scaled(26, 26, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
             p.setBrush(QBrush(QColor(GREEN)))
             p.setPen(Qt.NoPen)
-            p.drawRoundedRect(2, 2, 36, 36, 8, 8)
+            p.drawRoundedRect(1, 1, 24, 24, 6, 6)
             p.drawText(pm.rect(), Qt.AlignCenter, "ERP")
         p.end()
         logo_lbl.setPixmap(pm)
         logo_frame.addWidget(logo_lbl)
         title_col = QVBoxLayout()
-        title_col.setSpacing(2)
-        t1 = QLabel("牛蛙产销协同系统")
-        t1.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT};")
+        title_col.setSpacing(0)
+        t1 = QLabel("牛蛙产销协同")
+        t1.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT};")
         t2 = QLabel("启动器")
-        t2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT3};")
+        t2.setStyleSheet(f"font: 8px {FONT}; color:{TEXT3};")
         title_col.addWidget(t1)
         title_col.addWidget(t2)
         logo_frame.addLayout(title_col)
+        logo_frame.addStretch()
         v.addLayout(logo_frame)
-        v.addSpacing(26)
+        v.addSpacing(12)
 
         def section(text):
             lbl = QLabel(text)
-            lbl.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT3}; padding-left:4px;")
+            lbl.setStyleSheet(f"font: bold 8px {FONT}; color:{TEXT3}; padding-left:3px;")
             return lbl
 
         v.addWidget(section("运行监控"))
-        v.addSpacing(6)
+        v.addSpacing(2)
         self.nav_home = NavItem('状态', 'home', self._show_home_view, self.sidebar)
         v.addWidget(self.nav_home)
         v.addStretch()
 
         v.addWidget(section("备份设置"))
-        v.addSpacing(6)
+        v.addSpacing(2)
         self.nav_settings = NavItem('备份', 'folder', self.open_settings, self.sidebar)
         self.nav_reset = NavItem('初始', 'restore', self._open_reset_view, self.sidebar)
         v.addWidget(self.nav_settings)
         v.addWidget(self.nav_reset)
 
-        v.addSpacing(18)
+        v.addSpacing(8)
         ver = QLabel('v3.0')
-        ver.setStyleSheet(f"font: 10px 'Segoe UI'; color:#5c6068; padding-left:4px;")
+        ver.setStyleSheet(f"font: 8px 'Segoe UI'; color:#5c6068; padding-left:3px;")
         v.addWidget(ver, alignment=Qt.AlignLeft)
         self._refresh_nav()
 
@@ -696,51 +697,52 @@ class LauncherApp(QWidget):
         self.home_page = QWidget()
         self.home_page.setStyleSheet(f"background:{BG};")
         root = QVBoxLayout(self.home_page)
-        root.setContentsMargins(28, 20, 28, 16)
+        root.setContentsMargins(12, 10, 12, 8)
         root.setSpacing(0)
 
         # 顶栏品牌 + 系统状态
         header = QHBoxLayout()
         brand = QHBoxLayout()
-        brand.setSpacing(12)
+        brand.setSpacing(7)
         bicon = QLabel()
-        bicon.setFixedSize(28, 28)
-        bp = QPixmap(28, 28)
+        bicon.setFixedSize(20, 20)
+        bp = QPixmap(20, 20)
         bp.fill(Qt.transparent)
         pp = QPainter(bp)
         pp.setRenderHint(QPainter.Antialiasing)
         pp.setBrush(QBrush(QColor(BLUE)))
         pp.setPen(Qt.NoPen)
-        pp.drawRoundedRect(1, 1, 26, 26, 8, 8)
+        pp.drawRoundedRect(1, 1, 18, 18, 6, 6)
         pp.drawText(bp.rect(), Qt.AlignCenter, "G")
         pp.end()
         bicon.setPixmap(bp)
         brand.addWidget(bicon)
         b1 = QLabel("ERP_GO 订单管理系统")
-        b1.setStyleSheet(f"font: bold 16px {FONT}; color:{TEXT};")
+        b1.setStyleSheet(f"font: bold 12px {FONT}; color:{TEXT};")
         b2 = QLabel("控制台")
-        b2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT2};")
+        b2.setStyleSheet(f"font: 9px {FONT}; color:{TEXT2};")
         brand.addWidget(b1)
         brand.addWidget(b2)
         header.addLayout(brand)
         header.addStretch()
         self.hdr_backend_lbl = QLabel("后端 8000")
-        self.hdr_backend_lbl.setStyleSheet(f"font: 10px {FONT}; color:{TEXT3};")
+        self.hdr_backend_lbl.setStyleSheet(f"font: 9px {FONT}; color:{TEXT3};")
         self.hdr_frontend_lbl = QLabel("前端 5173")
-        self.hdr_frontend_lbl.setStyleSheet(f"font: 10px {FONT}; color:{TEXT3};")
+        self.hdr_frontend_lbl.setStyleSheet(f"font: 9px {FONT}; color:{TEXT3};")
         header.addWidget(self.hdr_backend_lbl)
-        header.addSpacing(10)
+        header.addSpacing(6)
         header.addWidget(self.hdr_frontend_lbl)
         root.addLayout(header)
 
         line = QFrame()
-        line.setFixedHeight(2)
+        line.setFixedHeight(1)
         line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        root.addSpacing(6)
         root.addWidget(line)
-        root.addSpacing(14)
+        root.addSpacing(8)
 
         content = QHBoxLayout()
-        content.setSpacing(20)
+        content.setSpacing(9)
         content.setContentsMargins(0, 0, 0, 0)
         left_card, left_body = self._make_card("服务概览")
         right_card, right_body = self._make_card("实时日志")
@@ -752,18 +754,18 @@ class LauncherApp(QWidget):
         self.backend_tile = ServiceTile("后端接口服务", "SRV-01 · API", "server", GREEN)
         self.frontend_tile = ServiceTile("前端网页客户端", "SRV-02 · WEB", "window", BLUE)
         left_body.addWidget(self.backend_tile)
-        left_body.addSpacing(14)
+        left_body.addSpacing(7)
         left_body.addWidget(self.frontend_tile)
         left_body.addStretch()
 
         # 实时日志：页签 + 搜索 + 4 通道
         tab_row = QHBoxLayout()
-        tab_row.setSpacing(8)
+        tab_row.setSpacing(4)
         self.tab_buttons = []
         tab_specs = [("综合", "grid"), ("前端", "window"), ("后端", "server"), ("备份", "save")]
         for i, (t, ic) in enumerate(tab_specs):
             btn = QPushButton(t)
-            btn.setMinimumSize(80, 32)
+            btn.setMinimumSize(38, 22)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda _, idx=i: self._switch_tab(idx))
@@ -773,18 +775,18 @@ class LauncherApp(QWidget):
         right_body.addLayout(tab_row)
 
         search_row = QHBoxLayout()
-        search_row.setSpacing(8)
+        search_row.setSpacing(5)
         self.log_search = QLineEdit()
         self.log_search.setPlaceholderText("检索日志")
         self.log_search.setStyleSheet(
-            f"QLineEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-            f"padding:4px 10px; font:10px {FONT}; color:{TEXT2};}}")
+            f"QLineEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:6px; "
+            f"padding:2px 7px; font:9px {FONT}; color:{TEXT2};}}")
         self.log_search.textChanged.connect(self._on_filter_changed)
         search_btn = QPushButton()
-        search_btn.setFixedSize(74, 26)
+        search_btn.setFixedSize(38, 20)
         search_btn.setCursor(Qt.PointingHandCursor)
-        search_btn.setIcon(svg_icon('search', TEXT2, 15))
-        search_btn.setStyleSheet(f"QPushButton{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px;}}")
+        search_btn.setIcon(svg_icon('search', TEXT2, 12))
+        search_btn.setStyleSheet(f"QPushButton{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:6px;}}")
         search_btn.clicked.connect(lambda: self._apply_filter(self.log_search.text()))
         search_row.addWidget(self.log_search, 1)
         search_row.addWidget(search_btn)
@@ -800,8 +802,8 @@ class LauncherApp(QWidget):
         for w in (self.all_log, self.frontend_log, self.backend_log, self.backup_log):
             w.setReadOnly(True)
             w.setStyleSheet(
-                f"QTextEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-                f"font:9pt Consolas; color:{TEXT}; padding:8px;}}")
+                f"QTextEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:6px; "
+                f"font:7pt Consolas; color:{TEXT}; padding:4px;}}")
             self.log_stack.addWidget(w)
         log_area.addWidget(self.log_stack, 1)
         right_body.addLayout(log_area, 1)
@@ -811,21 +813,21 @@ class LauncherApp(QWidget):
         card.setObjectName('card')
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(8)
+        v.setSpacing(4)
         t = QLabel(title)
-        t.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; padding:14px 16px 6px 16px;")
+        t.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT}; padding:8px 9px 3px 9px;")
         v.addWidget(t)
         body = QWidget()
         bv = QVBoxLayout(body)
-        bv.setContentsMargins(16, 0, 16, 14)
-        bv.setSpacing(8)
+        bv.setContentsMargins(9, 0, 9, 8)
+        bv.setSpacing(5)
         v.addWidget(body, 1)
         return card, bv
 
     def _build_bottom_row(self):
         self.bottom_row = QWidget()
         self.bottom_row.setStyleSheet(f"background:{BG};")
-        self.bottom_row.setFixedHeight(132)
+        self.bottom_row.setFixedHeight(68)
         v = QVBoxLayout(self.bottom_row)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
@@ -834,8 +836,8 @@ class LauncherApp(QWidget):
         line.setStyleSheet(f"background:{DIVIDER}; border:none;")
         v.addWidget(line)
         lay = QHBoxLayout()
-        lay.setContentsMargins(28, 16, 28, 20)
-        lay.setSpacing(18)
+        lay.setContentsMargins(12, 8, 12, 10)
+        lay.setSpacing(8)
         self.start_btn = ActionButton("启动系统", "play", BTN_SPEC['start'], self.start_services)
         self.stop_btn = ActionButton("停止系统", "stop", BTN_SPEC['stop'], self.stop_services)
         self.open_btn = ActionButton("打开页面", "browser", BTN_SPEC['open'], self.open_browser)
@@ -902,8 +904,8 @@ class LauncherApp(QWidget):
             else:
                 bg, fg = '#f0f0f3', '#8e8e93'
             btn.setStyleSheet(
-                f"QPushButton{{background:{bg}; color:{fg}; border:none; border-radius:8px; "
-                f"font: bold 11px {FONT};}}")
+                f"QPushButton{{background:{bg}; color:{fg}; border:none; border-radius:6px; "
+                f"font: bold 9px {FONT};}}")
 
     def _on_filter_changed(self, text):
         self.log_filter = text.strip()
@@ -1545,22 +1547,23 @@ class LauncherApp(QWidget):
         today = datetime.now().strftime('%Y%m%d')
         dlg = QDialog(self)
         dlg.setWindowTitle("管理员验证")
-        dlg.setFixedSize(380, 200)
+        dlg.setFixedSize(280, 160)
         dlg.setStyleSheet(f"QDialog{{background:{BG};}}")
         dv = QVBoxLayout(dlg)
-        dv.setContentsMargins(20, 18, 20, 18)
+        dv.setContentsMargins(14, 12, 14, 12)
+        dv.setSpacing(5)
         t1 = QLabel("恢复出厂需要管理员验证")
-        t1.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT};")
+        t1.setStyleSheet(f"font: bold 11px {FONT}; color:{TEXT};")
         t2 = QLabel("请输入密码：")
-        t2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT2};")
+        t2.setStyleSheet(f"font: 9px {FONT}; color:{TEXT2};")
         pwd = QLineEdit()
         pwd.setEchoMode(QLineEdit.Password)
         pwd.setAlignment(Qt.AlignCenter)
         pwd.setStyleSheet(
-            f"QLineEdit{{border:1px solid {CARD_BORDER}; border-radius:8px; padding:6px; "
-            f"font:12pt 'Segoe UI'; background:{CARD};}}")
+            f"QLineEdit{{border:1px solid {CARD_BORDER}; border-radius:6px; padding:4px; "
+            f"font:10pt 'Segoe UI'; background:{CARD};}}")
         err = QLabel("")
-        err.setStyleSheet(f"color:{RED}; font: 9px {FONT};")
+        err.setStyleSheet(f"color:{RED}; font: 8px {FONT};")
 
         def to_half_width(s):
             out = []
@@ -1584,10 +1587,10 @@ class LauncherApp(QWidget):
         cancel = QPushButton("取消")
         ok = QPushButton("确定")
         for b in (cancel, ok):
-            b.setFixedWidth(80)
+            b.setFixedWidth(62)
             b.setCursor(Qt.PointingHandCursor)
             b.setStyleSheet(f"QPushButton{{background:{CARD}; border:1px solid {CARD_BORDER}; "
-                            f"border-radius:8px; padding:6px; font:11px {FONT};}}"
+                            f"border-radius:6px; padding:4px; font:9px {FONT};}}"
                             f"QPushButton:hover{{background:#e8e8ed;}}")
         cancel.clicked.connect(dlg.reject)
         ok.clicked.connect(on_confirm)
@@ -1615,24 +1618,24 @@ class LauncherApp(QWidget):
     def _build_settings_view(self):
         page = self.settings_page
         root = QVBoxLayout(page)
-        root.setContentsMargins(20, 16, 20, 16)
-        root.setSpacing(8)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(5)
         h = QVBoxLayout()
-        h.setSpacing(2)
+        h.setSpacing(0)
         t1 = QLabel("数据库备份与还原")
-        t1.setStyleSheet(f"font: bold 16px {FONT}; color:{TEXT};")
-        t2 = QLabel("管理数据库备份目录、自动备份计划与还原操作")
-        t2.setStyleSheet(f"font: 9px 'Segoe UI'; color:{TEXT2};")
+        t1.setStyleSheet(f"font: bold 12px {FONT}; color:{TEXT};")
+        t2 = QLabel("管理备份目录、自动备份计划与还原操作")
+        t2.setStyleSheet(f"font: 8px 'Segoe UI'; color:{TEXT2};")
         h.addWidget(t1)
         h.addWidget(t2)
         root.addLayout(h)
 
         cols = QHBoxLayout()
-        cols.setSpacing(16)
+        cols.setSpacing(8)
         left = QVBoxLayout()
-        left.setSpacing(12)
+        left.setSpacing(6)
         right = QVBoxLayout()
-        right.setSpacing(12)
+        right.setSpacing(6)
         cols.addLayout(left, 1)
         cols.addLayout(right, 1)
         root.addLayout(cols, 1)
@@ -1641,9 +1644,9 @@ class LauncherApp(QWidget):
         c1, b1 = self._make_card_settings("备份设置")
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("备份目录:"))
-        row1.itemAt(0).widget().setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
+        row1.itemAt(0).widget().setStyleSheet(f"font:9px {FONT}; color:{TEXT};")
         self.settings_backup_dir_var = QLabel(self.backup_config.get('backup_dir', ''))
-        self.settings_backup_dir_var.setStyleSheet(f"font:9pt 'Segoe UI'; color:{TEXT2};")
+        self.settings_backup_dir_var.setStyleSheet(f"font:7pt 'Segoe UI'; color:{TEXT2};")
         self.settings_backup_dir_var.setWordWrap(True)
         row1.addWidget(self.settings_backup_dir_var, 1)
         b1.addLayout(row1)
@@ -1661,15 +1664,15 @@ class LauncherApp(QWidget):
         wlabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         self.settings_auto_enabled = QCheckBox("启用自动备份")
         self.settings_auto_enabled.setChecked(auto.get('enabled', False))
-        self.settings_auto_enabled.setStyleSheet(f"font:11px {FONT}; color:{TEXT};")
+        self.settings_auto_enabled.setStyleSheet(f"font:9px {FONT}; color:{TEXT};")
         b2.addWidget(self.settings_auto_enabled)
-        b2.addSpacing(4)
+        b2.addSpacing(2)
 
-        lbl_style = f"font:11px {FONT}; color:{TEXT2};"
+        lbl_style = f"font:9px {FONT}; color:{TEXT2};"
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(10)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
 
@@ -1695,7 +1698,7 @@ class LauncherApp(QWidget):
         self.weekday_container = QWidget()
         wcv = QHBoxLayout(self.weekday_container)
         wcv.setContentsMargins(0, 0, 0, 0)
-        wcv.setSpacing(10)
+        wcv.setSpacing(6)
         l_week = QLabel("星期:")
         l_week.setStyleSheet(lbl_style)
         self.weekday_combo = QComboBox()
@@ -1710,7 +1713,7 @@ class LauncherApp(QWidget):
         self.day_container = QWidget()
         dcv = QHBoxLayout(self.day_container)
         dcv.setContentsMargins(0, 0, 0, 0)
-        dcv.setSpacing(10)
+        dcv.setSpacing(6)
         l_day = QLabel("日期:")
         l_day.setStyleSheet(lbl_style)
         self.day_combo = QComboBox()
@@ -1723,10 +1726,10 @@ class LauncherApp(QWidget):
         grid.addWidget(self.day_container, 1, 2, 1, 2)
 
         b2.addLayout(grid)
-        b2.addSpacing(6)
+        b2.addSpacing(3)
         row2c = QHBoxLayout()
         self.settings_next_backup = QLabel("")
-        self.settings_next_backup.setStyleSheet(f"font:10px 'Segoe UI'; color:{TEXT2};")
+        self.settings_next_backup.setStyleSheet(f"font:8px 'Segoe UI'; color:{TEXT2};")
         row2c.addWidget(self.settings_next_backup, 1)
         row2c.addStretch()
         self._settings_btn(row2c, "保存设置", PURPLE, self._save_auto_backup_settings)
@@ -1737,14 +1740,14 @@ class LauncherApp(QWidget):
         c3, b3 = self._make_card_settings("还原操作")
         row3 = QHBoxLayout()
         row3.addWidget(QLabel("备份文件列表:"))
-        row3.itemAt(0).widget().setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
+        row3.itemAt(0).widget().setStyleSheet(f"font:9px {FONT}; color:{TEXT};")
         row3.addStretch()
         self._settings_btn(row3, "刷新列表", BLUE, self._refresh_backup_list)
         b3.addLayout(row3)
         self.settings_backup_listbox = QListWidget()
         self.settings_backup_listbox.setStyleSheet(
-            f"QListWidget{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-            f"font:10pt Consolas; color:{TEXT};}}")
+            f"QListWidget{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:6px; "
+            f"font:7pt Consolas; color:{TEXT};}}")
         b3.addWidget(self.settings_backup_listbox, 1)
         row3c = QHBoxLayout()
         row3c.addStretch()
@@ -1758,8 +1761,8 @@ class LauncherApp(QWidget):
         self.settings_log_text = QTextEdit()
         self.settings_log_text.setReadOnly(True)
         self.settings_log_text.setStyleSheet(
-            f"QTextEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-            f"font:9pt Consolas; color:{TEXT}; padding:8px;}}")
+            f"QTextEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:6px; "
+            f"font:7pt Consolas; color:{TEXT}; padding:4px;}}")
         b4.addWidget(self.settings_log_text, 1)
         right.addWidget(c4, 1)
 
@@ -1771,35 +1774,35 @@ class LauncherApp(QWidget):
         card.setObjectName('card')
         v = QVBoxLayout(card)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(8)
+        v.setSpacing(4)
         t = QLabel(title)
-        t.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; padding:14px 16px 6px 16px;")
+        t.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT}; padding:8px 9px 3px 9px;")
         v.addWidget(t)
         body = QWidget()
         bv = QVBoxLayout(body)
-        bv.setContentsMargins(16, 0, 16, 14)
-        bv.setSpacing(8)
+        bv.setContentsMargins(9, 0, 9, 8)
+        bv.setSpacing(5)
         v.addWidget(body, 1)
         return card, bv
 
     def _style_combo(self, combo):
-        combo.setFixedWidth(110)
+        combo.setFixedWidth(72)
         combo.setCursor(Qt.PointingHandCursor)
         combo.setStyleSheet(
-            f"QComboBox{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-            f"padding:4px 8px; font:10px {FONT}; color:{TEXT};}}"
+            f"QComboBox{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:6px; "
+            f"padding:2px 6px; font:9px {FONT}; color:{TEXT};}}"
             f"QComboBox::drop-down{{border:none;}}"
             f"QComboBox QAbstractItemView{{background:{CARD}; selection-background-color:{BLUE}; "
-            f"color:{TEXT}; font:10px {FONT};}}")
+            f"color:{TEXT}; font:9px {FONT};}}")
 
     def _settings_btn(self, layout, text, color, cmd):
         btn = QPushButton(text)
-        btn.setFixedHeight(32)
+        btn.setFixedHeight(22)
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(cmd)
         btn.setStyleSheet(
-            f"QPushButton{{background:{color}; color:#ffffff; border:none; border-radius:8px; "
-            f"font: bold 10px {FONT}; padding:0 14px;}}"
+            f"QPushButton{{background:{color}; color:#ffffff; border:none; border-radius:6px; "
+            f"font: bold 9px {FONT}; padding:0 9px;}}"
             f"QPushButton:hover{{background:{color};}}")
         layout.addWidget(btn)
         return btn
@@ -1933,38 +1936,39 @@ class LauncherApp(QWidget):
     def _build_reset_view(self):
         page = self.reset_page
         root = QVBoxLayout(page)
-        root.setContentsMargins(20, 16, 20, 14)
-        root.setSpacing(8)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(5)
         h = QVBoxLayout()
-        h.setSpacing(2)
+        h.setSpacing(0)
         t1 = QLabel("恢复出厂设置")
-        t1.setStyleSheet(f"font: bold 16px {FONT}; color:{RED};")
+        t1.setStyleSheet(f"font: bold 12px {FONT}; color:{RED};")
         t2 = QLabel("清空全部业务数据并重建系统（等同于重新初始化数据库）")
-        t2.setStyleSheet(f"font: 9px 'Segoe UI'; color:{TEXT2};")
+        t2.setStyleSheet(f"font: 8px 'Segoe UI'; color:{TEXT2};")
         h.addWidget(t1)
         h.addWidget(t2)
         root.addLayout(h)
 
         warn = QFrame()
-        warn.setStyleSheet(f"QFrame{{background:#fff8f7; border-left:4px solid {RED}; border-radius:8px;}}")
+        warn.setStyleSheet(f"QFrame{{background:#fff8f7; border-left:3px solid {RED}; border-radius:6px;}}")
         wv = QVBoxLayout(warn)
-        wv.setContentsMargins(14, 12, 14, 12)
+        wv.setContentsMargins(8, 6, 8, 6)
+        wv.setSpacing(1)
         w1 = QLabel("⚠ 危险操作，不可恢复！")
-        w1.setStyleSheet(f"font: bold 12px {FONT}; color:{RED};")
+        w1.setStyleSheet(f"font: bold 10px {FONT}; color:{RED};")
         w2 = QLabel("执行后将清空以下内容，且无法找回，请先确认已做好备份：")
-        w2.setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
+        w2.setStyleSheet(f"font:8px {FONT}; color:{TEXT};")
         w3 = QLabel("订单、网店、商品、类别、品牌、物流公司、图片、日志、站内信、提现记录、除1001外的账号")
-        w3.setStyleSheet(f"font:9px {FONT}; color:{TEXT2};")
+        w3.setStyleSheet(f"font:8px {FONT}; color:{TEXT2};")
         w3.setWordWrap(True)
         w4 = QLabel("保留：管理员账号(1001)、系统配置、默认类别(999-其他类别)、默认品牌(999-默认品牌)")
-        w4.setStyleSheet(f"font:9px {FONT}; color:{GREEN};")
+        w4.setStyleSheet(f"font:8px {FONT}; color:{GREEN};")
         w4.setWordWrap(True)
         for w in (w1, w2, w3, w4):
             wv.addWidget(w)
         root.addWidget(warn)
 
         opt = QVBoxLayout()
-        opt.setSpacing(4)
+        opt.setSpacing(1)
         self.reset_opt_data = QCheckBox("清空业务数据（订单/网店/商品/类别/品牌/日志等）")
         self.reset_opt_images = QCheckBox("清理图片文件（订单/商品/临时图片）")
         self.reset_opt_restart = QCheckBox("执行后重新启动后端与前端")
@@ -1972,17 +1976,17 @@ class LauncherApp(QWidget):
         self.reset_opt_images.setChecked(True)
         self.reset_opt_restart.setChecked(False)
         for c in (self.reset_opt_data, self.reset_opt_images, self.reset_opt_restart):
-            c.setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
+            c.setStyleSheet(f"font:9px {FONT}; color:{TEXT};")
             opt.addWidget(c)
         root.addLayout(opt)
 
         act = QHBoxLayout()
         self.reset_exec_btn = QPushButton("执行恢复出厂")
-        self.reset_exec_btn.setFixedHeight(36)
+        self.reset_exec_btn.setFixedHeight(24)
         self.reset_exec_btn.setCursor(Qt.PointingHandCursor)
         self.reset_exec_btn.setStyleSheet(
-            f"QPushButton{{background:{RED}; color:#fff; border:none; border-radius:8px; "
-            f"font: bold 11px {FONT}; padding:0 20px;}}"
+            f"QPushButton{{background:{RED}; color:#fff; border:none; border-radius:6px; "
+            f"font: bold 9px {FONT}; padding:0 12px;}}"
             f"QPushButton:hover{{background:{RED_L};}} QPushButton:pressed{{background:{RED_D};}}")
         self.reset_exec_btn.clicked.connect(self._do_factory_reset)
         act.addWidget(self.reset_exec_btn)
@@ -1990,7 +1994,7 @@ class LauncherApp(QWidget):
         root.addLayout(act)
 
         rl = QLabel("执行日志：")
-        rl.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT};")
+        rl.setStyleSheet(f"font: bold 9px {FONT}; color:{TEXT};")
         root.addWidget(rl)
         log_frame = QFrame()
         lf = QVBoxLayout(log_frame)
@@ -1998,8 +2002,8 @@ class LauncherApp(QWidget):
         self.reset_log_text = QTextEdit()
         self.reset_log_text.setReadOnly(True)
         self.reset_log_text.setStyleSheet(
-            "QTextEdit{background:#1e1e1e; color:#d4d4d4; border-radius:8px; "
-            "font:9pt Consolas; padding:8px;}")
+            "QTextEdit{background:#1e1e1e; color:#d4d4d4; border-radius:6px; "
+            "font:7pt Consolas; padding:4px;}")
         lf.addWidget(self.reset_log_text)
         root.addWidget(log_frame, 1)
         self.on_resetlog("待命。点击「执行恢复出厂」开始（将先停止后端/前端服务）。")
