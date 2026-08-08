@@ -304,6 +304,14 @@
               </el-form-item>
             </el-col>
           </el-row>
+          <!-- 退款备注：与普通备注为两个独立字段，仅状态为"已退货/退款"时显示且必填 -->
+          <el-row :gutter="20" v-if="orderForm.shipping_status === 'refunded'">
+            <el-col :span="24">
+              <el-form-item label="退款备注" prop="refund_note" :required="orderForm.shipping_status === 'refunded'">
+                <el-input v-model="orderForm.refund_note" type="textarea" :rows="2" placeholder="请填写退款原因（已退货/退款订单必填）" class="w-full" />
+              </el-form-item>
+            </el-col>
+          </el-row>
         </div>
 
         <!-- 生产进度区域 -->
@@ -549,6 +557,10 @@
           <div style="display: flex; align-items: flex-start;" v-if="isFullFieldRole">
             <span style="width: 100px; color: #666; font-weight: 500; flex-shrink: 0;">备注：</span>
             <span style="color: #333;">{{ currentOrder.remark || '——' }}</span>
+          </div>
+          <div style="display: flex; align-items: flex-start; margin-top: 6px;" v-if="currentOrder.shipping_status === 'refunded'">
+            <span style="width: 100px; color: #f56c6c; font-weight: 500; flex-shrink: 0;">退款备注：</span>
+            <span style="color: #333;">{{ currentOrder.refund_note || '——' }}</span>
           </div>
         </div>
 
@@ -896,6 +908,7 @@ const orderForm = reactive({
   freight: '',
   receiver_address: '',
   remark: '',
+  refund_note: '',
   logistics_company: '',
   logistics_no: '',
   logistics_no_2: '',
@@ -1418,6 +1431,7 @@ async function editOrder(row) {
   orderForm.freight = row.freight || ''
   orderForm.receiver_address = row.receiver_address
   orderForm.remark = row.remark
+  orderForm.refund_note = row.refund_note || ''
   orderForm.logistics_company = row.logistics_company || ''
   orderForm.logistics_no = row.logistics_no || ''
   orderForm.logistics_no_2 = row.logistics_no_2 || ''
@@ -1623,7 +1637,7 @@ async function submitOrder() {
       const isShippingRole = userStore.role === 'shipping'
 
       // 发货端仅允许编辑发货状态、物流公司、运单号1、运单号2、运费，禁止发送其他字段；
-      // 例外：状态选为"已退货/退款"时允许提交备注（退货原因）
+      // 例外：状态选为"已退货/退款"时允许提交备注与退款备注（退货原因）
       const data = isShippingRole
         ? {
             shipping_status: orderForm.shipping_status,
@@ -1631,7 +1645,9 @@ async function submitOrder() {
             logistics_no: orderForm.logistics_no,
             logistics_no_2: orderForm.logistics_no_2,
             freight: orderForm.freight ?? '',
-            ...(orderForm.shipping_status === 'refunded' ? { remark: orderForm.remark ?? '' } : {})
+            ...(orderForm.shipping_status === 'refunded'
+              ? { remark: orderForm.remark ?? '', refund_note: orderForm.refund_note ?? '' }
+              : {})
           }
         : {
             shop_id: orderForm.shop_id,
@@ -1641,6 +1657,7 @@ async function submitOrder() {
             freight: orderForm.freight,
             receiver_address: orderForm.receiver_address,
             remark: orderForm.remark,
+            refund_note: orderForm.refund_note,
             logistics_company: orderForm.logistics_company,
             logistics_no: orderForm.logistics_no,
             logistics_no_2: orderForm.logistics_no_2,
@@ -1692,6 +1709,7 @@ function resetForm() {
   orderForm.freight = ''
   orderForm.receiver_address = ''
   orderForm.remark = ''
+  orderForm.refund_note = ''
   orderForm.logistics_company = ''
   orderForm.logistics_no = ''
   orderForm.logistics_no_2 = ''

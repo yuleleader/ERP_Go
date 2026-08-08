@@ -212,9 +212,9 @@
   }
 
   function editableFields(role){
-    if(role==="factory") return ["produce_status","remark"];
-    if(role==="shipping") return ["shipping_status","logistics_company","logistics_no","logistics_no_2","freight","remark"];
-    return ["produce_status","shipping_status","logistics_company","logistics_no","logistics_no_2","freight","remark"];
+    if(role==="factory") return ["produce_status","remark","refund_note"];
+    if(role==="shipping") return ["shipping_status","logistics_company","logistics_no","logistics_no_2","freight","remark","refund_note"];
+    return ["produce_status","shipping_status","logistics_company","logistics_no","logistics_no_2","freight","remark","refund_note"];
   }
   function uploadModule(){
     if(state.user.role==="shipping") return "shipping";
@@ -432,7 +432,7 @@
       if(f==="produce_status"){
         html+='<label>生产状态</label><select id="edit-produce_status">'+Object.entries(PRODUCE_MAP).map(([k,l])=>'<option value="'+k+'"'+(k===val?" selected":"")+'>'+l+'</option>').join("")+'</select>';
       } else if(f==="shipping_status"){
-        html+='<label>发货状态</label><select id="edit-shipping_status">'+Object.entries(SHIP_MAP).map(([k,l])=>'<option value="'+k+'"'+(k===val?" selected":"")+'>'+l+'</option>').join("")+'</select>';
+        html+='<label>发货状态</label><select id="edit-shipping_status" onchange="state.order.shipping_status=this.value;renderEdit(state.order)">'+Object.entries(SHIP_MAP).map(([k,l])=>'<option value="'+k+'"'+(k===val?" selected":"")+'>'+l+'</option>').join("")+'</select>';
       } else if(f==="logistics_company"){
         const opts = (state.logisticsCompanies||[]).map(c=>'<option value="'+esc(c.company_name)+'"'+(c.company_name===val?" selected":"")+'>'+esc(c.company_name)+'</option>').join("");
         html+='<label>物流公司</label><select id="edit-logistics_company">'+opts+'</select>';
@@ -444,6 +444,11 @@
         html+='<label>运费</label><input id="edit-freight" value="'+esc(val)+'" inputmode="decimal">';
       } else if(f==="remark"){
         html+='<label>备注</label><textarea id="edit-remark" rows="3">'+esc(val)+'</textarea>';
+      } else if(f==="refund_note"){
+        // 退款备注：与普通备注独立，仅当发货状态为"已退货/退款"时显示并必填
+        if(state.order.shipping_status==="refunded"){
+          html+='<label>退款备注（必填）</label><textarea id="edit-refund_note" rows="2" placeholder="请填写退款原因">'+esc(val)+'</textarea>';
+        }
       }
     });
     $("editForm").innerHTML=html;

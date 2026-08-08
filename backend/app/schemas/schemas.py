@@ -81,6 +81,7 @@ class OrderBase(BaseModel):
     logistics_no_2: Optional[str] = None  # 运单号2（选填）
     receiver_address: Optional[str] = None
     remark: Optional[str] = None
+    refund_note: Optional[str] = None  # 退款备注（仅已退货/退款订单必填，与 remark 独立）
 
     @field_validator("sales_amount", "freight", mode="before")
     @classmethod
@@ -106,6 +107,7 @@ class OrderUpdate(BaseModel):
     freight: Optional[float] = None
     receiver_address: Optional[str] = None
     remark: Optional[str] = None
+    refund_note: Optional[str] = None  # 退款备注（仅已退货/退款订单必填，与 remark 独立）
     created_at: Optional[datetime] = None
     shipping_time: Optional[datetime] = None
     produce_status: Optional[str] = None

@@ -63,6 +63,7 @@ class Order(Base):
     receiver_address = Column(Text, nullable=True)
     detected_country = Column(String(100), nullable=True, index=True)  # 离线/翻译/搜索识别出的国家中文名；NULL=未计算, ""=识别不到
     remark = Column(Text, nullable=True)
+    refund_note = Column(Text, nullable=True)  # 退款备注（仅已退货/退款订单，编辑时必填；与 remark 为两个独立字段）
     commission_rate = Column(Integer, nullable=True)
     commission_amount = Column(String(20), nullable=True)
     created_by = Column(String(50), nullable=True)

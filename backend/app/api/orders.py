@@ -187,6 +187,10 @@ async def create_order(
             order_data.product_name, order_data.sales_amount, db
         )
 
+        # 创建即为已退货/退款时，退款备注必填
+        if order_data.shipping_status == "refunded" and not (order_data.refund_note or "").strip():
+            raise HTTPException(status_code=400, detail="已退货/退款订单必须填写退款备注")
+
         new_order = Order(
             order_id=order_id,
             shop_id=order_data.shop_id,
@@ -197,6 +201,7 @@ async def create_order(
             shipping_status=order_data.shipping_status,
             receiver_address=order_data.receiver_address,
             remark=order_data.remark,
+            refund_note=order_data.refund_note,
             commission_rate=current_user.commission_rate,
             commission_amount=commission_amount,
             created_by=current_user.username,
@@ -241,7 +246,8 @@ async def create_order(
             "created_by": str(new_order.created_by) if new_order.created_by else None,
             "creator_real_name": current_user.real_name or current_user.username,
             "created_at": new_order.created_at,
-            "order_days": effective_order_days(new_order)
+            "order_days": effective_order_days(new_order),
+            "refund_note": new_order.refund_note
         }
         
         try:
@@ -351,6 +357,7 @@ async def get_orders(
             "shipping_time": order.shipping_time,
             "receiver_address": order.receiver_address,
             "remark": order.remark,
+            "refund_note": order.refund_note,
             "commission_rate": order.commission_rate,
             "commission_amount": order.commission_amount,
             "created_by": str(order.created_by) if order.created_by else None,
@@ -399,6 +406,7 @@ async def _serialize_order(order, db: AsyncSession, current_user):
         "shipping_time": order.shipping_time,
         "receiver_address": order.receiver_address,
         "remark": order.remark,
+        "refund_note": order.refund_note,
         "commission_rate": order.commission_rate,
         "commission_amount": order.commission_amount,
         "created_by": str(order.created_by) if order.created_by else None,
@@ -647,7 +655,11 @@ async def update_order(
         if new_status in _FROZEN_DAYS_STATUSES and old_shipping_status not in _FROZEN_DAYS_STATUSES:
             order.order_days = calculate_order_days(order.created_at)
             changes.append(f"下单时长: 冻结为 {order.order_days} 天")
-    
+
+    # 已退货/退款订单：退款备注必填（与普通备注 remark 是两个独立字段）
+    if order.shipping_status == "refunded" and not (order.refund_note or "").strip():
+        raise HTTPException(status_code=400, detail="已退货/退款订单必须填写退款备注")
+
     # 收货地址发生变更 → 重置国家识别结果，智慧大屏下次刷新会按新地址重新识别
     if "receiver_address" in update_data and update_data["receiver_address"] != old_receiver_address:
         order.detected_country = None
@@ -701,6 +713,7 @@ async def update_order(
         "shipping_time": order.shipping_time,
         "receiver_address": order.receiver_address,
         "remark": order.remark,
+        "refund_note": order.refund_note,
         "commission_rate": order.commission_rate,
         "commission_amount": order.commission_amount,
         "created_by": str(order.created_by) if order.created_by else None,
