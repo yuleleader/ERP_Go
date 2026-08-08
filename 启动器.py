@@ -903,7 +903,7 @@ class WindowsLauncherApp:
             card.pack(fill=tk.X)
 
         def _on_card_configure(event):
-            card.delete('bg')
+            card.delete('all')
             r = 16
             w, h = event.width, event.height
             # 柔和投影
@@ -2525,7 +2525,7 @@ class WindowsLauncherApp:
             if kind == 'min':
                 cv.create_rectangle(cx - 6, cy - 1, cx + 6, cy + 1, fill=fg, outline='')
             elif kind == 'max':
-                if self.root.state() == 'zoomed':
+                if getattr(self, '_zoomed', False):
                     # 还原图标：外框 + 内层框（右上重叠）
                     cv.create_rectangle(cx - 7, cy - 6, cx + 6, cy + 7, outline=fg, width=1.3)
                     cv.create_rectangle(cx - 4, cy - 3, cx + 9, cy + 5,
@@ -2652,11 +2652,42 @@ class WindowsLauncherApp:
         self._tray_icon = None
 
     def _on_zoom(self):
+        """最大化/还原。
+
+        无边框窗口(overrideredirect)在 Windows Tcl/Tk 下**不能**用 state('zoomed')：
+        Windows Tcl/Tk 底层对无边框窗口执行 zoomed 最大化时，旧画布缓冲区不会自动
+        擦除——旧一帧画面保留、新布局渲染在下方，视觉上就是"一模一样两份界面上下堆叠"。
+        改用"记录正常几何 + 手动铺满工作区(SPI_GETWORKAREA)"，行为一致且无缓冲残留坑。
+        """
         try:
-            if self.root.state() == 'zoomed':
-                self.root.state('normal')
+            if getattr(self, '_zoomed', False):
+                # 还原：恢复到最大化前记录的正常几何
+                self.root.geometry(getattr(self, '_normal_geo', '1240x880'))
+                self._zoomed = False
             else:
-                self.root.state('zoomed')
+                # 记录当前正常几何（每次最大化都覆盖，避免还原后拖动过窗口再最大化时用旧值）
+                self._normal_geo = (
+                    f"{self.root.winfo_width()}x{self.root.winfo_height()}"
+                    f"+{self.root.winfo_x()}+{self.root.winfo_y()}"
+                )
+                # 铺满 Windows 工作区（不含任务栏）
+                try:
+                    import ctypes
+                    rect = ctypes.wintypes.RECT()
+                    # SPI_GETWORKAREA = 0x0030
+                    ctypes.windll.user32.SystemParametersInfoW(
+                        0x0030, 0, ctypes.byref(rect), 0)
+                    wa, ha = rect.right - rect.left, rect.bottom - rect.top
+                except Exception:
+                    wa = self.root.winfo_screenwidth()
+                    ha = self.root.winfo_screenheight()
+                self.root.geometry(f"{wa}x{ha}+0+0")
+                self._zoomed = True
+        except Exception:
+            pass
+        # 让 <Configure> 重绘及时执行，避免残帧
+        try:
+            self.root.update_idletasks()
         except Exception:
             pass
         if getattr(self, '_max_btn', None):
