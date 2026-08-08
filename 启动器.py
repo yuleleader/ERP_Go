@@ -1,7 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-订单管理系统启动器 - macOS / Apple 风格
+订单管理系统启动器 v2.0（重构版）
 提供可视化交互界面和实时日志显示
+
+功能模块：
+  1. 无边框窗口框架（自定义标题栏/拖拽/缩放/最大化缓冲重建/系统托盘）
+  2. 左侧侧边栏（logo + 状态/备份/初始 三导航 + 版本号）
+  3. 运行监控视图（服务磁贴 + 四通道实时日志 + 启停/打开/刷新按钮）
+  4. 备份设置视图（立即备份/自动备份计划/还原/操作日志）
+  5. 恢复出厂视图（密码验证 + 确认选项 + 执行日志）
+  6. 核心服务管理（依赖检查/启动/停止/自愈看门狗/健康检查）
+线程安全铁律：子线程绝不直接调用 Tk 方法，统一走 _to_ui 队列。
 """
 
 import os
@@ -244,7 +253,23 @@ class WindowsLauncherApp:
             self._set_button_state(start='normal', stop='normal', open='normal')
         else:
             self._set_button_state(start='normal', stop='disabled', open='disabled')
+        self._update_hdr_status()
         self.add_log("检测完成", 'system')
+
+    def _update_hdr_status(self):
+        """根据当前服务状态变量同步顶栏「后端8000/前端5173」标签颜色。"""
+        try:
+            for lbl, var in ((self.hdr_backend_lbl, self.backend_status),
+                             (self.hdr_frontend_lbl, self.frontend_status)):
+                v = var.get()
+                if '运行' in v or v == '正常':
+                    lbl.config(fg=self.colors['green'])
+                elif '异常' in v:
+                    lbl.config(fg=self.colors['orange'])
+                else:
+                    lbl.config(fg=self.colors['text_tertiary'])
+        except Exception:
+            pass
 
     def refresh_status(self):
         """手动刷新前后端运行状态 — 使用 HTTP 健康检查，精准判断服务是否可用"""
@@ -290,6 +315,7 @@ class WindowsLauncherApp:
         else:
             self._set_button_state(start='normal', stop='disabled', open='disabled')
 
+        self._update_hdr_status()
         self.add_log("状态刷新完成", 'system')
 
     def create_widgets(self):
@@ -351,7 +377,8 @@ class WindowsLauncherApp:
                 elif hover:
                     bg, fg, ic = self.colors['sidebar_hover'], self.colors['text_primary'], self.colors['text_primary']
                 else:
-                    bg, fg, ic = self.colors['sidebar_bg'], self.colors['sidebar_text'], self.colors['sidebar_text_dim']
+                    # 普通态也铺一层比侧栏背景略深的底色，确保按钮可见（防"点不到/看不见"）
+                    bg, fg, ic = '#e4e6eb', '#3f4248', '#5c6068'
                 self._draw_rounded_rect(cv, 6, 6, 170, 38, 8, fill=bg, outline='', tags='bg')
                 self._draw_icon(cv, icon_name, 30, 22, 18, ic)
                 cv.create_text(56, 22, text=text, fill=fg, anchor='w',
@@ -366,9 +393,9 @@ class WindowsLauncherApp:
 
         self.nav_home = make_nav_item(sidebar, '状态', 'home', self._show_home_view, 'home')
 
-        # 底部版本号（左下角，先 pack 确保贴底、anchor=w 靠左）
-        tk.Label(sidebar, text='v1.1', font=('Segoe UI', 9),
-                 bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim']).pack(
+        # 底部版本号（左下角，贴底靠左，加深颜色确保可见）
+        tk.Label(sidebar, text='v2.0', font=('Segoe UI', 9),
+                 bg=self.colors['sidebar_bg'], fg='#5c6068').pack(
             side=tk.BOTTOM, anchor='w', padx=16, pady=(0, 10))
 
         # 底部导航区：备份 / 初始（靠上）
@@ -409,13 +436,15 @@ class WindowsLauncherApp:
         tk.Label(brand, text="控制台", font=('微软雅黑', 11),
                  bg=root_bg, fg=self.colors['text_secondary']).pack(side=tk.LEFT, padx=(12, 0), pady=(4, 0))
 
-        # 右侧：系统状态信息
+        # 右侧：系统状态信息（动态着色：绿=运行 / 橙=异常 / 灰=未启动）
         info = tk.Frame(header, bg=root_bg)
         info.pack(side=tk.RIGHT)
-        tk.Label(info, text="后端 8000", font=('微软雅黑', 10),
-                 bg=root_bg, fg=self.colors['text_secondary']).pack(side=tk.LEFT, padx=(0, 10))
-        tk.Label(info, text="前端 5173", font=('微软雅黑', 10),
-                 bg=root_bg, fg=self.colors['text_secondary']).pack(side=tk.LEFT)
+        self.hdr_backend_lbl = tk.Label(info, text="后端 8000", font=('微软雅黑', 10),
+                                        bg=root_bg, fg=self.colors['text_tertiary'])
+        self.hdr_backend_lbl.pack(side=tk.LEFT, padx=(0, 10))
+        self.hdr_frontend_lbl = tk.Label(info, text="前端 5173", font=('微软雅黑', 10),
+                                         bg=root_bg, fg=self.colors['text_tertiary'])
+        self.hdr_frontend_lbl.pack(side=tk.LEFT)
 
         # 极淡分割线
         hud_line = tk.Canvas(main, height=2, bg=root_bg, highlightthickness=0)
@@ -1085,10 +1114,18 @@ class WindowsLauncherApp:
             self.ui_queue.put((fn, args))
 
     def _ui_set_service(self, which, word, fg):
-        """线程安全地设置某服务的状态文字与指示灯（供子线程调用）。"""
+        """线程安全地设置某服务的状态文字与指示灯（供子线程调用），并同步顶栏状态标签着色。"""
         status_var = self.backend_status if which == 'backend' else self.frontend_status
         ind = self.backend_indicator if which == 'backend' else self.frontend_indicator
-        self._to_ui(lambda: (status_var.set(word), ind.config(text='●', foreground=fg)))
+        lbl = self.hdr_backend_lbl if which == 'backend' else self.hdr_frontend_lbl
+        if '运行' in word or word == '正常':
+            hdr_color = self.colors['green']
+        elif '异常' in word:
+            hdr_color = self.colors['orange']
+        else:
+            hdr_color = self.colors['text_tertiary']
+        self._to_ui(lambda: (status_var.set(word), ind.config(text='●', foreground=fg),
+                             lbl.config(fg=hdr_color)))
 
     def _switch_tab(self, index):
         if index == self.active_tab:
@@ -1699,7 +1736,8 @@ class WindowsLauncherApp:
             self.add_log("后端服务已停止", 'success')
             self._to_ui(lambda: (
                 self.backend_status.set("未启动"),
-                self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
+                self.backend_indicator.config(text='○', foreground=self.colors['text_tertiary']),
+                self.hdr_backend_lbl.config(fg=self.colors['text_tertiary'])
             ))
             self._update_progress(self.backend_progress_canvas, 0, self.colors['text_tertiary'])
 
@@ -1709,7 +1747,8 @@ class WindowsLauncherApp:
             self.add_log("前端服务已停止", 'success')
             self._to_ui(lambda: (
                 self.frontend_status.set("未启动"),
-                self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary'])
+                self.frontend_indicator.config(text='○', foreground=self.colors['text_tertiary']),
+                self.hdr_frontend_lbl.config(fg=self.colors['text_tertiary'])
             ))
             self._update_progress(self.frontend_progress_canvas, 0, self.colors['text_tertiary'])
 
@@ -2006,7 +2045,8 @@ class WindowsLauncherApp:
         opt.pack(fill=tk.X, padx=20, pady=6)
         self.reset_opt_data = tk.BooleanVar(value=True)
         self.reset_opt_images = tk.BooleanVar(value=True)
-        self.reset_opt_restart = tk.BooleanVar(value=True)
+        # "执行后重启"默认不勾选：避免用户没注意就点了执行，导致服务被强制停启
+        self.reset_opt_restart = tk.BooleanVar(value=False)
         tk.Checkbutton(opt, text="清空业务数据（订单/网店/商品/类别/品牌/日志等）", variable=self.reset_opt_data,
                        font=('微软雅黑', 10), bg=self.colors['bg'], fg=self.colors['text_primary'],
                        activebackground=self.colors['bg']).pack(anchor=tk.W)
@@ -2031,7 +2071,7 @@ class WindowsLauncherApp:
                  bg=self.colors['bg'], fg=self.colors['text_primary']).pack(anchor=tk.W, padx=20, pady=(8, 2))
         log_frame = tk.Frame(parent, bg=self.colors['bg'])
         log_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 14))
-        self.reset_log_text = tk.Text(log_frame, height=8, bg='#1e1e1e', fg='#d4d4d4',
+        self.reset_log_text = tk.Text(log_frame, height=12, bg='#1e1e1e', fg='#d4d4d4',
                                       font=('Consolas', 9), state='disabled', wrap='word')
         sb = tk.Scrollbar(log_frame, command=self.reset_log_text.yview)
         self.reset_log_text.configure(yscrollcommand=sb.set)
@@ -2109,15 +2149,18 @@ class WindowsLauncherApp:
         tk.Label(header, text="管理数据库备份目录、自动备份计划与还原操作",
                  font=('Segoe UI', 9), bg=self.colors['bg'], fg=self.colors['text_secondary']).pack(anchor=tk.W)
 
-        # 内容区：双列网格布局，无右侧滚动条，确保整体在一屏内显示
+        # 内容区：双列 grid 布局（权重 3:2，防右列被内容挤压裁剪），整体在一屏内显示
         content = tk.Frame(parent, bg=self.colors['bg'])
         content.pack(fill=tk.BOTH, expand=True, padx=20, pady=8)
         cols = tk.Frame(content, bg=self.colors['bg'])
         cols.pack(fill=tk.BOTH, expand=True)
+        cols.columnconfigure(0, weight=3, minsize=420)
+        cols.columnconfigure(1, weight=2, minsize=320)
+        cols.rowconfigure(0, weight=1)
         left_col = tk.Frame(cols, bg=self.colors['bg'])
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+        left_col.grid(row=0, column=0, sticky='nsew', padx=(0, 8))
         right_col = tk.Frame(cols, bg=self.colors['bg'])
-        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
+        right_col.grid(row=0, column=1, sticky='nsew', padx=(8, 0))
 
         # 1. Backup settings
         backup_card = self._create_card(left_col, "备份设置")
