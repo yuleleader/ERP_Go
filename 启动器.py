@@ -468,123 +468,7 @@ class WindowsLauncherApp:
         # 恢复出厂视图（默认隐藏，点击侧边栏"恢复出厂"并验证密码后切换）
         self.reset_view = tk.Frame(content, bg=root_bg)
 
-        left_card = self._create_card(self.home_view, "服务概览", side=tk.LEFT, expand=True, padx=(0, 10))
-        right_card = self._create_card(self.home_view, "实时日志", side=tk.LEFT, expand=True, padx=(10, 0))
-
-        # ── Left: service overview ──
-        left_body = tk.Frame(left_card, bg=self.colors['card'])
-        left_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
-
-        self._create_service_tile(left_body, 'backend', "后端接口服务", "后端在线服务", "后端在线服务", "server",
-                                  self.colors['green'], side=tk.TOP, srv_tag="SRV-01 · API")
-        self._create_service_tile(left_body, 'frontend', "前端网页客户端", "前端页面服务", "前端页面服务", "window",
-                                  self.colors['blue'], side=tk.TOP, srv_tag="SRV-02 · WEB")
-
-        # ── Right: realtime log ──
-        right_body = tk.Frame(right_card, bg=self.colors['card'])
-        right_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
-
-        tab_frame = tk.Frame(right_body, bg=self.colors['card'])
-        tab_frame.pack(fill=tk.X, padx=12, pady=(8, 6))
-
-        self.tab_buttons = []
-        tab_specs = [("综合", "grid", "all"), ("前端", "window", "frontend"),
-                     ("后端", "server", "backend"), ("备份", "save", "backup")]
-        for i, (t, ic, key) in enumerate(tab_specs):
-            cv = tk.Canvas(tab_frame, width=86, height=30, bg=self.colors['tab_inactive_bg'],
-                           highlightthickness=0, cursor='hand2')
-            cv.pack(side=tk.LEFT, padx=(0, 6))
-            cv._text = t
-            cv._icon = ic
-            cv._active = (i == 0)
-
-            def tab_redraw(cv=cv):
-                cv.delete('all')
-                if cv._active:
-                    bg, fg = self.colors['tab_active_bg'], self.colors['tab_active_text']
-                else:
-                    bg, fg = self.colors['tab_inactive_bg'], self.colors['tab_inactive_text']
-                cv.configure(bg=bg)
-                self._draw_rounded_rect(cv, 0, 0, 86, 30, 8, fill=bg, outline='', tags='bg')
-                self._draw_icon(cv, cv._icon, 18, 15, 16, fg)
-                cv.create_text(48, 15, text=cv._text, font=('微软雅黑', 11, 'bold'), fill=fg, tags='t')
-
-            cv._redraw = tab_redraw
-            tab_redraw()
-            cv.bind('<Button-1>', lambda e, idx=i: self._switch_tab(idx))
-            self.tab_buttons.append(cv)
-
-        search_row = tk.Frame(right_body, bg=self.colors['card'])
-        search_row.pack(fill=tk.X, padx=12, pady=(0, 8))
-
-        search = tk.Entry(search_row, bg=self.colors['log_bg'], fg=self.colors['text_secondary'],
-                          insertbackground=self.colors['text_secondary'], relief=tk.FLAT,
-                          font=('微软雅黑', 10))
-        search.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        search.insert(0, "检索日志")
-        search.bind('<FocusIn>', lambda e: search.delete(0, tk.END) if search.get() == "检索日志" else None)
-        search.bind('<KeyRelease>', lambda e: self._filter_log(search.get()))
-        self.log_search_entry = search
-
-        search_btn = tk.Canvas(search_row, width=74, height=26, bg=self.colors['card'],
-                                highlightthickness=0, cursor='hand2')
-        search_btn.pack(side=tk.RIGHT)
-
-        def search_redraw(hot=False):
-            search_btn.delete('all')
-            col = self.colors['text_primary'] if hot else self.colors['text_secondary']
-            self._draw_icon(search_btn, 'search', 14, 13, 15, col)
-            search_btn.create_text(34, 13, text="搜索", font=('微软雅黑', 10), fill=col, tags='s')
-
-        search_btn.bind('<Enter>', lambda e: search_redraw(hot=True))
-        search_btn.bind('<Leave>', lambda e: search_redraw(hot=False))
-        search_btn.bind('<Button-1>', lambda e: self._filter_log(search.get()))
-        search_redraw()
-
-        log_area = tk.Frame(right_body, bg=self.colors['log_bg'])
-        log_area.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
-
-        log_font = ('Consolas', 9) if sys.platform == 'win32' else ('Menlo', 10)
-        self.all_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                    bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
-                                    padx=10, pady=8, spacing1=2, highlightthickness=0,
-                                    insertbackground=self.colors['blue'])
-        self.all_log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        self.backend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                         bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
-                                         padx=10, pady=8, spacing1=2, highlightthickness=0)
-        self.frontend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                          bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
-                                          padx=10, pady=8, spacing1=2, highlightthickness=0)
-        self.backup_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
-                                        bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
-                                        padx=10, pady=8, spacing1=2, highlightthickness=0)
-
-        scrollbar_frame = tk.Frame(log_area, bg=self.colors['log_bg'], width=12)
-        scrollbar_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        scrollbar_frame.pack_propagate(False)
-        self.log_scrollbar = ttk.Scrollbar(scrollbar_frame, orient=tk.VERTICAL,
-                                           command=self.all_log_text.yview,
-                                           style='LightScrollbar.Vertical.TScrollbar')
-        self.log_scrollbar.pack(fill=tk.Y, expand=True)
-        self.all_log_text.configure(yscrollcommand=self.log_scrollbar.set)
-
-        self.active_tab = 0
-        self.tab_text_widgets = [self.all_log_text, self.frontend_log_text, self.backend_log_text, self.backup_log_text]
-
-        log_tags = {
-            'system':  self.colors['text_tertiary'],
-            'backend': '#60a5fa',
-            'frontend': '#4ade80',
-            'error':   '#f87171',
-            'success': '#4ade80',
-            'warning': '#f59e0b',
-            'info':    '#60a5fa',
-        }
-        for tw in self.tab_text_widgets:
-            for tag, color in log_tags.items():
-                tw.tag_config(tag, foreground=color)
+        self._populate_home_view()
 
         # ═══════════════════════════════════════
         # Bottom function buttons
@@ -1080,6 +964,130 @@ class WindowsLauncherApp:
     def _hover_btn(self, canvas, w, h, color):
         self._draw_rounded_btn(canvas, w, h, color)
 
+
+    def _populate_home_view(self):
+        """填充首页视图（服务概览 + 实时日志）。
+
+        可重建：最大化/视图切换出现合成残留时，destroy home_view 的所有 children
+        后重新调用本方法即可彻底消除旧帧叠加（比 Canvas redraw 更彻底）。
+        """
+        left_card = self._create_card(self.home_view, "服务概览", side=tk.LEFT, expand=True, padx=(0, 10))
+        right_card = self._create_card(self.home_view, "实时日志", side=tk.LEFT, expand=True, padx=(10, 0))
+
+        # ── Left: service overview ──
+        left_body = tk.Frame(left_card, bg=self.colors['card'])
+        left_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
+
+        self._create_service_tile(left_body, 'backend', "后端接口服务", "后端在线服务", "后端在线服务", "server",
+                                  self.colors['green'], side=tk.TOP, srv_tag="SRV-01 · API")
+        self._create_service_tile(left_body, 'frontend', "前端网页客户端", "前端页面服务", "前端页面服务", "window",
+                                  self.colors['blue'], side=tk.TOP, srv_tag="SRV-02 · WEB")
+
+        # ── Right: realtime log ──
+        right_body = tk.Frame(right_card, bg=self.colors['card'])
+        right_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 12))
+
+        tab_frame = tk.Frame(right_body, bg=self.colors['card'])
+        tab_frame.pack(fill=tk.X, padx=12, pady=(8, 6))
+
+        self.tab_buttons = []
+        tab_specs = [("综合", "grid", "all"), ("前端", "window", "frontend"),
+                     ("后端", "server", "backend"), ("备份", "save", "backup")]
+        for i, (t, ic, key) in enumerate(tab_specs):
+            cv = tk.Canvas(tab_frame, width=86, height=30, bg=self.colors['tab_inactive_bg'],
+                           highlightthickness=0, cursor='hand2')
+            cv.pack(side=tk.LEFT, padx=(0, 6))
+            cv._text = t
+            cv._icon = ic
+            cv._active = (i == 0)
+
+            def tab_redraw(cv=cv):
+                cv.delete('all')
+                if cv._active:
+                    bg, fg = self.colors['tab_active_bg'], self.colors['tab_active_text']
+                else:
+                    bg, fg = self.colors['tab_inactive_bg'], self.colors['tab_inactive_text']
+                cv.configure(bg=bg)
+                self._draw_rounded_rect(cv, 0, 0, 86, 30, 8, fill=bg, outline='', tags='bg')
+                self._draw_icon(cv, cv._icon, 18, 15, 16, fg)
+                cv.create_text(48, 15, text=cv._text, font=('微软雅黑', 11, 'bold'), fill=fg, tags='t')
+
+            cv._redraw = tab_redraw
+            tab_redraw()
+            cv.bind('<Button-1>', lambda e, idx=i: self._switch_tab(idx))
+            self.tab_buttons.append(cv)
+
+        search_row = tk.Frame(right_body, bg=self.colors['card'])
+        search_row.pack(fill=tk.X, padx=12, pady=(0, 8))
+
+        search = tk.Entry(search_row, bg=self.colors['log_bg'], fg=self.colors['text_secondary'],
+                          insertbackground=self.colors['text_secondary'], relief=tk.FLAT,
+                          font=('微软雅黑', 10))
+        search.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        search.insert(0, "检索日志")
+        search.bind('<FocusIn>', lambda e: search.delete(0, tk.END) if search.get() == "检索日志" else None)
+        search.bind('<KeyRelease>', lambda e: self._filter_log(search.get()))
+        self.log_search_entry = search
+
+        search_btn = tk.Canvas(search_row, width=74, height=26, bg=self.colors['card'],
+                                highlightthickness=0, cursor='hand2')
+        search_btn.pack(side=tk.RIGHT)
+
+        def search_redraw(hot=False):
+            search_btn.delete('all')
+            col = self.colors['text_primary'] if hot else self.colors['text_secondary']
+            self._draw_icon(search_btn, 'search', 14, 13, 15, col)
+            search_btn.create_text(34, 13, text="搜索", font=('微软雅黑', 10), fill=col, tags='s')
+
+        search_btn.bind('<Enter>', lambda e: search_redraw(hot=True))
+        search_btn.bind('<Leave>', lambda e: search_redraw(hot=False))
+        search_btn.bind('<Button-1>', lambda e: self._filter_log(search.get()))
+        search_redraw()
+
+        log_area = tk.Frame(right_body, bg=self.colors['log_bg'])
+        log_area.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
+
+        log_font = ('Consolas', 9) if sys.platform == 'win32' else ('Menlo', 10)
+        self.all_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
+                                    bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
+                                    padx=10, pady=8, spacing1=2, highlightthickness=0,
+                                    insertbackground=self.colors['blue'])
+        self.all_log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.backend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
+                                         bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
+                                         padx=10, pady=8, spacing1=2, highlightthickness=0)
+        self.frontend_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
+                                          bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
+                                          padx=10, pady=8, spacing1=2, highlightthickness=0)
+        self.backup_log_text = tk.Text(log_area, state=tk.DISABLED, font=log_font, wrap=tk.WORD,
+                                        bg=self.colors['log_bg'], fg=self.colors['log_text'], relief=tk.FLAT,
+                                        padx=10, pady=8, spacing1=2, highlightthickness=0)
+
+        scrollbar_frame = tk.Frame(log_area, bg=self.colors['log_bg'], width=12)
+        scrollbar_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar_frame.pack_propagate(False)
+        self.log_scrollbar = ttk.Scrollbar(scrollbar_frame, orient=tk.VERTICAL,
+                                           command=self.all_log_text.yview,
+                                           style='LightScrollbar.Vertical.TScrollbar')
+        self.log_scrollbar.pack(fill=tk.Y, expand=True)
+        self.all_log_text.configure(yscrollcommand=self.log_scrollbar.set)
+
+        self.active_tab = 0
+        self.tab_text_widgets = [self.all_log_text, self.frontend_log_text, self.backend_log_text, self.backup_log_text]
+
+        log_tags = {
+            'system':  self.colors['text_tertiary'],
+            'backend': '#60a5fa',
+            'frontend': '#4ade80',
+            'error':   '#f87171',
+            'success': '#4ade80',
+            'warning': '#f59e0b',
+            'info':    '#60a5fa',
+        }
+        for tw in self.tab_text_widgets:
+            for tag, color in log_tags.items():
+                tw.tag_config(tag, foreground=color)
     def _set_button_state(self, start='normal', stop='disabled', open='disabled'):
         # 子线程调用时切回主线程执行，避免跨线程访问 Tk 导致闪退
         if threading.current_thread() is not self._main_thread:
@@ -2737,10 +2745,36 @@ class WindowsLauncherApp:
         self._rebuild_window_buffer()
         # 二次兜底：合成器有时延迟到 deiconify 之后才刷新，再次重建（150ms 后）
         self.root.after(150, self._rebuild_window_buffer)
-        # 三次兜底：强制所有已显示 view 重新绘制（清除视图切换残留的旧帧）
-        self.root.after(400, self._force_repaint_views)
+        # 三次兜底：destroy home_view children 并重建——彻底消除合成残留
+        self.root.after(400, self._force_rebuild_home_view)
         if getattr(self, '_max_btn', None):
             self._max_btn._redraw(hover=False)
+
+    def _force_rebuild_home_view(self):
+        """销毁 home_view 的所有 children 并重新填充——100% 消除同视图双份堆叠。
+
+        与 _force_repaint_views 区别：本方法直接销毁并重建 widget 树，
+        是 canvas.delete + redraw 仍无法解决合成残留时的终极方案。
+        """
+        home = getattr(self, 'home_view', None)
+        if home is None:
+            return
+        try:
+            # 销毁 home_view 所有子 widget
+            for child in list(home.winfo_children()):
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+            # 重建内容
+            self._populate_home_view()
+        except Exception:
+            pass
+        try:
+            self.root.update_idletasks()
+            self.root.update()
+        except Exception:
+            pass
 
     def _force_repaint_views(self):
         """强制所有当前显示的 view 重画——清除视图切换残留 + 强化最大化后无残帧。
