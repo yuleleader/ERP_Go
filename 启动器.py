@@ -379,7 +379,7 @@ class ActionButton(QWidget):
         return self.spec['color']
 
     def _fg(self):
-        return '#ffffff' if self._enabled else '#8e8e93'
+        return TEXT
 
     def _render(self):
         bg = self._bg()
@@ -680,8 +680,6 @@ class LauncherApp(QWidget):
         v.addWidget(self.nav_home)
         v.addStretch()
 
-        v.addWidget(section("备份设置"))
-        v.addSpacing(2)
         self.nav_settings = NavItem('备份', 'folder', self.open_settings, self.sidebar)
         self.nav_reset = NavItem('初始', 'restore', self._open_reset_view, self.sidebar)
         v.addWidget(self.nav_settings)
