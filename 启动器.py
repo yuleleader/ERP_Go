@@ -2655,9 +2655,14 @@ class WindowsLauncherApp:
         """最大化/还原。
 
         无边框窗口(overrideredirect)在 Windows Tcl/Tk 下**不能**用 state('zoomed')：
-        Windows Tcl/Tk 底层对无边框窗口执行 zoomed 最大化时，旧画布缓冲区不会自动
-        擦除——旧一帧画面保留、新布局渲染在下方，视觉上就是"一模一样两份界面上下堆叠"。
-        改用"记录正常几何 + 手动铺满工作区(SPI_GETWORKAREA)"，行为一致且无缓冲残留坑。
+        旧画布渲染缓冲不会自动失效，旧一帧画面保留、新布局渲染在下方，
+        视觉上就是"一模一样两份界面上下堆叠"。
+
+        两个层面的修复（缺一不可）：
+        1. 逻辑层：手动 geometry 切换尺寸（本方法）+ 所有 <Configure> 重绘回调
+           已 delete('all') 彻底清空，避免图形碎片叠加；
+        2. 合成层：withdraw→deiconify 强制 Tk/Windows 重建窗口渲染缓冲，
+           彻底销毁旧帧（delete('all') 只清逻辑对象，清不掉合成缓冲残留）。
         """
         try:
             if getattr(self, '_zoomed', False):
@@ -2665,7 +2670,7 @@ class WindowsLauncherApp:
                 self.root.geometry(getattr(self, '_normal_geo', '1240x880'))
                 self._zoomed = False
             else:
-                # 记录当前正常几何（每次最大化都覆盖，避免还原后拖动过窗口再最大化时用旧值）
+                # 记录当前正常几何（每次最大化都覆盖，避免还原后拖动再最大化用旧值）
                 self._normal_geo = (
                     f"{self.root.winfo_width()}x{self.root.winfo_height()}"
                     f"+{self.root.winfo_x()}+{self.root.winfo_y()}"
@@ -2685,13 +2690,55 @@ class WindowsLauncherApp:
                 self._zoomed = True
         except Exception:
             pass
-        # 让 <Configure> 重绘及时执行，避免残帧
-        try:
-            self.root.update_idletasks()
-        except Exception:
-            pass
+        # 合成层兜底：隐藏→立即恢复，强制重建窗口渲染缓冲，清除旧帧叠加
+        self._rebuild_window_buffer()
         if getattr(self, '_max_btn', None):
             self._max_btn._redraw(hover=False)
+
+    def _rebuild_window_buffer(self):
+        """隐藏→1ms 后恢复窗口，强制 Tk/Windows 重建整个渲染缓冲。
+
+        无边框窗口 resize 后旧合成帧不会自动失效（overrideredirect 双缓冲坑），
+        withdraw→deiconify 会触发窗口重建，100% 清除残留；间隔 1ms 肉眼几乎无感。
+        """
+        try:
+            self.root.withdraw()
+            self.root.update_idletasks()
+            self.root.after(1, self._deiconify_and_redraw)
+        except Exception:
+            pass
+
+    def _deiconify_and_redraw(self):
+        try:
+            self.root.deiconify()
+            self.root.lift()
+            self.root.update_idletasks()
+            self._refresh_all_canvases()
+            self.root.update()
+        except Exception:
+            pass
+
+    def _refresh_all_canvases(self):
+        """最大化/还原后强制所有挂载了 _redraw 回调的 Canvas 重新绘制。
+
+        注意：不能对所有 Canvas 无脑 delete('all')——cv_logo / search_btn /
+        服务磁贴的图标·波形·开关等 Canvas 没有 _redraw 属性，清空后不会自动
+        重绘，会直接变空白。这里只重绘有 _redraw 的（导航/页签/功能按钮/
+        设置按钮/标题栏按钮）；卡片/分割线等依赖 <Configure> 的 Canvas 由
+        deiconify 触发的 Configure 事件负责重绘。
+        """
+        def walk(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, tk.Canvas):
+                    redraw = getattr(child, '_redraw', None)
+                    if callable(redraw):
+                        try:
+                            child.delete('all')
+                            redraw()
+                        except Exception:
+                            pass
+                walk(child)
+        walk(self.root)
 
     def _on_press(self, e):
         # 标题栏区域交给拖拽处理，不触发缩放
