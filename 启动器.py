@@ -121,7 +121,12 @@ class WindowsLauncherApp:
 
         self.colors = {
             'bg':              '#f5f5f7',   # 主背景（苹果浅灰）
-            'sidebar':         '#ececf1',   # 侧边栏（毛玻璃浅灰）
+            'sidebar':         '#ececf1',   # 侧边栏（毛玻璃浅灰，兼容旧引用）
+            'sidebar_bg':      '#1e293b',   # 侧边栏深色背景
+            'sidebar_text':    '#cbd5e1',   # 侧边栏导航文字（普通态）
+            'sidebar_text_dim':'#64748b',   # 侧边栏副文字/版本号
+            'sidebar_hover':   '#334155',   # 侧边栏导航悬停
+            'sidebar_active':  '#34c759',   # 侧边栏导航选中（绿）
             'card':            '#ffffff',   # 卡片背景（纯白）
             'card_border':     '#e6e6eb',   # 卡片边框（极淡灰）
             'card_shadow':     '#d9d9df',   # 卡片投影（柔和）
@@ -293,34 +298,45 @@ class WindowsLauncherApp:
         # ═══════════════════════════════════════
         # Sidebar (72px)
         # ═══════════════════════════════════════
-        sidebar = tk.Frame(self.body, bg=self.colors['sidebar'], width=112)
+        sidebar = tk.Frame(self.body, bg=self.colors['sidebar_bg'], width=200)
         sidebar.pack(side=tk.LEFT, fill=tk.Y)
         sidebar.pack_propagate(False)
 
-        sidebar_top = tk.Frame(sidebar, bg=self.colors['sidebar'])
-        sidebar_top.pack(side=tk.TOP, fill=tk.X, pady=(22, 0))
+        # Logo 区
+        logo_frame = tk.Frame(sidebar, bg=self.colors['sidebar_bg'])
+        logo_frame.pack(fill=tk.X, padx=14, pady=(18, 22))
+        cv_logo = tk.Canvas(logo_frame, width=32, height=32, bg=self.colors['sidebar_bg'],
+                            highlightthickness=0)
+        cv_logo.pack(side=tk.LEFT)
+        self._draw_rounded_rect(cv_logo, 2, 2, 30, 30, 8, fill=self.colors['green'], outline='')
+        cv_logo.create_text(16, 17, text='ERP', fill='#ffffff', font=('微软雅黑', 9, 'bold'))
+        title_frame = tk.Frame(logo_frame, bg=self.colors['sidebar_bg'])
+        title_frame.pack(side=tk.LEFT, padx=(10, 0), fill=tk.Y)
+        tk.Label(title_frame, text='牛蛙产销协同系统', font=('微软雅黑', 10, 'bold'),
+                 bg=self.colors['sidebar_bg'], fg='#ffffff', anchor='w').pack(fill=tk.X)
+        tk.Label(title_frame, text='启动器', font=('微软雅黑', 8),
+                 bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim'], anchor='w').pack(fill=tk.X)
 
-        # 侧边栏仅保留"运行监控"与"备份设置"两个文字入口（科技青色高亮）
-        def make_nav_icon(parent, text, cmd, active_view, pad_bottom=0):
-            cv = tk.Canvas(parent, width=88, height=40, bg=self.colors['sidebar'],
+        # 侧边栏导航项：深色背景 + 左侧图标 + 右侧文字（选中绿色高亮）
+        def make_nav_item(parent, text, icon_name, cmd, active_view):
+            cv = tk.Canvas(parent, width=176, height=40, bg=self.colors['sidebar_bg'],
                            highlightthickness=0, cursor='hand2')
-            cv.pack(pady=(0, pad_bottom))
-            cv._name = text
+            cv.pack(fill=tk.X, padx=10, pady=2)
             cv._active_view = active_view
 
             def redraw(hover=False):
                 cv.delete('all')
                 active = getattr(self, '_current_view', 'home') == active_view
                 if active:
-                    bg, icon_color = self.colors['accent_soft'], self.colors['blue']
+                    bg, fg, ic = self.colors['sidebar_active'], '#ffffff', '#ffffff'
                 elif hover:
-                    bg, icon_color = '#f0f0f3', self.colors['text_primary']
+                    bg, fg, ic = self.colors['sidebar_hover'], '#ffffff', '#ffffff'
                 else:
-                    bg, icon_color = self.colors['sidebar'], self.colors['text_tertiary']
-                cv.configure(bg=bg)
-                self._draw_rounded_rect(cv, 4, 4, 84, 36, 9, fill=bg, outline='', tags='bg')
-                cv.create_text(44, 22, text=text, fill=icon_color,
-                               font=('Microsoft YaHei UI', 11, 'bold'))
+                    bg, fg, ic = self.colors['sidebar_bg'], self.colors['sidebar_text'], self.colors['sidebar_text_dim']
+                self._draw_rounded_rect(cv, 6, 6, 170, 34, 8, fill=bg, outline='', tags='bg')
+                self._draw_icon(cv, icon_name, 30, 20, 18, ic)
+                cv.create_text(56, 20, text=text, fill=fg, anchor='w',
+                               font=('微软雅黑', 11, 'bold' if active else 'normal'))
 
             cv._redraw = redraw
             cv.bind('<Button-1>', lambda e: cmd())
@@ -329,11 +345,19 @@ class WindowsLauncherApp:
             redraw()
             return cv
 
-        self.nav_home = make_nav_icon(sidebar_top, '运行监控', self._show_home_view, 'home', pad_bottom=18)
-        self.nav_reset = make_nav_icon(sidebar_top, '恢复出厂', self._open_reset_view, 'reset', pad_bottom=18)
-        sidebar_bottom = tk.Frame(sidebar, bg=self.colors['sidebar'])
-        sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 22))
-        self.nav_settings = make_nav_icon(sidebar_bottom, '备份设置', self.open_settings_window, 'settings')
+        self.nav_home = make_nav_item(sidebar, '状态', 'home', self._show_home_view, 'home')
+
+        # 备份设置下移到底部（与截图位置一致：状态/备份/初始，备份和初始靠下）
+        sidebar_bottom = tk.Frame(sidebar, bg=self.colors['sidebar_bg'])
+        sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.nav_settings = make_nav_item(sidebar_bottom, '备份', 'folder', self.open_settings_window, 'settings')
+        self.nav_reset = make_nav_item(sidebar_bottom, '初始', 'restore', self._open_reset_view, 'reset')
+
+        # 底部版本号
+        tk.Label(sidebar, text='v1.1', font=('Segoe UI', 9),
+                 bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim']).pack(
+            side=tk.BOTTOM, pady=(0, 14))
 
         self._current_view = 'home'
         self._settings_built = False
