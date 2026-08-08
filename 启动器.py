@@ -293,19 +293,19 @@ class WindowsLauncherApp:
         # ═══════════════════════════════════════
         # Sidebar (72px)
         # ═══════════════════════════════════════
-        sidebar = tk.Frame(self.body, bg=self.colors['sidebar'], width=72)
+        sidebar = tk.Frame(self.body, bg=self.colors['sidebar'], width=112)
         sidebar.pack(side=tk.LEFT, fill=tk.Y)
         sidebar.pack_propagate(False)
 
         sidebar_top = tk.Frame(sidebar, bg=self.colors['sidebar'])
         sidebar_top.pack(side=tk.TOP, fill=tk.X, pady=(22, 0))
 
-        # 侧边栏仅保留首页与设置两个有效入口（矢量线性图标，科技青色高亮）
-        def make_nav_icon(parent, name, cmd, active_view, pad_bottom=0):
-            cv = tk.Canvas(parent, width=40, height=40, bg=self.colors['sidebar'],
+        # 侧边栏仅保留"运行监控"与"备份设置"两个文字入口（科技青色高亮）
+        def make_nav_icon(parent, text, cmd, active_view, pad_bottom=0):
+            cv = tk.Canvas(parent, width=88, height=40, bg=self.colors['sidebar'],
                            highlightthickness=0, cursor='hand2')
             cv.pack(pady=(0, pad_bottom))
-            cv._name = name
+            cv._name = text
             cv._active_view = active_view
 
             def redraw(hover=False):
@@ -318,8 +318,9 @@ class WindowsLauncherApp:
                 else:
                     bg, icon_color = self.colors['sidebar'], self.colors['text_tertiary']
                 cv.configure(bg=bg)
-                self._draw_rounded_rect(cv, 4, 4, 36, 36, 9, fill=bg, outline='', tags='bg')
-                self._draw_icon(cv, name, 20, 20, 22, icon_color)
+                self._draw_rounded_rect(cv, 4, 4, 84, 36, 9, fill=bg, outline='', tags='bg')
+                cv.create_text(44, 22, text=text, fill=icon_color,
+                               font=('Microsoft YaHei UI', 11, 'bold'))
 
             cv._redraw = redraw
             cv.bind('<Button-1>', lambda e: cmd())
@@ -328,10 +329,10 @@ class WindowsLauncherApp:
             redraw()
             return cv
 
-        self.nav_home = make_nav_icon(sidebar_top, 'home', self._show_home_view, 'home', pad_bottom=18)
+        self.nav_home = make_nav_icon(sidebar_top, '运行监控', self._show_home_view, 'home', pad_bottom=18)
         sidebar_bottom = tk.Frame(sidebar, bg=self.colors['sidebar'])
         sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 22))
-        self.nav_settings = make_nav_icon(sidebar_bottom, 'settings', self.open_settings_window, 'settings')
+        self.nav_settings = make_nav_icon(sidebar_bottom, '备份设置', self.open_settings_window, 'settings')
 
         self._current_view = 'home'
         self._settings_built = False
