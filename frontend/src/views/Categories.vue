@@ -3,10 +3,6 @@
     <!-- 顶部面包屑 + 关闭按钮 -->
     <div class="page-header">
       <div class="breadcrumb">
-        <span class="bc-link" @click="goHome">首页</span>
-        <span class="bc-sep">›</span>
-        <span class="bc-plain">导航管理</span>
-        <span class="bc-sep">›</span>
         <span class="bc-current">类别</span>
       </div>
       <el-button class="close-btn" link @click="goBack" title="关闭">
@@ -431,11 +427,6 @@ async function confirmDelete() {
 }
 
 // ===== 面包屑与关闭 =====
-function goHome() {
-  if (router.currentRoute.value.path !== '/dashboard') {
-    router.push('/dashboard')
-  }
-}
 function goBack() {
   if (window.history.length > 1) {
     router.back()
