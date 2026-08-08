@@ -764,7 +764,9 @@ async def get_overview_statistics(
     
     sales_query = select(func.sum(func.cast(Order.sales_amount, Float))).filter(
         Order.created_at >= start_datetime,
-        Order.created_at < end_datetime
+        Order.created_at < end_datetime,
+        # 退款单不计入销售金额（与销售趋势/销售统计/毛利/运费等报表口径一致）
+        Order.shipping_status != "refunded"
     )
     if current_user.role == "sales":
         sales_query = sales_query.filter(Order.created_by == current_user.username)
