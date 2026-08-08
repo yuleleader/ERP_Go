@@ -330,6 +330,7 @@ class WindowsLauncherApp:
             return cv
 
         self.nav_home = make_nav_icon(sidebar_top, '运行监控', self._show_home_view, 'home', pad_bottom=18)
+        self.nav_reset = make_nav_icon(sidebar_top, '恢复出厂', self._open_reset_view, 'reset', pad_bottom=18)
         sidebar_bottom = tk.Frame(sidebar, bg=self.colors['sidebar'])
         sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 22))
         self.nav_settings = make_nav_icon(sidebar_bottom, '备份设置', self.open_settings_window, 'settings')
@@ -392,6 +393,8 @@ class WindowsLauncherApp:
         self.home_view.pack(fill=tk.BOTH, expand=True)
         # 设置视图：数据库备份与还原（默认隐藏，点击 ⚙ 切换，不弹新窗口）
         self.settings_view = tk.Frame(content, bg=root_bg)
+        # 恢复出厂视图（默认隐藏，点击侧边栏"恢复出厂"并验证密码后切换）
+        self.reset_view = tk.Frame(content, bg=root_bg)
 
         left_card = self._create_card(self.home_view, "服务概览", side=tk.LEFT, expand=True, padx=(0, 10))
         right_card = self._create_card(self.home_view, "实时日志", side=tk.LEFT, expand=True, padx=(10, 0))
@@ -1832,6 +1835,8 @@ class WindowsLauncherApp:
             self._settings_built = True
             self._settings_view_open = True
         self.home_view.pack_forget()
+        if getattr(self, '_reset_built', False):
+            self.reset_view.pack_forget()
         self.settings_view.pack(fill=tk.BOTH, expand=True)
         self._current_view = 'settings'
         self._refresh_nav()
@@ -1839,16 +1844,206 @@ class WindowsLauncherApp:
     def _show_home_view(self):
         if getattr(self, '_settings_built', False):
             self.settings_view.pack_forget()
+        if getattr(self, '_reset_built', False):
+            self.reset_view.pack_forget()
         self.home_view.pack(fill=tk.BOTH, expand=True)
         self._current_view = 'home'
         self._settings_view_open = False
         self._refresh_nav()
 
+    def _switch_to_reset_view(self):
+        """密码验证通过后：切换到「恢复出厂设置」视图。"""
+        if not getattr(self, '_reset_built', False):
+            self._build_reset_view(self.reset_view)
+            self._reset_built = True
+        self.home_view.pack_forget()
+        if getattr(self, '_settings_built', False):
+            self.settings_view.pack_forget()
+        self.reset_view.pack(fill=tk.BOTH, expand=True)
+        self._current_view = 'reset'
+        self._refresh_nav()
+
     def _refresh_nav(self):
         if getattr(self, 'nav_home', None):
             self.nav_home._redraw(hover=False)
+        if getattr(self, 'nav_reset', None):
+            self.nav_reset._redraw(hover=False)
         if getattr(self, 'nav_settings', None):
             self.nav_settings._redraw(hover=False)
+
+    # ═══════════ 恢复出厂设置（密码验证 + 可视化交互） ═══════════
+    def _open_reset_view(self):
+        """点击「恢复出厂」：弹密码框验证（密码=当天日期 YYYYMMDD），通过后切换视图。"""
+        today = datetime.now().strftime('%Y%m%d')
+        dlg = tk.Toplevel(self.root)
+        dlg.title("管理员验证")
+        dlg.configure(bg=self.colors['bg'])
+        dlg.resizable(False, False)
+        dlg.attributes('-topmost', True)
+        dlg.update_idletasks()
+        w, h = 380, 185
+        x = dlg.winfo_screenwidth() // 2 - w // 2
+        y = dlg.winfo_screenheight() // 2 - h // 2
+        dlg.geometry(f"{w}x{h}+{x}+{y}")
+
+        tk.Label(dlg, text="恢复出厂需要管理员验证", font=('微软雅黑', 13, 'bold'),
+                 bg=self.colors['bg'], fg=self.colors['text_primary']).pack(pady=(18, 4))
+        tk.Label(dlg, text=f"请输入密码（当天日期，如 {today}）：", font=('微软雅黑', 10),
+                 bg=self.colors['bg'], fg=self.colors['text_secondary']).pack()
+        pwd_var = tk.StringVar()
+        pwd_entry = tk.Entry(dlg, textvariable=pwd_var, show='*', width=22,
+                             font=('Segoe UI', 12), justify='center')
+        pwd_entry.pack(pady=(10, 2), ipady=3)
+        err_lbl = tk.Label(dlg, text="", font=('微软雅黑', 9), bg=self.colors['bg'], fg=self.colors['red'])
+        err_lbl.pack()
+
+        def on_confirm(event=None):
+            if pwd_var.get().strip() == today:
+                dlg.destroy()
+                self._switch_to_reset_view()
+            else:
+                err_lbl.config(text="密码错误，请重试（密码为当天日期）")
+
+        btns = tk.Frame(dlg, bg=self.colors['bg'])
+        btns.pack(pady=(6, 12))
+        tk.Button(btns, text="取消", width=8, command=dlg.destroy).pack(side=tk.LEFT, padx=8)
+        tk.Button(btns, text="确定", width=8, command=on_confirm).pack(side=tk.LEFT, padx=8)
+        dlg.bind('<Return>', on_confirm)
+        pwd_entry.focus_set()
+
+    def _reset_log_append(self, text):
+        """追加一行到恢复出厂日志区（仅主线程调用）。"""
+        tw = getattr(self, 'reset_log_text', None)
+        if not tw:
+            return
+        tw.configure(state='normal')
+        tw.insert('end', text + '\n')
+        tw.see('end')
+        tw.configure(state='disabled')
+
+    def _build_reset_view(self, parent):
+        """恢复出厂设置视图：警告说明 + 可交互选项 + 执行按钮 + 日志区。"""
+        parent.configure(bg=self.colors['bg'])
+
+        header = tk.Frame(parent, bg=self.colors['bg'])
+        header.pack(fill=tk.X, padx=20, pady=(16, 8))
+        tk.Label(header, text="恢复出厂设置", font=('微软雅黑', 16, 'bold'),
+                 bg=self.colors['bg'], fg=self.colors['red']).pack(anchor=tk.W)
+        tk.Label(header, text="清空全部业务数据并重建系统（等同于重新初始化数据库）",
+                 font=('Segoe UI', 9), bg=self.colors['bg'], fg=self.colors['text_secondary']).pack(anchor=tk.W)
+
+        # 危险警告卡
+        warn = tk.Frame(parent, bg='#fff1f0', highlightbackground=self.colors['red'],
+                        highlightthickness=1, bd=0)
+        warn.pack(fill=tk.X, padx=20, pady=8)
+        tk.Label(warn, text="⚠ 危险操作，不可恢复！", font=('微软雅黑', 12, 'bold'),
+                 bg='#fff1f0', fg=self.colors['red']).pack(anchor=tk.W, padx=14, pady=(10, 2))
+        tk.Label(warn, text="执行后将清空以下内容，且无法找回，请先确认已做好备份：",
+                 font=('微软雅黑', 10), bg='#fff1f0', fg=self.colors['text_primary']).pack(anchor=tk.W, padx=14)
+        tk.Label(warn, text="订单、网店、商品、类别、品牌、物流公司、图片、日志、站内信、提现记录、除1001外的账号",
+                 font=('微软雅黑', 9), bg='#fff1f0', fg=self.colors['text_secondary'],
+                 wraplength=940, justify=tk.LEFT).pack(anchor=tk.W, padx=14, pady=(2, 4))
+        tk.Label(warn, text="保留：管理员账号(1001)、系统配置、默认类别(999-其他类别)、默认品牌(999-默认品牌)",
+                 font=('微软雅黑', 9), bg='#fff1f0', fg=self.colors['green'],
+                 wraplength=940, justify=tk.LEFT).pack(anchor=tk.W, padx=14, pady=(0, 10))
+
+        # 可交互选项
+        opt = tk.Frame(parent, bg=self.colors['bg'])
+        opt.pack(fill=tk.X, padx=20, pady=6)
+        self.reset_opt_data = tk.BooleanVar(value=True)
+        self.reset_opt_images = tk.BooleanVar(value=True)
+        self.reset_opt_restart = tk.BooleanVar(value=True)
+        tk.Checkbutton(opt, text="清空业务数据（订单/网店/商品/类别/品牌/日志等）", variable=self.reset_opt_data,
+                       font=('微软雅黑', 10), bg=self.colors['bg'], fg=self.colors['text_primary'],
+                       activebackground=self.colors['bg']).pack(anchor=tk.W)
+        tk.Checkbutton(opt, text="清理图片文件（订单/商品/临时图片）", variable=self.reset_opt_images,
+                       font=('微软雅黑', 10), bg=self.colors['bg'], fg=self.colors['text_primary'],
+                       activebackground=self.colors['bg']).pack(anchor=tk.W)
+        tk.Checkbutton(opt, text="执行后重新启动后端与前端", variable=self.reset_opt_restart,
+                       font=('微软雅黑', 10), bg=self.colors['bg'], fg=self.colors['text_primary'],
+                       activebackground=self.colors['bg']).pack(anchor=tk.W)
+
+        # 执行按钮
+        act = tk.Frame(parent, bg=self.colors['bg'])
+        act.pack(fill=tk.X, padx=20, pady=6)
+        self.reset_exec_btn = tk.Button(act, text="执行恢复出厂", font=('微软雅黑', 11, 'bold'),
+                                        fg='white', bg=self.colors['red'], activebackground=self.colors['red_dark'],
+                                        activeforeground='white', relief='flat', cursor='hand2',
+                                        width=16, pady=6, command=self._do_factory_reset)
+        self.reset_exec_btn.pack(side=tk.LEFT)
+
+        # 日志区
+        tk.Label(parent, text="执行日志：", font=('微软雅黑', 10, 'bold'),
+                 bg=self.colors['bg'], fg=self.colors['text_primary']).pack(anchor=tk.W, padx=20, pady=(8, 2))
+        log_frame = tk.Frame(parent, bg=self.colors['bg'])
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 14))
+        self.reset_log_text = tk.Text(log_frame, height=8, bg='#1e1e1e', fg='#d4d4d4',
+                                      font=('Consolas', 9), state='disabled', wrap='word')
+        sb = tk.Scrollbar(log_frame, command=self.reset_log_text.yview)
+        self.reset_log_text.configure(yscrollcommand=sb.set)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.reset_log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._reset_log_append("待命。点击「执行恢复出厂」开始（将先停止后端/前端服务）。")
+
+    def _do_factory_reset(self):
+        """执行恢复出厂（子线程）：停服务 → 跑数据库初始化.py --force → 可选重启。"""
+        if getattr(self, '_reset_running', False):
+            return
+        # 校验确认项（主线程读取 Tk 变量，子线程不碰 Tcl）
+        if not (self.reset_opt_data.get() and self.reset_opt_images.get()):
+            self._reset_log_append("❌ 请勾选「清空业务数据」与「清理图片文件」以确认执行恢复出厂。")
+            return
+        want_restart = self.reset_opt_restart.get()
+        self._reset_running = True
+        self.reset_exec_btn.config(state='disabled')
+        self._reset_log_append("========================================")
+        self._reset_log_append("开始恢复出厂…")
+
+        def worker():
+            # 执行期间禁止看门狗自动重启后端（避免初始化中途后端被拉起占用数据库）
+            self._stop_requested = True
+            try:
+                # 1) 停止后端/前端
+                self._to_ui(self._reset_log_append, "[1/3] 停止后端(8000)与前端(5173)…")
+                try:
+                    kill_process_on_port(8000)
+                    kill_process_on_port(5173)
+                except Exception as e:
+                    self._to_ui(self._reset_log_append, f"  停止服务提示: {e}")
+                self._to_ui(self._reset_log_append, "  服务端口已释放")
+
+                # 2) 执行数据库初始化（--force：清业务数据+清图片+重建默认数据）
+                self._to_ui(self._reset_log_append, "[2/3] 执行数据库初始化（恢复出厂）…")
+                import subprocess as sp
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                script = os.path.join(base_dir, "数据库初始化.py")
+                cmd = [sys.executable, script, "--force"]
+                proc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, text=True,
+                                encoding='utf-8', errors='replace',
+                                creationflags=getattr(sp, 'CREATE_NO_WINDOW', 0))
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    if line:
+                        self._to_ui(self._reset_log_append, line)
+                proc.wait()
+                self._to_ui(self._reset_log_append, f"  初始化脚本退出码: {proc.returncode}")
+
+                # 3) 可选重启
+                if want_restart:
+                    self._to_ui(self._reset_log_append, "[3/3] 重新启动后端与前端…")
+                    self._to_ui(self.start_services)
+                else:
+                    self._to_ui(self._reset_log_append, "[3/3] 跳过自动重启（可稍后在主界面手动启动）")
+
+                self._to_ui(self._reset_log_append, "✅ 恢复出厂完成，系统已重置为初始状态。")
+            except Exception as e:
+                self._to_ui(self._reset_log_append, f"❌ 恢复出厂失败: {e}")
+            finally:
+                self._stop_requested = False
+                self._reset_running = False
+                self._to_ui(lambda: self.reset_exec_btn.config(state='normal'))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _build_settings_view(self, parent):
         parent.configure(bg=self.colors['bg'])
