@@ -78,6 +78,7 @@ BLUE_L = '#3399ff'
 BLUE_D = '#0062cc'
 GREEN = '#34c759'
 GREEN_L = '#4cd964'
+FONT = "'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif"
 GREEN_D = '#28cd41'
 RED = '#ff3b30'
 RED_L = '#ff5e52'
@@ -263,46 +264,55 @@ class ServiceTile(QFrame):
         self.accent = accent
         self._color = accent
         self._state = 'off'
-        v = QVBoxLayout(self)
-        v.setContentsMargins(14, 14, 14, 14)
-        v.setSpacing(6)
-        if srv_tag:
-            t = QLabel(srv_tag)
-            t.setStyleSheet(f"color:{BLUE}; font: bold 9px 'Microsoft YaHei';")
-            v.addWidget(t, alignment=Qt.AlignLeft)
+        root = QHBoxLayout(self)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(16)
+
+        # 左侧图标
         self.icon_lbl = QLabel()
-        self.icon_lbl.setAlignment(Qt.AlignCenter)
-        self.icon_lbl.setFixedSize(64, 64)
+        self.icon_lbl.setFixedSize(60, 60)
         self._draw_icon()
-        v.addWidget(self.icon_lbl, alignment=Qt.AlignCenter)
+        root.addWidget(self.icon_lbl, alignment=Qt.AlignVCenter)
+
+        # 中间信息列
+        info = QVBoxLayout()
+        info.setSpacing(6)
+        info.setAlignment(Qt.AlignVCenter)
+        if srv_tag:
+            self.tag_lbl = QLabel(srv_tag)
+            self.tag_lbl.setStyleSheet(f"color:{BLUE}; font: bold 10px {FONT};")
+            info.addWidget(self.tag_lbl)
         self.name_lbl = QLabel(name)
-        self.name_lbl.setStyleSheet(f"font: bold 13px 'Microsoft YaHei'; color:{TEXT};")
-        self.name_lbl.setAlignment(Qt.AlignCenter)
-        v.addWidget(self.name_lbl)
+        self.name_lbl.setStyleSheet(f"font: bold 16px {FONT}; color:{TEXT};")
+        info.addWidget(self.name_lbl)
+        self.status_lbl = QLabel("未启动")
+        self.status_lbl.setStyleSheet(f"color:{TEXT3}; font: 12px {FONT};")
+        info.addWidget(self.status_lbl)
+        root.addLayout(info, 1)
+
+        # 右侧控制列
+        ctrl = QVBoxLayout()
+        ctrl.setSpacing(10)
+        ctrl.setAlignment(Qt.AlignVCenter)
         self.gauge = GaugeWidget()
         self.gauge.setFixedHeight(28)
-        v.addWidget(self.gauge)
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        self.status_lbl = QLabel("未启动")
-        self.status_lbl.setStyleSheet(f"color:{TEXT3}; font: 11px 'Microsoft YaHei';")
+        self.gauge.setMinimumWidth(160)
+        ctrl.addWidget(self.gauge)
         self.toggle = QLabel()
         self.toggle.setFixedSize(44, 22)
-        row.addWidget(self.status_lbl)
-        row.addStretch()
-        row.addWidget(self.toggle)
-        v.addLayout(row)
+        ctrl.addWidget(self.toggle, alignment=Qt.AlignRight)
+        root.addLayout(ctrl, 1)
         self._draw_toggle(TEXT3)
 
     def _draw_icon(self):
-        pix = QPixmap(64, 64)
+        pix = QPixmap(60, 60)
         pix.fill(Qt.transparent)
         p = QPainter(pix)
         p.setRenderHint(QPainter.Antialiasing)
         p.setBrush(QBrush(QColor('#f2f2f7')))
         p.setPen(QPen(QColor(CARD_BORDER)))
-        p.drawRoundedRect(1, 1, 62, 62, 16, 16)
-        p.drawPixmap((64 - 34) // 2, (64 - 34) // 2, svg_icon(self.glyph, self._color, 34))
+        p.drawRoundedRect(1, 1, 58, 58, 16, 16)
+        p.drawPixmap((60 - 30) // 2, (60 - 30) // 2, svg_icon(self.glyph, self._color, 30))
         p.end()
         self.icon_lbl.setPixmap(pix)
 
@@ -323,7 +333,7 @@ class ServiceTile(QFrame):
 
     def set_state(self, word, fg):
         self.status_lbl.setText(word)
-        self.status_lbl.setStyleSheet(f"color:{fg}; font: 11px 'Microsoft YaHei';")
+        self.status_lbl.setStyleSheet(f"color:{fg}; font: 12px {FONT};")
         self._draw_toggle(fg)
 
     def set_progress(self, width, state, color):
@@ -355,7 +365,8 @@ class ActionButton(QWidget):
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.text_lbl)
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(96)
+        self.setMinimumHeight(96)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._render()
 
     def _bg(self):
@@ -374,8 +385,8 @@ class ActionButton(QWidget):
         bg = self._bg()
         fg = self._fg()
         self.setStyleSheet(f"background:{bg}; border-radius:14px; border:none;")
-        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 30))
-        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 13px 'Microsoft YaHei'; background:transparent;")
+        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 34))
+        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 15px {FONT}; background:transparent;")
 
     def set_enabled(self, e):
         self._enabled = e
@@ -412,6 +423,8 @@ class ActionButton(QWidget):
 # ─────────────────────────────────────────
 # 侧边栏导航项
 # ─────────────────────────────────────────
+# 侧边栏导航项
+# ─────────────────────────────────────────
 class NavItem(QWidget):
     def __init__(self, text, icon_name, cmd, parent=None):
         super().__init__(parent)
@@ -421,28 +434,34 @@ class NavItem(QWidget):
         self._active = False
         self._hover = False
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(16, 0, 16, 0)
-        lay.setSpacing(12)
+        lay.setContentsMargins(12, 0, 14, 0)
+        lay.setSpacing(10)
+        self.indicator = QFrame()
+        self.indicator.setFixedWidth(4)
         self.icon_lbl = QLabel()
         self.text_lbl = QLabel(text)
-        self.text_lbl.setStyleSheet("font: bold 13px 'Microsoft YaHei';")
+        self.text_lbl.setStyleSheet(f"font: bold 14px {FONT};")
+        lay.addWidget(self.indicator, alignment=Qt.AlignVCenter)
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.text_lbl)
         lay.addStretch()
         self.setCursor(Qt.PointingHandCursor)
-        self.setFixedHeight(44)
+        self.setMinimumHeight(52)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._render()
 
     def _render(self):
         if self._active:
-            bg, fg = '#e3f2ff', BLUE
+            bg, fg, ind = '#e3f2ff', BLUE, BLUE
         elif self._hover:
-            bg, fg = '#f0f0f3', TEXT
+            bg, fg, ind = '#f2f2f7', TEXT, 'transparent'
         else:
-            bg, fg = '#e4e6eb', '#3f4248'
-        self.setStyleSheet(f"background:{bg}; border-radius:8px;")
-        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 20))
-        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 13px 'Microsoft YaHei'; background:transparent;")
+            bg, fg, ind = 'transparent', '#3f4248', 'transparent'
+        self.setStyleSheet(f"background:{bg}; border-radius:10px;")
+        self.indicator.setStyleSheet(f"background:{ind}; border-radius:2px; border:none;")
+        self.indicator.setFixedHeight(22 if self._active else 0)
+        self.icon_lbl.setPixmap(svg_icon(self.icon_name, fg, 22))
+        self.text_lbl.setStyleSheet(f"color:{fg}; font: bold 14px {FONT}; background:transparent;")
 
     def set_active(self, a):
         self._active = a
@@ -480,7 +499,7 @@ class TitleBar(QFrame):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         title = QLabel("ERP_GO 订单管理系统")
-        title.setStyleSheet(f"font: bold 13px 'Microsoft YaHei'; color:{TEXT}; padding-left:16px;")
+        title.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; padding-left:16px;")
         title.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         lay.addWidget(title, alignment=Qt.AlignVCenter)
         lay.addStretch()
@@ -611,56 +630,65 @@ class LauncherApp(QWidget):
 
     def _build_sidebar(self):
         self.sidebar = QWidget()
-        self.sidebar.setFixedWidth(200)
+        self.sidebar.setFixedWidth(220)
         self.sidebar.setStyleSheet(f"background:{SIDEBAR}; border:none;")
         v = QVBoxLayout(self.sidebar)
-        v.setContentsMargins(14, 18, 14, 14)
-        v.setSpacing(4)
+        v.setContentsMargins(14, 20, 14, 16)
+        v.setSpacing(6)
 
         # Logo 区
         logo_frame = QHBoxLayout()
         logo_frame.setSpacing(10)
         logo_lbl = QLabel()
-        logo_lbl.setFixedSize(36, 36)
-        pm = QPixmap(36, 36)
+        logo_lbl.setFixedSize(40, 40)
+        pm = QPixmap(40, 40)
         pm.fill(Qt.transparent)
         p = QPainter(pm)
         p.setRenderHint(QPainter.Antialiasing)
         logo_path = Path(__file__).resolve().parent / "frontend" / "src" / "assets" / "img" / "logo.png"
         if logo_path.exists():
-            p.drawPixmap(0, 0, QPixmap(str(logo_path)).scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            p.drawPixmap(0, 0, QPixmap(str(logo_path)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
             p.setBrush(QBrush(QColor(GREEN)))
             p.setPen(Qt.NoPen)
-            p.drawRoundedRect(2, 2, 32, 32, 8, 8)
+            p.drawRoundedRect(2, 2, 36, 36, 8, 8)
             p.drawText(pm.rect(), Qt.AlignCenter, "ERP")
         p.end()
         logo_lbl.setPixmap(pm)
         logo_frame.addWidget(logo_lbl)
         title_col = QVBoxLayout()
-        title_col.setSpacing(0)
+        title_col.setSpacing(2)
         t1 = QLabel("牛蛙产销协同系统")
-        t1.setStyleSheet(f"font: bold 12px 'Microsoft YaHei'; color:{TEXT};")
+        t1.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT};")
         t2 = QLabel("启动器")
-        t2.setStyleSheet(f"font: 9px 'Microsoft YaHei'; color:{TEXT3};")
+        t2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT3};")
         title_col.addWidget(t1)
         title_col.addWidget(t2)
         logo_frame.addLayout(title_col)
         v.addLayout(logo_frame)
-        v.addSpacing(18)
+        v.addSpacing(26)
 
+        def section(text):
+            lbl = QLabel(text)
+            lbl.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT3}; padding-left:4px;")
+            return lbl
+
+        v.addWidget(section("运行监控"))
+        v.addSpacing(6)
         self.nav_home = NavItem('状态', 'home', self._show_home_view, self.sidebar)
         v.addWidget(self.nav_home)
         v.addStretch()
 
+        v.addWidget(section("备份设置"))
+        v.addSpacing(6)
         self.nav_settings = NavItem('备份', 'folder', self.open_settings, self.sidebar)
         self.nav_reset = NavItem('初始', 'restore', self._open_reset_view, self.sidebar)
         v.addWidget(self.nav_settings)
         v.addWidget(self.nav_reset)
-        v.addSpacing(8)
 
+        v.addSpacing(18)
         ver = QLabel('v3.0')
-        ver.setStyleSheet(f"font: 9px 'Segoe UI'; color:#5c6068; padding-left:2px;")
+        ver.setStyleSheet(f"font: 10px 'Segoe UI'; color:#5c6068; padding-left:4px;")
         v.addWidget(ver, alignment=Qt.AlignLeft)
         self._refresh_nav()
 
@@ -689,17 +717,17 @@ class LauncherApp(QWidget):
         bicon.setPixmap(bp)
         brand.addWidget(bicon)
         b1 = QLabel("ERP_GO 订单管理系统")
-        b1.setStyleSheet(f"font: bold 18px 'Microsoft YaHei'; color:{TEXT};")
+        b1.setStyleSheet(f"font: bold 16px {FONT}; color:{TEXT};")
         b2 = QLabel("控制台")
-        b2.setStyleSheet(f"font: 11px 'Microsoft YaHei'; color:{TEXT2};")
+        b2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT2};")
         brand.addWidget(b1)
         brand.addWidget(b2)
         header.addLayout(brand)
         header.addStretch()
         self.hdr_backend_lbl = QLabel("后端 8000")
-        self.hdr_backend_lbl.setStyleSheet(f"font: 10px 'Microsoft YaHei'; color:{TEXT3};")
+        self.hdr_backend_lbl.setStyleSheet(f"font: 10px {FONT}; color:{TEXT3};")
         self.hdr_frontend_lbl = QLabel("前端 5173")
-        self.hdr_frontend_lbl.setStyleSheet(f"font: 10px 'Microsoft YaHei'; color:{TEXT3};")
+        self.hdr_frontend_lbl.setStyleSheet(f"font: 10px {FONT}; color:{TEXT3};")
         header.addWidget(self.hdr_backend_lbl)
         header.addSpacing(10)
         header.addWidget(self.hdr_frontend_lbl)
@@ -724,21 +752,23 @@ class LauncherApp(QWidget):
         self.backend_tile = ServiceTile("后端接口服务", "SRV-01 · API", "server", GREEN)
         self.frontend_tile = ServiceTile("前端网页客户端", "SRV-02 · WEB", "window", BLUE)
         left_body.addWidget(self.backend_tile)
-        left_body.addSpacing(12)
+        left_body.addSpacing(14)
         left_body.addWidget(self.frontend_tile)
+        left_body.addStretch()
 
         # 实时日志：页签 + 搜索 + 4 通道
         tab_row = QHBoxLayout()
-        tab_row.setSpacing(6)
+        tab_row.setSpacing(8)
         self.tab_buttons = []
         tab_specs = [("综合", "grid"), ("前端", "window"), ("后端", "server"), ("备份", "save")]
         for i, (t, ic) in enumerate(tab_specs):
             btn = QPushButton(t)
-            btn.setFixedSize(86, 30)
+            btn.setMinimumSize(80, 32)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda _, idx=i: self._switch_tab(idx))
             self.tab_buttons.append(btn)
-            tab_row.addWidget(btn)
+            tab_row.addWidget(btn, 1)
         self._style_tab(0)
         right_body.addLayout(tab_row)
 
@@ -748,7 +778,7 @@ class LauncherApp(QWidget):
         self.log_search.setPlaceholderText("检索日志")
         self.log_search.setStyleSheet(
             f"QLineEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-            f"padding:4px 10px; font:10px 'Microsoft YaHei'; color:{TEXT2};}}")
+            f"padding:4px 10px; font:10px {FONT}; color:{TEXT2};}}")
         self.log_search.textChanged.connect(self._on_filter_changed)
         search_btn = QPushButton()
         search_btn.setFixedSize(74, 26)
@@ -783,7 +813,7 @@ class LauncherApp(QWidget):
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(8)
         t = QLabel(title)
-        t.setStyleSheet(f"font: bold 13px 'Microsoft YaHei'; color:{TEXT}; padding:14px 16px 6px 16px;")
+        t.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; padding:14px 16px 6px 16px;")
         v.addWidget(t)
         body = QWidget()
         bv = QVBoxLayout(body)
@@ -795,16 +825,24 @@ class LauncherApp(QWidget):
     def _build_bottom_row(self):
         self.bottom_row = QWidget()
         self.bottom_row.setStyleSheet(f"background:{BG};")
-        self.bottom_row.setFixedHeight(96 + 40)
-        lay = QHBoxLayout(self.bottom_row)
-        lay.setContentsMargins(28, 18, 28, 22)
-        lay.setSpacing(16)
+        self.bottom_row.setFixedHeight(132)
+        v = QVBoxLayout(self.bottom_row)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(0)
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{DIVIDER}; border:none;")
+        v.addWidget(line)
+        lay = QHBoxLayout()
+        lay.setContentsMargins(28, 16, 28, 20)
+        lay.setSpacing(18)
         self.start_btn = ActionButton("启动系统", "play", BTN_SPEC['start'], self.start_services)
         self.stop_btn = ActionButton("停止系统", "stop", BTN_SPEC['stop'], self.stop_services)
         self.open_btn = ActionButton("打开页面", "browser", BTN_SPEC['open'], self.open_browser)
         self.refresh_btn = ActionButton("刷新状态", "refresh", BTN_SPEC['refresh'], self.refresh_status)
         for b in (self.start_btn, self.stop_btn, self.open_btn, self.refresh_btn):
             lay.addWidget(b, 1)
+        v.addLayout(lay)
         self._set_button_state(start='enabled', stop='disabled', open='disabled')
 
     # ── 日志渲染 ──
@@ -865,7 +903,7 @@ class LauncherApp(QWidget):
                 bg, fg = '#f0f0f3', '#8e8e93'
             btn.setStyleSheet(
                 f"QPushButton{{background:{bg}; color:{fg}; border:none; border-radius:8px; "
-                f"font: bold 11px 'Microsoft YaHei';}}")
+                f"font: bold 11px {FONT};}}")
 
     def _on_filter_changed(self, text):
         self.log_filter = text.strip()
@@ -880,7 +918,7 @@ class LauncherApp(QWidget):
         tile = self.backend_tile if which == 'backend' else self.frontend_tile
         tile.set_state(word, fg)
         hdr = self.hdr_backend_lbl if which == 'backend' else self.hdr_frontend_lbl
-        hdr.setStyleSheet(f"font: 10px 'Microsoft YaHei'; color:{fg};")
+        hdr.setStyleSheet(f"font: 10px {FONT}; color:{fg};")
         if which == 'backend':
             self.backend_status = word
         else:
@@ -1512,9 +1550,9 @@ class LauncherApp(QWidget):
         dv = QVBoxLayout(dlg)
         dv.setContentsMargins(20, 18, 20, 18)
         t1 = QLabel("恢复出厂需要管理员验证")
-        t1.setStyleSheet(f"font: bold 13px 'Microsoft YaHei'; color:{TEXT};")
+        t1.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT};")
         t2 = QLabel("请输入密码：")
-        t2.setStyleSheet(f"font: 10px 'Microsoft YaHei'; color:{TEXT2};")
+        t2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT2};")
         pwd = QLineEdit()
         pwd.setEchoMode(QLineEdit.Password)
         pwd.setAlignment(Qt.AlignCenter)
@@ -1522,7 +1560,7 @@ class LauncherApp(QWidget):
             f"QLineEdit{{border:1px solid {CARD_BORDER}; border-radius:8px; padding:6px; "
             f"font:12pt 'Segoe UI'; background:{CARD};}}")
         err = QLabel("")
-        err.setStyleSheet(f"color:{RED}; font: 9px 'Microsoft YaHei';")
+        err.setStyleSheet(f"color:{RED}; font: 9px {FONT};")
 
         def to_half_width(s):
             out = []
@@ -1549,7 +1587,7 @@ class LauncherApp(QWidget):
             b.setFixedWidth(80)
             b.setCursor(Qt.PointingHandCursor)
             b.setStyleSheet(f"QPushButton{{background:{CARD}; border:1px solid {CARD_BORDER}; "
-                            f"border-radius:8px; padding:6px; font:11px 'Microsoft YaHei';}}"
+                            f"border-radius:8px; padding:6px; font:11px {FONT};}}"
                             f"QPushButton:hover{{background:#e8e8ed;}}")
         cancel.clicked.connect(dlg.reject)
         ok.clicked.connect(on_confirm)
@@ -1582,7 +1620,7 @@ class LauncherApp(QWidget):
         h = QVBoxLayout()
         h.setSpacing(2)
         t1 = QLabel("数据库备份与还原")
-        t1.setStyleSheet(f"font: bold 16px 'Microsoft YaHei'; color:{TEXT};")
+        t1.setStyleSheet(f"font: bold 16px {FONT}; color:{TEXT};")
         t2 = QLabel("管理数据库备份目录、自动备份计划与还原操作")
         t2.setStyleSheet(f"font: 9px 'Segoe UI'; color:{TEXT2};")
         h.addWidget(t1)
@@ -1595,15 +1633,15 @@ class LauncherApp(QWidget):
         left.setSpacing(12)
         right = QVBoxLayout()
         right.setSpacing(12)
-        cols.addLayout(left, 3)
-        cols.addLayout(right, 2)
+        cols.addLayout(left, 1)
+        cols.addLayout(right, 1)
         root.addLayout(cols, 1)
 
         # 备份设置卡
         c1, b1 = self._make_card_settings("备份设置")
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("备份目录:"))
-        row1.itemAt(0).widget().setStyleSheet(f"font:10px 'Microsoft YaHei'; color:{TEXT};")
+        row1.itemAt(0).widget().setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
         self.settings_backup_dir_var = QLabel(self.backup_config.get('backup_dir', ''))
         self.settings_backup_dir_var.setStyleSheet(f"font:9pt 'Segoe UI'; color:{TEXT2};")
         self.settings_backup_dir_var.setWordWrap(True)
@@ -1623,63 +1661,72 @@ class LauncherApp(QWidget):
         wlabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         self.settings_auto_enabled = QCheckBox("启用自动备份")
         self.settings_auto_enabled.setChecked(auto.get('enabled', False))
-        self.settings_auto_enabled.setStyleSheet(f"font:10px 'Microsoft YaHei'; color:{TEXT};")
+        self.settings_auto_enabled.setStyleSheet(f"font:11px {FONT}; color:{TEXT};")
         b2.addWidget(self.settings_auto_enabled)
-        lbl_style = f"font:10px 'Microsoft YaHei'; color:{TEXT2};"
-        row2 = QHBoxLayout()
+        b2.addSpacing(4)
+
+        lbl_style = f"font:11px {FONT}; color:{TEXT2};"
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(10)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
+
         l_period = QLabel("周期:")
         l_period.setStyleSheet(lbl_style)
-        row2.addWidget(l_period)
         self.period_combo = QComboBox()
         self.period_combo.addItems(list(plabels.values()))
         self.period_combo.setCurrentText(plabels.get(auto.get('period', 'daily'), '每日'))
         self.period_combo.currentTextChanged.connect(self._update_settings_ui)
         self._style_combo(self.period_combo)
-        row2.addWidget(self.period_combo)
+        grid.addWidget(l_period, 0, 0)
+        grid.addWidget(self.period_combo, 0, 1)
+
         l_time = QLabel("时间:")
         l_time.setStyleSheet(lbl_style)
-        row2.addWidget(l_time)
         self.time_combo = QComboBox()
         self.time_combo.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
         self.time_combo.setCurrentText(auto.get('time', '02:00'))
         self._style_combo(self.time_combo)
-        row2.addWidget(self.time_combo)
-        b2.addLayout(row2)
+        grid.addWidget(l_time, 0, 2)
+        grid.addWidget(self.time_combo, 0, 3)
 
         self.weekday_container = QWidget()
-        wcv = QVBoxLayout(self.weekday_container)
+        wcv = QHBoxLayout(self.weekday_container)
         wcv.setContentsMargins(0, 0, 0, 0)
-        self.weekday_row = QHBoxLayout()
+        wcv.setSpacing(10)
         l_week = QLabel("星期:")
         l_week.setStyleSheet(lbl_style)
-        self.weekday_row.addWidget(l_week)
         self.weekday_combo = QComboBox()
         self.weekday_combo.addItems(wlabels)
         self.weekday_combo.setCurrentIndex(auto.get('weekday', 0))
         self._style_combo(self.weekday_combo)
-        self.weekday_row.addWidget(self.weekday_combo)
-        wcv.addLayout(self.weekday_row)
-        b2.addWidget(self.weekday_container)
+        wcv.addWidget(l_week)
+        wcv.addWidget(self.weekday_combo)
+        wcv.addStretch()
+        grid.addWidget(self.weekday_container, 1, 0, 1, 2)
 
         self.day_container = QWidget()
-        dcv = QVBoxLayout(self.day_container)
+        dcv = QHBoxLayout(self.day_container)
         dcv.setContentsMargins(0, 0, 0, 0)
-        self.day_row = QHBoxLayout()
+        dcv.setSpacing(10)
         l_day = QLabel("日期:")
         l_day.setStyleSheet(lbl_style)
-        self.day_row.addWidget(l_day)
         self.day_combo = QComboBox()
         self.day_combo.addItems([str(d) for d in range(1, 32)])
         self.day_combo.setCurrentText(str(auto.get('day', 1)))
         self._style_combo(self.day_combo)
-        self.day_row.addWidget(self.day_combo)
-        dcv.addLayout(self.day_row)
-        b2.addWidget(self.day_container)
+        dcv.addWidget(l_day)
+        dcv.addWidget(self.day_combo)
+        dcv.addStretch()
+        grid.addWidget(self.day_container, 1, 2, 1, 2)
+
+        b2.addLayout(grid)
+        b2.addSpacing(6)
         row2c = QHBoxLayout()
-        row2c.addWidget(QLabel())
-        row2c.itemAt(0).widget().setStyleSheet("color:transparent;")
         self.settings_next_backup = QLabel("")
-        self.settings_next_backup.setStyleSheet(f"font:9pt 'Segoe UI'; color:{TEXT2};")
+        self.settings_next_backup.setStyleSheet(f"font:10px 'Segoe UI'; color:{TEXT2};")
         row2c.addWidget(self.settings_next_backup, 1)
         row2c.addStretch()
         self._settings_btn(row2c, "保存设置", PURPLE, self._save_auto_backup_settings)
@@ -1690,7 +1737,7 @@ class LauncherApp(QWidget):
         c3, b3 = self._make_card_settings("还原操作")
         row3 = QHBoxLayout()
         row3.addWidget(QLabel("备份文件列表:"))
-        row3.itemAt(0).widget().setStyleSheet(f"font:10px 'Microsoft YaHei'; color:{TEXT};")
+        row3.itemAt(0).widget().setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
         row3.addStretch()
         self._settings_btn(row3, "刷新列表", BLUE, self._refresh_backup_list)
         b3.addLayout(row3)
@@ -1726,7 +1773,7 @@ class LauncherApp(QWidget):
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(8)
         t = QLabel(title)
-        t.setStyleSheet(f"font: bold 13px 'Microsoft YaHei'; color:{TEXT}; padding:14px 16px 6px 16px;")
+        t.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; padding:14px 16px 6px 16px;")
         v.addWidget(t)
         body = QWidget()
         bv = QVBoxLayout(body)
@@ -1740,10 +1787,10 @@ class LauncherApp(QWidget):
         combo.setCursor(Qt.PointingHandCursor)
         combo.setStyleSheet(
             f"QComboBox{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:8px; "
-            f"padding:4px 8px; font:10px 'Microsoft YaHei'; color:{TEXT};}}"
+            f"padding:4px 8px; font:10px {FONT}; color:{TEXT};}}"
             f"QComboBox::drop-down{{border:none;}}"
             f"QComboBox QAbstractItemView{{background:{CARD}; selection-background-color:{BLUE}; "
-            f"color:{TEXT}; font:10px 'Microsoft YaHei';}}")
+            f"color:{TEXT}; font:10px {FONT};}}")
 
     def _settings_btn(self, layout, text, color, cmd):
         btn = QPushButton(text)
@@ -1752,14 +1799,12 @@ class LauncherApp(QWidget):
         btn.clicked.connect(cmd)
         btn.setStyleSheet(
             f"QPushButton{{background:{color}; color:#ffffff; border:none; border-radius:8px; "
-            f"font: bold 10px 'Microsoft YaHei'; padding:0 14px;}}"
+            f"font: bold 10px {FONT}; padding:0 14px;}}"
             f"QPushButton:hover{{background:{color};}}")
         layout.addWidget(btn)
         return btn
 
     def _update_settings_ui(self, *args):
-        if not getattr(self, '_settings_view_open', False):
-            return
         pmap = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly'}
         wlabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         period = pmap.get(self.period_combo.currentText(), 'daily')
@@ -1893,7 +1938,7 @@ class LauncherApp(QWidget):
         h = QVBoxLayout()
         h.setSpacing(2)
         t1 = QLabel("恢复出厂设置")
-        t1.setStyleSheet(f"font: bold 16px 'Microsoft YaHei'; color:{RED};")
+        t1.setStyleSheet(f"font: bold 16px {FONT}; color:{RED};")
         t2 = QLabel("清空全部业务数据并重建系统（等同于重新初始化数据库）")
         t2.setStyleSheet(f"font: 9px 'Segoe UI'; color:{TEXT2};")
         h.addWidget(t1)
@@ -1901,18 +1946,18 @@ class LauncherApp(QWidget):
         root.addLayout(h)
 
         warn = QFrame()
-        warn.setStyleSheet(f"QFrame{{background:#fff1f0; border:1px solid {RED}; border-radius:8px;}}")
+        warn.setStyleSheet(f"QFrame{{background:#fff8f7; border-left:4px solid {RED}; border-radius:8px;}}")
         wv = QVBoxLayout(warn)
-        wv.setContentsMargins(14, 10, 14, 10)
+        wv.setContentsMargins(14, 12, 14, 12)
         w1 = QLabel("⚠ 危险操作，不可恢复！")
-        w1.setStyleSheet(f"font: bold 12px 'Microsoft YaHei'; color:{RED};")
+        w1.setStyleSheet(f"font: bold 12px {FONT}; color:{RED};")
         w2 = QLabel("执行后将清空以下内容，且无法找回，请先确认已做好备份：")
-        w2.setStyleSheet(f"font:10px 'Microsoft YaHei'; color:{TEXT};")
+        w2.setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
         w3 = QLabel("订单、网店、商品、类别、品牌、物流公司、图片、日志、站内信、提现记录、除1001外的账号")
-        w3.setStyleSheet(f"font:9px 'Microsoft YaHei'; color:{TEXT2};")
+        w3.setStyleSheet(f"font:9px {FONT}; color:{TEXT2};")
         w3.setWordWrap(True)
         w4 = QLabel("保留：管理员账号(1001)、系统配置、默认类别(999-其他类别)、默认品牌(999-默认品牌)")
-        w4.setStyleSheet(f"font:9px 'Microsoft YaHei'; color:{GREEN};")
+        w4.setStyleSheet(f"font:9px {FONT}; color:{GREEN};")
         w4.setWordWrap(True)
         for w in (w1, w2, w3, w4):
             wv.addWidget(w)
@@ -1927,7 +1972,7 @@ class LauncherApp(QWidget):
         self.reset_opt_images.setChecked(True)
         self.reset_opt_restart.setChecked(False)
         for c in (self.reset_opt_data, self.reset_opt_images, self.reset_opt_restart):
-            c.setStyleSheet(f"font:10px 'Microsoft YaHei'; color:{TEXT};")
+            c.setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
             opt.addWidget(c)
         root.addLayout(opt)
 
@@ -1937,7 +1982,7 @@ class LauncherApp(QWidget):
         self.reset_exec_btn.setCursor(Qt.PointingHandCursor)
         self.reset_exec_btn.setStyleSheet(
             f"QPushButton{{background:{RED}; color:#fff; border:none; border-radius:8px; "
-            f"font: bold 11px 'Microsoft YaHei'; padding:0 20px;}}"
+            f"font: bold 11px {FONT}; padding:0 20px;}}"
             f"QPushButton:hover{{background:{RED_L};}} QPushButton:pressed{{background:{RED_D};}}")
         self.reset_exec_btn.clicked.connect(self._do_factory_reset)
         act.addWidget(self.reset_exec_btn)
@@ -1945,7 +1990,7 @@ class LauncherApp(QWidget):
         root.addLayout(act)
 
         rl = QLabel("执行日志：")
-        rl.setStyleSheet(f"font: bold 10px 'Microsoft YaHei'; color:{TEXT};")
+        rl.setStyleSheet(f"font: bold 10px {FONT}; color:{TEXT};")
         root.addWidget(rl)
         log_frame = QFrame()
         lf = QVBoxLayout(log_frame)
