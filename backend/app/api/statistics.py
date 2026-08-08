@@ -1526,3 +1526,135 @@ async def get_summary_order_details(
             "sales_amount": amt
         })
     return {"mode": mode, "items": items, "total": len(items)}
+
+
+# ==================== 退款订单明细（销售分析 → 退款订单） ====================
+@router.get("/refund-orders")
+async def get_refund_orders(
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD（按下单时间）"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD（按下单时间）"),
+    sales_person: str = Query(None, description="销售人员（真实姓名/用户名，模糊）"),
+    brand: str = Query(None, description="品牌名称（模糊）"),
+    category: str = Query(None, description="类别名称（模糊）"),
+    platform_order_no: str = Query(None, description="平台订单号（模糊）"),
+    product_name: str = Query(None, description="商品名称（模糊）"),
+    limit: int = Query(5000, ge=1, le=20000),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """退款订单明细：所有 shipping_status=refunded 的订单。
+    列：平台订单号/商品名称/销售金额/销售人员/下单时间/退款备注。
+    查询模式与毛利分析一致：按下单时间范围 + 人员/品牌/类别（下拉+模糊）/平台单号/商品名模糊。
+    权限：仅老板端/工厂端。
+    """
+    if current_user.role not in ("boss", "factory"):
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端/工厂端可访问")
+
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    query = select(
+        Order.order_id,
+        Order.platform_order_no,
+        Order.product_name,
+        Order.sales_amount,
+        Order.created_by,
+        Order.created_at,
+        Order.refund_note,
+        Order.remark,
+        Order.logistics_company,
+        Order.logistics_no,
+        Order.logistics_no_2,
+        Order.receiver_address,
+        Order.shipping_status
+    )
+    # 仅已退货/退款订单
+    query = query.where(Order.shipping_status == "refunded")
+    if start_dt:
+        query = query.where(Order.created_at >= start_dt)
+    if end_dt:
+        query = query.where(Order.created_at < end_dt)
+    if platform_order_no:
+        query = query.where(Order.platform_order_no.like(f"%{platform_order_no.strip()}%"))
+    if product_name:
+        query = query.where(Order.product_name.like(f"%{product_name.strip()}%"))
+
+    query = query.order_by(Order.created_at.desc())
+    rows = (await db.execute(query.limit(limit))).all()
+
+    # 人员 / 品牌 / 类别映射（订单商品名 → products → brand/category）
+    user_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_map[u.username] = u.real_name or u.username
+
+    brand_map = {}
+    for b in (await db.execute(select(Brand))).scalars().all():
+        brand_map[b.id] = b.brand_name
+    cat_map = {}
+    for c in (await db.execute(select(Category))).scalars().all():
+        cat_map[c.id] = c.category_name
+
+    prod_map = {}
+    for p in (await db.execute(select(Product))).scalars().all():
+        if p.product_name not in prod_map:
+            prod_map[p.product_name] = {
+                "brand": brand_map.get(p.brand_id) if p.brand_id is not None else None,
+                "category": cat_map.get(p.category_id) if p.category_id is not None else None
+            }
+
+    items = []
+    total_amount = 0.0
+    for r in rows:
+        pname = r.product_name or ""
+        pmeta = prod_map.get(pname) or {}
+        brand_name = pmeta.get("brand") or "未分类"
+        cat_name = pmeta.get("category") or "未分类"
+        person = user_map.get(r.created_by or "") or (r.created_by or "未知")
+
+        # 品牌/类别/人员模糊过滤（前端下拉选择传回名称，同样按名称过滤）
+        if brand and brand.strip().lower() not in (brand_name or "").lower():
+            continue
+        if category and category.strip().lower() not in (cat_name or "").lower():
+            continue
+        if sales_person and sales_person.strip().lower() not in (person or "").lower():
+            continue
+
+        try:
+            amt = round(float(r.sales_amount or 0), 2)
+        except (TypeError, ValueError):
+            amt = 0.0
+        total_amount += amt
+
+        items.append({
+            "order_id": r.order_id,
+            "platform_order_no": r.platform_order_no or "",
+            "product_name": pname,
+            "sales_amount": amt,
+            "sales_person": person,
+            "brand": brand_name,
+            "category": cat_name,
+            "order_time": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None,
+            "refund_note": r.refund_note or "",
+            "remark": r.remark or "",
+            "logistics_company": r.logistics_company or "",
+            "logistics_no": r.logistics_no or "",
+            "logistics_no_2": r.logistics_no_2 or "",
+            "receiver_address": r.receiver_address or "",
+            "shipping_status": r.shipping_status or ""
+        })
+
+    return {
+        "items": items,
+        "total_count": len(items),
+        "total_amount": round(total_amount, 2)
+    }

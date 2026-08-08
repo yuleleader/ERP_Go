@@ -125,6 +125,12 @@ const routes = [
         meta: { title: '网店销售统计' }
       },
       {
+        path: 'refund-orders',
+        name: 'RefundOrders',
+        component: () => import('@/views/RefundOrders.vue'),
+        meta: { title: '退款订单' }
+      },
+      {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('@/views/Notifications.vue'),

@@ -165,3 +165,12 @@ export function getSummaryOrderDetails(params) {
     params
   })
 }
+
+// 退款订单明细（销售分析 → 退款订单；查询模式与毛利分析一致）
+export function getRefundOrders(params) {
+  return request({
+    url: '/statistics/refund-orders',
+    method: 'get',
+    params
+  })
+}
