@@ -89,13 +89,30 @@ class WindowsLauncherApp:
         self.root.minsize(980, 680)
         self.root.resizable(True, True)
         self.root.configure(bg='#c9c9cf')
-        # 让无边框窗口拥有任务栏按钮，使最小化后可从任务栏恢复
+        # 让无边框窗口拥有任务栏按钮（真正顶层 HWND 设置 WS_EX_APPWINDOW）
+        self._enable_taskbar_icon()
+
+    def _enable_taskbar_icon(self):
+        """让无边框窗口在任务栏显示图标按钮。
+
+        overrideredirect 窗口默认没有任务栏按钮；需对【真正顶层 HWND】设置
+        WS_EX_APPWINDOW（0x00040000）并移除 WS_EX_TOOLWINDOW（0x00000080）。
+        注意：root.winfo_id() 返回的是 Tk 包装窗口句柄，必须用 GetAncestor
+        提升到顶层窗口句柄，否则样式设置不会作用到任务栏。
+        幂等、可重复调用（窗口显示后再调一次确保生效）。
+        """
         try:
             from ctypes import windll
             GWL_EXSTYLE = -20
             WS_EX_APPWINDOW = 0x00040000
             WS_EX_TOOLWINDOW = 0x00000080
-            hwnd = self.root.winfo_id()
+            GA_ROOT = 2
+            child = self.root.winfo_id()
+            hwnd = windll.user32.GetAncestor(child, GA_ROOT)
+            if not hwnd:
+                hwnd = windll.user32.GetParent(child)
+            if not hwnd:
+                return
             ex = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             ex = (ex | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW
             windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex)
@@ -2488,6 +2505,14 @@ def main():
     root.configure(bg='#c9c9cf')
 
     app = WindowsLauncherApp(root)
+
+    # 窗口映射后再次刷新任务栏图标（overrideredirect 样式在 map 时可能被重置）
+    try:
+        root.update_idletasks()
+        root.update()
+        app._enable_taskbar_icon()
+    except Exception:
+        pass
 
     # 兜底：任何 Tk 回调（after/按钮/绑定事件）抛出的未捕获异常，
     # 默认会让 mainloop 退出导致"闪退"。这里统一拦截并记录，不让程序退出。
