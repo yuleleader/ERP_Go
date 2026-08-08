@@ -55,7 +55,7 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="orders" v-loading="loading" style="width: 100%;" :default-sort="{ prop: 'order_days', order: 'descending' }" :height="tableHeight" class="uniform-row-height">
+      <el-table :data="orders" v-loading="loading" style="width: 100%;" :height="tableHeight" class="uniform-row-height">
         <!-- 固定前置展示字段：所有角色通用 -->
         <!-- 1. 订单二维码 -->
         <el-table-column label="二维码" width="80" align="center">

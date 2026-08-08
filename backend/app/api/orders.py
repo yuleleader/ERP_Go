@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, cast, String
+from sqlalchemy import select, func, cast, String, case
 from typing import List, Optional
 from ..core.database import get_db
 from ..core.security import get_current_active_user, verify_password
@@ -333,9 +333,19 @@ async def get_orders(
     count_result = await db.execute(count_query)
     total = count_result.scalar()
 
-    # 下单时长实时化后无法用存库值排序：按下单时间升序（下单越早=滞留越久，排越前），
-    # 与"超期订单"实时计算口径一致；同日订单按存库时长降序保持稳定
-    query = query.order_by(Order.created_at.asc(), Order.order_days.desc().nullslast()).offset(skip).limit(limit)
+    # 排序规则（用户确认）：
+    #   未完成订单（未发货 pending / 虚拟发货 virtual）优先排前面，按下单时间升序（最早在前，优先处理超期）；
+    #   已完成订单（已虚拟发货/已发货/已退货）沉底排后面，按下单时间升序保持时间连贯。
+    active_statuses = ["pending", "virtual"]
+    status_group = case(
+        (Order.shipping_status.in_(active_statuses), 0),
+        else_=1
+    )
+    query = query.order_by(
+        status_group,
+        Order.created_at.asc(),
+        Order.order_days.desc().nullslast()
+    ).offset(skip).limit(limit)
     result = await db.execute(query)
     orders = result.scalars().all()
 
