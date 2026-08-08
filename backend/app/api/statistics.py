@@ -1174,11 +1174,18 @@ async def get_freight_list(
     query = select(
         Order.order_id,
         Order.platform_order_no,
+        Order.product_name,
+        Order.sales_amount,
+        Order.created_by,
+        Order.created_at,
         Order.logistics_no,
         Order.logistics_no_2,
         Order.freight,
         Order.logistics_company,
-        Order.created_at
+        Order.receiver_address,
+        Order.remark,
+        Order.refund_note,
+        Order.shipping_status
     )
     if start_dt:
         query = query.where(Order.created_at >= start_dt)
@@ -1191,7 +1198,26 @@ async def get_freight_list(
     if logistics_company:
         query = query.where(Order.logistics_company.like(f"%{logistics_company.strip()}%"))
 
+    query = query.order_by(Order.created_at.desc())
     rows = (await db.execute(query.limit(limit))).all()
+
+    # 人员 / 品牌 / 类别映射（抽屉展示用，与退款订单一致）
+    user_map = {}
+    for u in (await db.execute(select(User))).scalars().all():
+        user_map[u.username] = u.real_name or u.username
+    brand_map = {}
+    for b in (await db.execute(select(Brand))).scalars().all():
+        brand_map[b.id] = b.brand_name
+    cat_map = {}
+    for c in (await db.execute(select(Category))).scalars().all():
+        cat_map[c.id] = c.category_name
+    prod_map = {}
+    for p in (await db.execute(select(Product))).scalars().all():
+        if p.product_name not in prod_map:
+            prod_map[p.product_name] = {
+                "brand": brand_map.get(p.brand_id) if p.brand_id is not None else None,
+                "category": cat_map.get(p.category_id) if p.category_id is not None else None
+            }
 
     items = []
     total_freight = 0.0
@@ -1201,13 +1227,25 @@ async def get_freight_list(
         except (TypeError, ValueError):
             freight = 0.0
         total_freight += freight
+        pname = r.product_name or ""
+        pmeta = prod_map.get(pname) or {}
         items.append({
             "order_id": r.order_id,
             "platform_order_no": r.platform_order_no or "",
+            "product_name": pname,
+            "sales_amount": round(float(r.sales_amount or 0), 2) if r.sales_amount else 0,
+            "sales_person": user_map.get(r.created_by or "") or (r.created_by or "未知"),
+            "brand": pmeta.get("brand") or "未分类",
+            "category": pmeta.get("category") or "未分类",
             "logistics_no": r.logistics_no or "",
             "logistics_no_2": r.logistics_no_2 or "",
             "freight": round(freight, 2),
             "logistics_company": r.logistics_company or "",
+            "receiver_address": r.receiver_address or "",
+            "remark": r.remark or "",
+            "refund_note": r.refund_note or "",
+            "shipping_status": r.shipping_status or "",
+            "order_time": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None,
             "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else None
         })
 
