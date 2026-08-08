@@ -2735,8 +2735,46 @@ class WindowsLauncherApp:
             pass
         # 合成层兜底：隐藏→立即恢复，强制重建窗口渲染缓冲，清除旧帧叠加
         self._rebuild_window_buffer()
+        # 二次兜底：合成器有时延迟到 deiconify 之后才刷新，再次重建（150ms 后）
+        self.root.after(150, self._rebuild_window_buffer)
+        # 三次兜底：强制所有已显示 view 重新绘制（清除视图切换残留的旧帧）
+        self.root.after(400, self._force_repaint_views)
         if getattr(self, '_max_btn', None):
             self._max_btn._redraw(hover=False)
+
+    def _force_repaint_views(self):
+        """强制所有当前显示的 view 重画——清除视图切换残留 + 强化最大化后无残帧。
+
+        对每个已 pack 的 view 递归遍历：Canvas 有 _redraw 回调的清空重绘；
+        触发 update_idletasks 让 <Configure> 重绘回调及时执行。
+        """
+        for view in (getattr(self, 'home_view', None),
+                     getattr(self, 'settings_view', None),
+                     getattr(self, 'reset_view', None)):
+            if view is None or not view.winfo_ismapped():
+                continue
+
+            def walk(widget):
+                try:
+                    if isinstance(widget, tk.Canvas):
+                        redraw = getattr(widget, '_redraw', None)
+                        if callable(redraw):
+                            widget.delete('all')
+                            redraw()
+                except Exception:
+                    pass
+                try:
+                    widget.update_idletasks()
+                except Exception:
+                    pass
+                for child in widget.winfo_children():
+                    walk(child)
+            walk(view)
+        try:
+            self.root.update_idletasks()
+            self.root.update()
+        except Exception:
+            pass
 
     def _rebuild_window_buffer(self):
         """隐藏→1ms 后恢复窗口，强制 Tk/Windows 重建整个渲染缓冲。
