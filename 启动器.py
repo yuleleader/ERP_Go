@@ -331,14 +331,14 @@ class WindowsLauncherApp:
             cv_logo.create_text(18, 18, text='ERP', fill='#ffffff', font=('微软雅黑', 9, 'bold'))
         title_frame = tk.Frame(logo_frame, bg=self.colors['sidebar_bg'])
         title_frame.pack(side=tk.LEFT, padx=(10, 0), fill=tk.Y)
-        tk.Label(title_frame, text='牛蛙产销协同系统', font=('微软雅黑', 10, 'bold'),
+        tk.Label(title_frame, text='牛蛙产销协同系统', font=('微软雅黑', 12, 'bold'),
                  bg=self.colors['sidebar_bg'], fg=self.colors['text_primary'], anchor='w').pack(fill=tk.X)
-        tk.Label(title_frame, text='启动器', font=('微软雅黑', 8),
+        tk.Label(title_frame, text='启动器', font=('微软雅黑', 9),
                  bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim'], anchor='w').pack(fill=tk.X)
 
         # 侧边栏导航项：深色背景 + 左侧图标 + 右侧文字（选中绿色高亮）
         def make_nav_item(parent, text, icon_name, cmd, active_view):
-            cv = tk.Canvas(parent, width=176, height=40, bg=self.colors['sidebar_bg'],
+            cv = tk.Canvas(parent, width=176, height=44, bg=self.colors['sidebar_bg'],
                            highlightthickness=0, cursor='hand2')
             cv.pack(fill=tk.X, padx=10, pady=2)
             cv._active_view = active_view
@@ -352,10 +352,10 @@ class WindowsLauncherApp:
                     bg, fg, ic = self.colors['sidebar_hover'], self.colors['text_primary'], self.colors['text_primary']
                 else:
                     bg, fg, ic = self.colors['sidebar_bg'], self.colors['sidebar_text'], self.colors['sidebar_text_dim']
-                self._draw_rounded_rect(cv, 6, 6, 170, 34, 8, fill=bg, outline='', tags='bg')
-                self._draw_icon(cv, icon_name, 30, 20, 18, ic)
-                cv.create_text(56, 20, text=text, fill=fg, anchor='w',
-                               font=('微软雅黑', 11, 'bold' if active else 'normal'))
+                self._draw_rounded_rect(cv, 6, 6, 170, 38, 8, fill=bg, outline='', tags='bg')
+                self._draw_icon(cv, icon_name, 30, 22, 18, ic)
+                cv.create_text(56, 22, text=text, fill=fg, anchor='w',
+                               font=('微软雅黑', 13, 'bold' if active else 'normal'))
 
             cv._redraw = redraw
             cv.bind('<Button-1>', lambda e: cmd())
