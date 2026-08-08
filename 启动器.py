@@ -1931,7 +1931,7 @@ class WindowsLauncherApp:
 
         tk.Label(dlg, text="恢复出厂需要管理员验证", font=('微软雅黑', 13, 'bold'),
                  bg=self.colors['bg'], fg=self.colors['text_primary']).pack(pady=(18, 4))
-        tk.Label(dlg, text=f"请输入密码（当天日期，如 {today}）：", font=('微软雅黑', 10),
+        tk.Label(dlg, text="请输入密码：", font=('微软雅黑', 10),
                  bg=self.colors['bg'], fg=self.colors['text_secondary']).pack()
         pwd_var = tk.StringVar()
         pwd_entry = tk.Entry(dlg, textvariable=pwd_var, show='*', width=22,
@@ -1941,11 +1941,22 @@ class WindowsLauncherApp:
         err_lbl.pack()
 
         def on_confirm(event=None):
-            if pwd_var.get().strip() == today:
+            # 兼容全角数字/空格（中文输入法常输入全角）：统一转半角再比较
+            def to_half_width(s):
+                out = []
+                for ch in s:
+                    code = ord(ch)
+                    if code == 0x3000:          # 全角空格
+                        code = 0x20
+                    elif 0xFF01 <= code <= 0xFF5E:  # 全角字符 → 半角
+                        code -= 0xFEE0
+                    out.append(chr(code))
+                return ''.join(out)
+            if to_half_width(pwd_var.get().strip()) == today:
                 dlg.destroy()
                 self._switch_to_reset_view()
             else:
-                err_lbl.config(text="密码错误，请重试（密码为当天日期）")
+                err_lbl.config(text="密码错误，请重试")
 
         btns = tk.Frame(dlg, bg=self.colors['bg'])
         btns.pack(pady=(6, 12))
