@@ -366,17 +366,17 @@ class WindowsLauncherApp:
 
         self.nav_home = make_nav_item(sidebar, '状态', 'home', self._show_home_view, 'home')
 
-        # 备份设置下移到底部（与截图位置一致：状态/备份/初始，备份和初始靠下）
+        # 底部版本号（左下角，先 pack 确保贴底、anchor=w 靠左）
+        tk.Label(sidebar, text='v1.1', font=('Segoe UI', 9),
+                 bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim']).pack(
+            side=tk.BOTTOM, anchor='w', padx=16, pady=(0, 10))
+
+        # 底部导航区：备份 / 初始（靠上）
         sidebar_bottom = tk.Frame(sidebar, bg=self.colors['sidebar_bg'])
         sidebar_bottom.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.nav_settings = make_nav_item(sidebar_bottom, '备份', 'folder', self.open_settings_window, 'settings')
         self.nav_reset = make_nav_item(sidebar_bottom, '初始', 'restore', self._open_reset_view, 'reset')
-
-        # 底部版本号
-        tk.Label(sidebar, text='v1.1', font=('Segoe UI', 9),
-                 bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim']).pack(
-            side=tk.BOTTOM, pady=(0, 14))
 
         self._current_view = 'home'
         self._settings_built = False
