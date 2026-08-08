@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-// 系统信息展示页（从原系统设置页拆分独立）
+// 系统信息展示页（位于"系统设置 → 关于本系统"分组下）
 </script>
 
 <style scoped>

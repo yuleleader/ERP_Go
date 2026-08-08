@@ -248,8 +248,7 @@ const menuGroups = computed(() => {
           items: pick([
             { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss },
             { label: '日志清理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss },
-            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
-            { label: '系统信息', path: '/system-info', desc: '版本、运行环境与数据概况', show: isBoss }
+            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss }
           ])
         },
         {
@@ -262,6 +261,12 @@ const menuGroups = computed(() => {
           title: '消息通讯',
           items: pick([
             { label: '站内信管理', path: '/notifications', desc: '消息收发与已读状态', show: true }
+          ])
+        },
+        {
+          title: '关于本系统',
+          items: pick([
+            { label: '系统信息', path: '/system-info', desc: '版本、运行环境与数据概况', show: isBoss }
           ])
         }
       ].filter((g) => g.items.length)
