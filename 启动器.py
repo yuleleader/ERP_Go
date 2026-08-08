@@ -86,6 +86,25 @@ def kill_process_on_port(port):
     return False
 
 
+def _acquire_single_instance_lock(port=25999):
+    """尝试绑定专用本地端口作为「单实例进程锁」。
+
+    绑定成功 = 当前进程是唯一实例（socket 保持监听，进程退出自动释放）；
+    绑定失败（端口已被占用）= 已有一个启动器实例在运行。
+    用于防止多次双击 启动器.py 产生多个窗口/进程——Windows 下双击偶发
+    触发两次启动事件，这是「点最大化后出现两个窗口」的真正根因。
+    """
+    try:
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('127.0.0.1', port))
+        sock.listen(1)
+        return sock
+    except Exception:
+        return None
+
+
 class WindowsLauncherApp:
     def __init__(self, root):
         self.root = root
@@ -2937,6 +2956,17 @@ class WindowsLauncherApp:
 
 
 def main():
+    # ═══════ 单实例保护 ═══════
+    # 防止重复双击 .py（Windows 偶发触发两次启动）产生多个启动器窗口
+    lock_sock = _acquire_single_instance_lock()
+    if lock_sock is None:
+        try:
+            import tkinter.messagebox as _mb
+            _mb.showwarning("提示", "启动器已在运行，请勿重复打开。\n若窗口不可见，请在任务栏或系统托盘查找。")
+        except Exception:
+            pass
+        sys.exit(0)
+
     root = tk.Tk()
 
     try:
@@ -2977,6 +3007,12 @@ def main():
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
+
+    # 释放单实例锁
+    try:
+        lock_sock.close()
+    except Exception:
+        pass
 
 
 if __name__ == '__main__':
