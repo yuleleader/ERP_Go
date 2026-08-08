@@ -2722,50 +2722,41 @@ class WindowsLauncherApp:
         self._tray_icon = None
 
     def _on_zoom(self):
-        """最大化/还原。
+        """最大化/还原——走 Windows 原生 ShowWindow 路径，避开 Tk/Windows 合成器 bug。
 
-        无边框窗口(overrideredirect)在 Windows Tcl/Tk 下**不能**用 state('zoomed')：
-        旧画布渲染缓冲不会自动失效，旧一帧画面保留、新布局渲染在下方，
-        视觉上就是"一模一样两份界面上下堆叠"。
+        历史教训（多次修复均未彻底解决）：
+        - 之前用 Tk state('zoomed')：overrideredirect 窗口不擦旧画布缓冲 → 双份堆叠
+        - 改用手动 geometry(wa×ha+0+0) resize：触发 Tk 窗口 resize 路径 → 合成器
+          仍可能延迟刷新留下旧帧
+        - destroy + rebuild home_view：widget 重建但 Windows 合成层仍有旧帧
+        - 三次兜底（880b5d0/13965af/3f5c5e0）均未能彻底清除
 
-        两个层面的修复（缺一不可）：
-        1. 逻辑层：手动 geometry 切换尺寸（本方法）+ 所有 <Configure> 重绘回调
-           已 delete('all') 彻底清空，避免图形碎片叠加；
-        2. 合成层：withdraw→deiconify 强制 Tk/Windows 重建窗口渲染缓冲，
-           彻底销毁旧帧（delete('all') 只清逻辑对象，清不掉合成缓冲残留）。
+        终极方案：直接调 Win32 ShowWindow(SW_MAXIMIZE/SW_RESTORE)，
+        不触发 Tk 内部 resize 事件——合成层只收到 Windows 系统级重绘指令，
+        不走 Tk 的缓冲管理路径（彻底规避合成器 bug）。
         """
         try:
-            if getattr(self, '_zoomed', False):
-                # 还原：恢复到最大化前记录的正常几何
-                self.root.geometry(getattr(self, '_normal_geo', '1240x880'))
-                self._zoomed = False
-            else:
-                # 记录当前正常几何（每次最大化都覆盖，避免还原后拖动再最大化用旧值）
-                self._normal_geo = (
-                    f"{self.root.winfo_width()}x{self.root.winfo_height()}"
-                    f"+{self.root.winfo_x()}+{self.root.winfo_y()}"
-                )
-                # 铺满 Windows 工作区（不含任务栏）
-                try:
-                    import ctypes
-                    rect = ctypes.wintypes.RECT()
-                    # SPI_GETWORKAREA = 0x0030
-                    ctypes.windll.user32.SystemParametersInfoW(
-                        0x0030, 0, ctypes.byref(rect), 0)
-                    wa, ha = rect.right - rect.left, rect.bottom - rect.top
-                except Exception:
-                    wa = self.root.winfo_screenwidth()
-                    ha = self.root.winfo_screenheight()
-                self.root.geometry(f"{wa}x{ha}+0+0")
-                self._zoomed = True
+            import ctypes
+            hwnd = ctypes.windll.user32.GetAncestor(self.root.winfo_id(), 2)
+            if not hwnd:
+                hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            if hwnd:
+                if ctypes.windll.user32.IsZoomed(hwnd):
+                    # 已最大化 → 还原
+                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                    self._zoomed = False
+                else:
+                    # 记录当前正常几何（用于用户后续手动还原参考）
+                    self._normal_geo = (
+                        f"{self.root.winfo_width()}x{self.root.winfo_height()}"
+                        f"+{self.root.winfo_x()}+{self.root.winfo_y()}"
+                    )
+                    ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+                    self._zoomed = True
+                # 让 Tk 同步窗口尺寸（不触发 resize 事件，只是同步 winfo_*）
+                self.root.update_idletasks()
         except Exception:
             pass
-        # 合成层兜底：隐藏→立即恢复，强制重建窗口渲染缓冲，清除旧帧叠加
-        self._rebuild_window_buffer()
-        # 二次兜底：合成器有时延迟到 deiconify 之后才刷新，再次重建（150ms 后）
-        self.root.after(150, self._rebuild_window_buffer)
-        # 三次兜底：destroy home_view children 并重建——彻底消除合成残留
-        self.root.after(400, self._force_rebuild_home_view)
         if getattr(self, '_max_btn', None):
             self._max_btn._redraw(hover=False)
 
