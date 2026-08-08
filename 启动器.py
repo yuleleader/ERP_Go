@@ -122,11 +122,11 @@ class WindowsLauncherApp:
         self.colors = {
             'bg':              '#f5f5f7',   # 主背景（苹果浅灰）
             'sidebar':         '#ececf1',   # 侧边栏（毛玻璃浅灰，兼容旧引用）
-            'sidebar_bg':      '#1e293b',   # 侧边栏深色背景
-            'sidebar_text':    '#cbd5e1',   # 侧边栏导航文字（普通态）
-            'sidebar_text_dim':'#64748b',   # 侧边栏副文字/版本号
-            'sidebar_hover':   '#334155',   # 侧边栏导航悬停
-            'sidebar_active':  '#34c759',   # 侧边栏导航选中（绿）
+            'sidebar_bg':      '#ececf1',   # 侧边栏浅色背景（与右侧保持一致）
+            'sidebar_text':    '#606266',   # 侧边栏导航文字（普通态）
+            'sidebar_text_dim':'#909399',   # 侧边栏副文字/版本号
+            'sidebar_hover':   '#f0f0f3',   # 侧边栏导航悬停
+            'sidebar_active':  '#e3f2ff',   # 侧边栏导航选中（淡蓝底）
             'card':            '#ffffff',   # 卡片背景（纯白）
             'card_border':     '#e6e6eb',   # 卡片边框（极淡灰）
             'card_shadow':     '#d9d9df',   # 卡片投影（柔和）
@@ -313,7 +313,7 @@ class WindowsLauncherApp:
         title_frame = tk.Frame(logo_frame, bg=self.colors['sidebar_bg'])
         title_frame.pack(side=tk.LEFT, padx=(10, 0), fill=tk.Y)
         tk.Label(title_frame, text='牛蛙产销协同系统', font=('微软雅黑', 10, 'bold'),
-                 bg=self.colors['sidebar_bg'], fg='#ffffff', anchor='w').pack(fill=tk.X)
+                 bg=self.colors['sidebar_bg'], fg=self.colors['text_primary'], anchor='w').pack(fill=tk.X)
         tk.Label(title_frame, text='启动器', font=('微软雅黑', 8),
                  bg=self.colors['sidebar_bg'], fg=self.colors['sidebar_text_dim'], anchor='w').pack(fill=tk.X)
 
@@ -328,9 +328,9 @@ class WindowsLauncherApp:
                 cv.delete('all')
                 active = getattr(self, '_current_view', 'home') == active_view
                 if active:
-                    bg, fg, ic = self.colors['sidebar_active'], '#ffffff', '#ffffff'
+                    bg, fg, ic = self.colors['sidebar_active'], self.colors['blue'], self.colors['blue']
                 elif hover:
-                    bg, fg, ic = self.colors['sidebar_hover'], '#ffffff', '#ffffff'
+                    bg, fg, ic = self.colors['sidebar_hover'], self.colors['text_primary'], self.colors['text_primary']
                 else:
                     bg, fg, ic = self.colors['sidebar_bg'], self.colors['sidebar_text'], self.colors['sidebar_text_dim']
                 self._draw_rounded_rect(cv, 6, 6, 170, 34, 8, fill=bg, outline='', tags='bg')
