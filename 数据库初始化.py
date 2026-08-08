@@ -286,6 +286,31 @@ def seed_all(conn: sqlite3.Connection):
     print("\n>>> 写入初始数据")
     seed_default_admin(conn)
     seed_system_settings(conn)
+    seed_default_category_brand(conn)
+
+
+def seed_default_category_brand(conn: sqlite3.Connection):
+    """重建默认兜底类别与品牌：
+    - 类别：编码 999、名称「其他类别」（一级）；页面左侧最上方的「全部」为固定选项，无需入库。
+    - 品牌：编码 999、名称「默认品牌」。
+    幂等：已存在则跳过。
+    """
+    cursor = conn.cursor()
+    if not cursor.execute("SELECT 1 FROM categories WHERE category_code='999'").fetchone():
+        cursor.execute(
+            "INSERT INTO categories (category_code, category_name, parent_id, level) VALUES ('999','其他类别',NULL,1)"
+        )
+        print("  ✓ 默认类别: 999-其他类别")
+    else:
+        print("  - 默认类别 999 已存在，跳过")
+    if not cursor.execute("SELECT 1 FROM brands WHERE brand_code=999").fetchone():
+        cursor.execute(
+            "INSERT INTO brands (brand_code, brand_name) VALUES (999,'默认品牌')"
+        )
+        print("  ✓ 默认品牌: 999-默认品牌")
+    else:
+        print("  - 默认品牌 999 已存在，跳过")
+    conn.commit()
 
 
 # ==================== 兼容性检查 ====================
@@ -352,6 +377,8 @@ def clean_user_data(conn: sqlite3.Connection):
         ("orders", "订单"),
         ("shops", "网店"),
         ("products", "商品"),
+        ("categories", "类别"),
+        ("brands", "品牌"),
         ("logistics_companies", "物流公司"),
     ]
 
