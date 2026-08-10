@@ -243,6 +243,76 @@ class ProductImage(Base):
     created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
 
 
+class OrderImport(Base):
+    """订单批量导入临时表：Excel 上传后先落临时表（按批次 batch_no 分组），
+    用户在"数据导入"页逐行查看异常提示 → 编辑修正 → 勾选审核 → 合并进正式 orders 表（生成追溯码）。
+    - status: pending=待审核（默认），merged=已合并（合并成功后删除记录，仅审计兜底）
+    - errors: JSON 数组字符串，如 ["已发货但生产未完成","退款备注不能为空"]；空数组/空串=无异常
+    - sales_amount/freight 存字符串，与正式 orders 表一致（合并时原样带入）
+    """
+    __tablename__ = "order_imports"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    batch_no = Column(String(40), index=True, nullable=False)     # 导入批次号，同批同号
+    platform_order_no = Column(String(100), index=True, nullable=False)
+    shop_name = Column(String(100), nullable=True)                # 模板填写的网店名称（用于定位网店）
+    shop_account = Column(String(100), nullable=True)             # 模板填写的网店账号（用于定位网店）
+    shop_id = Column(String(100), nullable=True)                  # 解析定位到的正式网店 shop_id；None=未匹配成功
+    product_name = Column(String(255), nullable=True)
+    sales_amount = Column(String(20), nullable=True)
+    freight = Column(String(20), nullable=True)
+    shipping_status = Column(String(20), default="pending")       # 英文枚举：pending/shipped/virtual/refunded
+    produce_status = Column(String(20), default="unproduce")      # 英文枚举：unproduce/producing/produced
+    logistics_company = Column(String(100), nullable=True)
+    logistics_no = Column(String(100), nullable=True)
+    receiver_address = Column(Text, nullable=True)
+    remark = Column(Text, nullable=True)
+    refund_note = Column(Text, nullable=True)
+    order_time = Column(String(30), nullable=True)                # 下单时间（规范化字符串；格式错误时保留原始值并标记异常）
+    shipping_time = Column(String(30), nullable=True)             # 发货时间（可选列，用于时间顺序校验）
+    errors = Column(Text, nullable=True)                          # JSON 数组字符串
+    imported_by = Column(String(50), nullable=False, index=True)  # 导入人 username（合并时作为订单 created_by）
+    import_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+    status = Column(String(20), default="pending")                # pending=待审核 / merged=已合并
+    merged_order_id = Column(String(100), nullable=True)          # 合并后生成的正式追溯码
+    merged_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
+class AccountingCode(Base):
+    """账务代码（财务模块-非交易收支的类型字典）。
+    code_type: income=非交易收入 / expense=非交易支出（如买水、广告、佣金等）。
+    仅老板端可维护；非交易收支录入时下拉选择。"""
+    __tablename__ = "accounting_codes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(String(20), unique=True, index=True, nullable=False)   # 自动生成：收入 SR001 / 支出 ZC001（递增）
+    name = Column(String(100), nullable=False)                           # 名称：买水/广告/佣金等
+    code_type = Column(String(20), nullable=False, default="expense")    # income=非交易收入 / expense=非交易支出
+    remark = Column(String(255), nullable=True)                          # 备注
+    created_by = Column(String(50), nullable=True)                       # 创建人 username（老板）
+    created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+    updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
+class NonTradeTransaction(Base):
+    """非交易收入/支出流水（财务模块，每人维护自己的数据）。
+    字段：账务代码(code_id) + 关联自己创建的网店(shop_id 可选) + 收入/支出 + 金额 + 备注。
+    trans_type: income=收入 / expense=支出（与账务代码类型独立，录入时手动选择）。"""
+    __tablename__ = "non_trade_transactions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code_id = Column(Integer, nullable=False, index=True)               # 关联 accounting_codes.id
+    shop_id = Column(String(100), nullable=True, index=True)            # 关联网店（可选，仅限自己创建的网店）
+    trans_type = Column(String(20), nullable=False, default="expense")  # income=收入 / expense=支出
+    amount = Column(Float, nullable=False, default=0)                   # 金额（>=0）
+    remark = Column(String(500), nullable=True)                         # 备注
+    created_by = Column(String(50), nullable=False, index=True)         # 录入人 username（每人只能维护自己的）
+    create_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+    update_by = Column(String(50), nullable=True)                       # 最近修改人
+    updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
 @event.listens_for(User, 'before_insert')
 @event.listens_for(Shop, 'before_insert')
 @event.listens_for(Order, 'before_insert')
@@ -258,6 +328,9 @@ class ProductImage(Base):
 @event.listens_for(Category, 'before_insert')
 @event.listens_for(Brand, 'before_insert')
 @event.listens_for(ProductImage, 'before_insert')
+@event.listens_for(OrderImport, 'before_insert')
+@event.listens_for(AccountingCode, 'before_insert')
+@event.listens_for(NonTradeTransaction, 'before_insert')
 def set_create_time_before_insert(mapper, connection, target):
     for col in ['created_at', 'create_time', 'login_time', 'start_time', 'updated_at', 'update_time']:
         if hasattr(target, col) and getattr(target, col) is None:
@@ -273,6 +346,10 @@ def set_create_time_before_insert(mapper, connection, target):
 @event.listens_for(ShopWithdrawRecord, 'before_update')
 @event.listens_for(Category, 'before_update')
 @event.listens_for(Brand, 'before_update')
+@event.listens_for(ProductImage, 'before_update')
+@event.listens_for(OrderImport, 'before_update')
+@event.listens_for(AccountingCode, 'before_update')
+@event.listens_for(NonTradeTransaction, 'before_update')
 def set_update_time_before_update(mapper, connection, target):
     for col in ['updated_at', 'update_time']:
         if hasattr(target, col):

@@ -174,3 +174,11 @@ export function getRefundOrders(params) {
     params
   })
 }
+// 退款率分析（按网店统计退款率，仅老板端）
+export function getRefundRate(params) {
+  return request({
+    url: '/statistics/refund-rate',
+    method: 'get',
+    params
+  })
+}

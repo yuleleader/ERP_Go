@@ -1704,3 +1704,78 @@ async def get_refund_orders(
         "total_count": len(items),
         "total_amount": round(total_amount, 2)
     }
+
+
+# ==================== 退款率分析 ====================
+@router.get("/refund-rate")
+async def get_refund_rate(
+    start_date: str = Query(None, description="起始日期 YYYY-MM-DD（按下单时间）"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD（按下单时间）"),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user),
+):
+    """退款率分析：按网店统计退款率（退款订单数 / 总订单数），支持按下单时间筛选。
+    返回各网店明细 + 汇总。仅老板端可访问。
+    """
+    if current_user.role != "boss":
+        raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
+
+    start_dt = None
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="start_date 格式应为 YYYY-MM-DD")
+    end_dt = None
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="end_date 格式应为 YYYY-MM-DD")
+
+    from sqlalchemy import case
+    total_case = func.count(Order.id)
+    refund_case = func.sum(case((Order.shipping_status == "refunded", 1), else_=0))
+    query = select(
+        Order.shop_id,
+        total_case.label("total_orders"),
+        refund_case.label("refund_orders"),
+    )
+    if start_dt:
+        query = query.where(Order.created_at >= start_dt)
+    if end_dt:
+        query = query.where(Order.created_at < end_dt)
+    query = query.group_by(Order.shop_id)
+
+    rows = (await db.execute(query)).all()
+
+    # 店铺名映射
+    shop_map = {}
+    for s in (await db.execute(select(Shop))).scalars().all():
+        shop_map[s.shop_id] = s.shop_name
+
+    items = []
+    total_orders = 0
+    total_refunds = 0
+    for r in rows:
+        to = r.total_orders or 0
+        rf = r.refund_orders or 0
+        total_orders += to
+        total_refunds += rf
+        items.append({
+            "shop_id": r.shop_id or "",
+            "shop_name": shop_map.get(r.shop_id) or r.shop_id or "未知网店",
+            "total_orders": to,
+            "refund_orders": rf,
+            "refund_rate": round(rf / to * 100, 2) if to else 0,
+        })
+
+    items.sort(key=lambda x: -x["refund_orders"])
+    return {
+        "items": items,
+        "summary": {
+            "total_orders": total_orders,
+            "refund_orders": total_refunds,
+            "refund_rate": round(total_refunds / total_orders * 100, 2) if total_orders else 0,
+        },
+    }

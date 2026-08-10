@@ -83,6 +83,12 @@ const routes = [
         meta: { title: '日志管理', roles: ['boss'] }
       },
       {
+        path: 'order-imports',
+        name: 'OrderImport',
+        component: () => import('@/views/OrderImport.vue'),
+        meta: { title: '数据导入', roles: ['boss', 'sales'] }
+      },
+      {
         path: 'images',
         name: 'Images',
         component: () => import('@/views/Images.vue'),
@@ -131,6 +137,18 @@ const routes = [
         meta: { title: '退款订单' }
       },
       {
+        path: 'refund-rate-analysis',
+        name: 'RefundRateAnalysis',
+        component: () => import('@/views/RefundRateAnalysis.vue'),
+        meta: { title: '退款率分析', roles: ['boss'] }
+      },
+      {
+        path: 'warnings',
+        name: 'WarningCenter',
+        component: () => import('@/views/WarningCenter.vue'),
+        meta: { title: '预警中心', roles: ['boss', 'sales'] }
+      },
+      {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('@/views/Notifications.vue'),
@@ -159,6 +177,24 @@ const routes = [
         name: 'AccountWithdrawal',
         component: () => import('@/modules/Finance/views/AccountWithdrawal.vue'),
         meta: { title: '账户提现', roles: ['boss', 'sales'] }
+      },
+      {
+        path: 'accounting-codes',
+        name: 'AccountingCodes',
+        component: () => import('@/views/AccountingCodes.vue'),
+        meta: { title: '账务代码', roles: ['boss'] }
+      },
+      {
+        path: 'non-trade-transactions',
+        name: 'NonTradeTransactions',
+        component: () => import('@/views/NonTradeTransactions.vue'),
+        meta: { title: '非交易收支录入', roles: ['boss', 'sales'] }
+      },
+      {
+        path: 'non-trade-summary',
+        name: 'NonTradeSummary',
+        component: () => import('@/views/NonTradeSummary.vue'),
+        meta: { title: '非交易收支统计', roles: ['boss'] }
       }
     ]
   }

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 import os
 from .core.database import init_db
 from .core.config import BASE_DIR, DATA_DIR
-from .api import auth, users, shops, orders, images, logs, logistics, statistics, notifications, products, dashboard, commission_settlement, withdraw, categories, brands, settings, product_images
+from .api import auth, users, shops, orders, images, logs, logistics, statistics, notifications, products, dashboard, commission_settlement, withdraw, categories, brands, settings, product_images, order_imports, warnings, non_trade
 from .services.scheduler import setup_scheduler, shutdown_scheduler
 
 @asynccontextmanager
@@ -55,6 +55,9 @@ app.include_router(categories.router)
 app.include_router(brands.router)
 app.include_router(settings.router)
 app.include_router(product_images.router)
+app.include_router(order_imports.router)
+app.include_router(warnings.router)
+app.include_router(non_trade.router)
 
 os.makedirs(DATA_DIR / "images", exist_ok=True)
 # 图片改为带登录鉴权的路由（?token= / Authorization），关闭免登录静态直链

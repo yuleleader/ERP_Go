@@ -341,7 +341,14 @@ const menuGroups = computed(() => {
             { label: '销售统计', path: '/sales-statistics', desc: '人员/类别/品牌/商品销售汇总', show: isBoss },
             { label: '毛利分析', path: '/gross-profit-analysis', desc: '按下单/发货时间核算毛利', show: isBoss },
             { label: '网店销售统计', path: '/shop-sales-statistics', desc: '按网店汇总销售与退货', show: isBoss },
-            { label: '退款订单', path: '/refund-orders', desc: '已退货/退款订单明细', show: isBoss }
+            { label: '退款订单', path: '/refund-orders', desc: '已退货/退款订单明细', show: isBoss },
+            { label: '退款率分析', path: '/refund-rate-analysis', desc: '按网店统计退款率报表', show: isBoss }
+          ])
+        },
+        {
+          title: '预警管理',
+          items: pick([
+            { label: '预警中心', path: '/warnings', desc: '超期未生产/未发货订单自动提醒', show: isBoss || isSales }
           ])
         },
         {
@@ -367,6 +374,14 @@ const menuGroups = computed(() => {
           items: pick([
             { label: '运费统计', path: '/freight-statistics', desc: '按订单时间段统计运费', show: isBoss }
           ])
+        },
+        {
+          title: '非交易收支',
+          items: pick([
+            { label: '账务代码', path: '/accounting-codes', desc: '非交易收入/支出类型字典维护', show: isBoss },
+            { label: '收支录入', path: '/non-trade-transactions', desc: '录入非交易收入/支出（每人维护自己的数据）', show: isBoss || isSales },
+            { label: '收支统计', path: '/non-trade-summary', desc: '按账务代码/人员汇总非交易收支', show: isBoss }
+          ])
         }
       ].filter((g) => g.items.length)
     },
@@ -378,7 +393,8 @@ const menuGroups = computed(() => {
           items: pick([
             { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss },
             { label: '日志清理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss },
-            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss }
+            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
+            { label: '数据导入', path: '/order-imports', desc: 'Excel 批量导入订单（临时表审核后合并）', show: isBoss || isSales }
           ])
         },
         {
