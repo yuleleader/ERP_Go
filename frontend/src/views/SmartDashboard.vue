@@ -65,12 +65,15 @@
             <div
               v-for="(item, index) in productRanking"
               :key="index"
-              class="rank-item"
+              class="shop-card"
             >
-              <span class="rank-index" :class="{ top: index < 3 }">{{ index + 1 }}</span>
-              <span class="rank-name" :title="item.product_name">{{ item.product_name }}</span>
-              <span class="rank-value">{{ formatNumber(item.sales_count) }}单</span>
+              <div class="shop-card-main">
+                <span class="rank-bar" :class="{ top: index < 3 }"></span>
+                <span class="owner-name" :title="item.product_name">{{ item.product_name }}</span>
+                <span class="sales-amount">{{ formatNumber(item.sales_count) }}单</span>
+              </div>
             </div>
+            <div v-if="productRanking.length === 0" class="empty-row">暂无数据</div>
           </div>
         </div>
       </aside>
@@ -82,6 +85,30 @@
 
       <!-- 右侧面板 -->
       <aside class="panel panel-right">
+        <!-- 超期订单 -->
+        <div class="table-block overdue-block">
+          <div class="block-title">超期订单 <span class="block-count">{{ overdueOrders.length }}单</span></div>
+          <div class="overdue-desc">统计未发货和虚拟发货订单，从下单时间到当前的时间差</div>
+          <div class="overdue-list">
+            <div
+              v-for="(item, index) in overdueOrders"
+              :key="index"
+              class="shop-card"
+            >
+              <div class="shop-card-main">
+                <span class="rank-bar" :class="{ top: index < 3 }"></span>
+                <span class="owner-name clickable-order" :title="item.order_id" @click="openDetail(item.order_id)">{{ item.order_id }}</span>
+                <span class="status-tags-col">
+                  <span class="status-tag" :class="item.shipping_status">{{ item.shipping_status_text }}</span>
+                  <span class="status-tag" :class="item.produce_status">{{ item.produce_status_text }}</span>
+                </span>
+              </div>
+              <div class="shop-card-sub">下单时长：<span class="overdue-days">{{ item.overdue_text }}</span></div>
+            </div>
+            <div v-if="overdueOrders.length === 0" class="empty-row">暂无超期订单</div>
+          </div>
+        </div>
+
         <!-- 网店销售排行 -->
         <div class="table-block shop-block">
           <div class="block-title">网店销售排行TOP30</div>
@@ -101,33 +128,6 @@
             <div v-if="shopRanking.length === 0" class="empty-row">暂无数据</div>
           </div>
         </div>
-
-        <!-- 超期订单 -->
-        <div class="table-block overdue-block">
-          <div class="block-title">超期订单</div>
-          <div class="overdue-desc">统计未发货和虚拟发货订单，从下单时间到当前的时间差</div>
-          <div class="data-table">
-            <div class="table-header">
-              <span class="col-order">订单ID</span>
-              <span class="col-status">状态</span>
-              <span class="col-time">下单时长</span>
-            </div>
-            <div class="table-body">
-              <div
-                v-for="(item, index) in overdueOrders"
-                :key="index"
-                class="table-row"
-              >
-                <span class="col-order clickable-order" title="点击查看订单详情" @click="openDetail(item.order_id)">{{ item.order_id }}</span>
-                <span class="col-status">
-                  <span class="status-tag" :class="item.shipping_status">{{ item.shipping_status_text }}</span>
-                </span>
-                <span class="col-time">{{ item.overdue_text }}</span>
-              </div>
-              <div v-if="overdueOrders.length === 0" class="empty-row">暂无超期订单</div>
-            </div>
-          </div>
-        </div>
       </aside>
     </main>
 
@@ -137,6 +137,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'SmartDashboard' })
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import * as echarts from 'echarts';
@@ -626,9 +627,18 @@ onUnmounted(() => {
   border-radius: 2px;
 }
 
-/* 统计卡片（三等分中的第一段：等高填满，6 张卡片全部可见，不滚动） */
+/* 标题内的计数（如：超期订单 20单） */
+.block-count {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #00d4ff;
+  font-family: 'Courier New', monospace;
+}
+
+/* 统计卡片：固定高度（6 张卡两列三行全部可见，不滚动） */
 .stats-cards {
-  flex: 1;
+  flex: 0 0 190px;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -693,9 +703,9 @@ onUnmounted(() => {
   color: #fecaca;
 }
 
-/* 图表块（三等分中的第二段：等高） */
+/* 图表块：固定高度（缩小至原3/4） */
 .chart-block {
-  flex: 1;
+  flex: 0 0 240px;
   min-height: 0;
   background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.15);
@@ -711,9 +721,9 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-/* 排行块（三等分中的第三段：等高） */
+/* 排行块：固定高度，内部列表超出滚动 */
 .rank-block {
-  flex: 1;
+  flex: 0 0 300px;
   min-height: 0;
   background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.15);
@@ -730,6 +740,29 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-right: 4px;
+  padding-bottom: 4px;
+  /* 自定义滚动条（与网店排行一致） */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.4) transparent;
+}
+
+.rank-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rank-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rank-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.35);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.rank-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.6);
 }
 
 .rank-item {
@@ -789,20 +822,22 @@ onUnmounted(() => {
   min-height: 600px;
 }
 
-/* 表格块 */
+/* 表格块：固定高度，内容超出内部滚动 */
 .table-block {
-  flex: 1;
-  min-height: 260px;
+  flex: 0 0 380px;
+  min-height: 0;
   background: rgba(30, 41, 59, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.15);
   border-radius: 8px;
   padding: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .overdue-block {
-  flex: 1.2;
+  flex: 0 0 400px;
+  min-height: 0;
 }
 
 .overdue-desc {
@@ -848,6 +883,29 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 6px;
   margin-top: 6px;
+  padding-right: 4px;
+  padding-bottom: 4px;
+  /* 自定义滚动条（与网店排行一致） */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.4) transparent;
+}
+
+.table-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.table-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.35);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.table-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.6);
 }
 
 .table-row {
@@ -880,6 +938,98 @@ onUnmounted(() => {
   text-align: right;
   color: #00d4ff;
   font-family: 'Courier New', monospace;
+}
+
+/* 超期订单列表：卡片式条目（与网店排行同款） */
+.overdue-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.4) transparent;
+}
+
+.overdue-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overdue-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overdue-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.35);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.overdue-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.6);
+}
+
+/* 超期订单卡片副行（复用原有 .shop-card-sub 样式） */
+.status-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.status-tag.pending,
+.status-tag.virtual {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.status-tag.shipped {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.status-tag.refunded {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+/* 生产进度标签三态（与订单状态标签并排） */
+.status-tag.unproduce {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.status-tag.producing {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.status-tag.produced {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+/* 发货状态 + 生产进度：上下结构，右对齐 */
+.status-tags-col {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* 超期订单天数字体：红色加粗 */
+.overdue-days {
+  color: #ef4444;
+  font-weight: bold;
 }
 
 /* 网店销售排行：卡片式排行条目（无表头） */
@@ -1000,10 +1150,6 @@ onUnmounted(() => {
   color: #f59e0b;
 }
 
-.status-tag.virtual_shipped {
-  background: rgba(99, 102, 241, 0.2);
-  color: #818cf8;
-}
 
 .empty-row {
   text-align: center;

@@ -11,7 +11,8 @@ import { orderApi } from '@/api'
 const ORDER_STATUS_MAP = {
   pending: '待发货',
   shipped: '已发货',
-  virtual: '虚拟发货'
+  virtual: '虚拟发货',
+  refunded: '已退货/退款'
 }
 
 /**
@@ -20,7 +21,8 @@ const ORDER_STATUS_MAP = {
 const ORDER_STATUS_TYPE_MAP = {
   pending: 'warning',
   shipped: 'success',
-  virtual: 'info'
+  virtual: 'info',
+  refunded: 'danger'
 }
 
 /**

@@ -76,6 +76,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Logistics' })
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { getLogisticsCompanies, createLogisticsCompany, updateLogisticsCompany, deleteLogisticsCompany as deleteCompanyApi } from '@/api/logistics'

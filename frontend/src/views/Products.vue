@@ -389,6 +389,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Products' })
 /**
  * 商品管理页面（主从布局 + 表格风格新建/编辑对话框 + 商品图片上传）
  */

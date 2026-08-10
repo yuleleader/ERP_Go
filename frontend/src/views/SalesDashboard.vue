@@ -98,7 +98,8 @@ function getStatusType(status) {
   const types = {
     pending: 'warning',
     shipped: 'success',
-    virtual: 'info'
+    virtual: 'info',
+    refunded: 'danger'
   }
   return types[status] || ''
 }

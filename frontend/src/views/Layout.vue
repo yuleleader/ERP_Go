@@ -72,8 +72,28 @@
         </div>
       </el-header>
 
+      <!-- MDI 多标签栏 -->
+      <div v-if="!isFullscreenDashboard" class="tabs-bar">
+        <div class="tabs-scroll">
+          <div
+            v-for="tab in tabs"
+            :key="tab.path"
+            class="tab-item"
+            :class="{ active: tab.path === route.path }"
+            @click="switchTab(tab)"
+          >
+            <span class="tab-title">{{ tab.title }}</span>
+            <el-icon v-if="!tab.affix" class="tab-close" @click.stop="closeTab(tab)"><Close /></el-icon>
+          </div>
+        </div>
+      </div>
+
       <el-main class="main" :class="{ 'fullscreen-main': isFullscreenDashboard }">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive :include="cachedViews">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
@@ -103,14 +123,14 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, computed, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import ExchangeCalculator from '@/modules/Common/components/ExchangeCalculator.vue'
 import SubMenuDrawer from '@/components/SubMenuDrawer.vue'
 import { getUnreadCount } from '@/api/notification'
-import { Bell, ArrowRight } from '@element-plus/icons-vue'
+import { Bell, ArrowRight, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,6 +169,8 @@ onMounted(async () => {
     loading.value = true
     try {
       await userStore.fetchUserInfo()
+      // 恢复历史标签（角色已加载，可做权限过滤）
+      initTabs()
       // 获取未读消息数量
       await fetchUnreadCount()
       // 设置定时刷新（每分钟）
@@ -168,6 +190,113 @@ onUnmounted(() => {
 
 const pageTitle = computed(() => route.meta.title || '')
 const isFullscreenDashboard = computed(() => route.name === 'SmartDashboard')
+
+// ========== MDI 多标签 ==========
+// 打开功能页自动生成标签；点标签切换；点叉关闭；刷新后从 sessionStorage 恢复
+const TABS_KEY = 'mdi_tabs'
+const HOME_TAB = { path: '/dashboard', name: 'Dashboard', title: '工作台', affix: true }
+
+const tabs = ref([])
+const cachedViews = ref([])
+
+function syncCachedViews() {
+  cachedViews.value = tabs.value.filter((t) => t.name).map((t) => t.name)
+}
+
+function persistTabs() {
+  try {
+    sessionStorage.setItem(TABS_KEY, JSON.stringify(tabs.value))
+  } catch (e) {
+    /* 忽略存储异常 */
+  }
+}
+
+// 解析路由 meta（含父级合并），用于标题与角色过滤
+function routeMetaFor(path) {
+  try {
+    return router.resolve(path).meta || {}
+  } catch (e) {
+    return {}
+  }
+}
+
+function isTabAllowed(path) {
+  const meta = routeMetaFor(path)
+  if (meta.roles && userStore.role && !meta.roles.includes(userStore.role)) return false
+  return true
+}
+
+// 将当前路由同步进标签栏（不存在则新建，已存在则更新 query）
+function syncCurrentTab() {
+  if (route.name === 'SmartDashboard' || route.path === '/smart-dashboard') return
+  const meta = route.meta || {}
+  if (!meta.title) return
+  const existing = tabs.value.find((t) => t.path === route.path)
+  if (existing) {
+    existing.query = { ...route.query }
+  } else {
+    tabs.value.push({
+      path: route.path,
+      name: route.name,
+      query: { ...route.query },
+      title: meta.title,
+      affix: false
+    })
+  }
+  syncCachedViews()
+  persistTabs()
+}
+
+// 刷新恢复历史标签
+function initTabs() {
+  let saved = []
+  try {
+    saved = JSON.parse(sessionStorage.getItem(TABS_KEY) || '[]')
+  } catch (e) {
+    saved = []
+  }
+  tabs.value = [{ ...HOME_TAB }]
+  for (const t of saved) {
+    if (!t || !t.path || t.path === HOME_TAB.path) continue
+    if (!t.title) {
+      const meta = routeMetaFor(t.path)
+      t.title = meta.title || ''
+    }
+    if (!t.title) continue
+    if (!isTabAllowed(t.path)) continue
+    if (tabs.value.some((x) => x.path === t.path)) continue
+    tabs.value.push({ path: t.path, name: t.name, query: t.query || {}, title: t.title, affix: false })
+  }
+  syncCurrentTab()
+  syncCachedViews()
+  persistTabs()
+}
+
+// 切换标签
+function switchTab(tab) {
+  if (tab.path === route.path) return
+  router.push({ path: tab.path, query: tab.query || {} })
+}
+
+// 关闭标签：若关闭的是当前激活标签，自动切到相邻标签
+function closeTab(tab) {
+  const idx = tabs.value.findIndex((t) => t.path === tab.path)
+  if (idx === -1) return
+  tabs.value.splice(idx, 1)
+  syncCachedViews()
+  if (route.path === tab.path) {
+    const next = tabs.value[idx] || tabs.value[idx - 1]
+    if (next) router.push({ path: next.path, query: next.query || {} })
+  }
+  persistTabs()
+}
+
+// 路由变化 → 自动建标签/更新标签（统一入口：菜单、抽屉、站内信跳转、URL 直达均生效）
+watch(
+  () => route.fullPath,
+  () => syncCurrentTab(),
+  { immediate: true }
+)
 
 // ========== 抽屉式二级菜单 ==========
 // 一级菜单点击后从右侧弹出抽屉展示二级菜单，点击二级菜单跳转到对应功能页面
@@ -216,12 +345,6 @@ const menuGroups = computed(() => {
           ])
         },
         {
-          title: '费用统计',
-          items: pick([
-            { label: '运费统计', path: '/freight-statistics', desc: '按订单时间段统计运费', show: isBoss }
-          ])
-        },
-        {
           title: '提成核算',
           items: pick([
             { label: '销售提成统计', path: '/commission-statistics', desc: '按发货时间核算销售提成', show: true }
@@ -237,6 +360,12 @@ const menuGroups = computed(() => {
           items: pick([
             { label: '工资结算', path: '/salary-settlement', desc: '销售提成核算与发放', show: isBoss },
             { label: '账户提现', path: '/account-withdrawal', desc: '提现申请与审批记录', show: isBoss || isSales }
+          ])
+        },
+        {
+          title: '费用统计',
+          items: pick([
+            { label: '运费统计', path: '/freight-statistics', desc: '按订单时间段统计运费', show: isBoss }
           ])
         }
       ].filter((g) => g.items.length)
@@ -418,7 +547,7 @@ function handleCommand(command) {
   padding: 20px;
   flex: 1;
   overflow: auto;
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 100px);
 }
 
 .main.fullscreen-main {
@@ -469,5 +598,76 @@ function handleCommand(command) {
   margin-left: auto;
   font-size: 12px;
   opacity: 0.45;
+}
+
+/* ===== MDI 多标签栏 ===== */
+.tabs-bar {
+  height: 40px;
+  flex-shrink: 0;
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  z-index: 5;
+}
+
+.tabs-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #606266;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.tab-item:hover {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.tab-item.active {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+}
+
+.tab-title {
+  line-height: 1;
+}
+
+.tab-close {
+  font-size: 12px;
+  opacity: 0.65;
+  border-radius: 50%;
+}
+
+.tab-close:hover {
+  opacity: 1;
+  color: #f56c6c;
 }
 </style>

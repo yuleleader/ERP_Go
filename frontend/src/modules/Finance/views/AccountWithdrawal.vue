@@ -176,6 +176,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'AccountWithdrawal' })
 import { formatDate, formatDateTime } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

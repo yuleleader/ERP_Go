@@ -106,6 +106,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'GrossProfitAnalysis' })
 import { ref, reactive, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 import { getGrossProfitList, getGrossProfitOptions } from '@/api/statistics'

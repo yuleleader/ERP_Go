@@ -32,6 +32,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Settings' })
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getSettings, updateSettings } from '@/api/setting'

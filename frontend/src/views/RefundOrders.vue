@@ -110,6 +110,27 @@
             <div class="detail-row"><span class="k">收货地址</span><span class="v">{{ currentRow.receiver_address || '—' }}</span></div>
             <div class="detail-row"><span class="k">备注</span><span class="v">{{ currentRow.remark || '—' }}</span></div>
             <div class="detail-row refund"><span class="k">退款备注</span><span class="v">{{ currentRow.refund_note || '—' }}</span></div>
+
+            <!-- 订单图片：按销售端/工厂端/发货端分类展示 -->
+            <div class="detail-section">
+              <div class="detail-section-title">订单图片</div>
+              <div v-for="group in imageGroups" :key="group.layer" class="img-group">
+                <div class="img-group-label">{{ group.label }}</div>
+                <div v-if="group.images.length" class="img-grid">
+                  <el-image
+                    v-for="(img, idx) in group.images"
+                    :key="img.id"
+                    :src="imageUrlWithToken(img.image_url)"
+                    :preview-src-list="group.images.map(i => imageUrlWithToken(i.image_url))"
+                    :initial-index="idx"
+                    fit="cover"
+                    class="img-item"
+                    preview-teleported
+                  />
+                </div>
+                <div v-else class="img-empty">暂无图片</div>
+              </div>
+            </div>
           </div>
         </div>
       </transition>
@@ -118,9 +139,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+defineOptions({ name: 'RefundOrders' })
+import { ref, reactive, computed, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 import { getRefundOrders, getGrossProfitOptions } from '@/api/statistics'
+import { getOrderImages } from '@/api/image'
+import { imageUrlWithToken } from '@/utils/imageUrl'
 import { ElMessage } from 'element-plus'
 
 /**
@@ -196,14 +220,36 @@ function resetQuery() {
 const detailVisible = ref(false)
 const currentRow = ref(null)
 
-function showDetail(row) {
+// 订单图片（按 layer 三端分类：销售端/工厂端/发货端）
+const detailImages = ref([])
+const imageGroups = computed(() => {
+  const map = [
+    { layer: 'sales', label: '销售端' },
+    { layer: 'factory', label: '工厂端' },
+    { layer: 'shipping', label: '发货端' }
+  ]
+  return map.map(g => ({
+    ...g,
+    images: detailImages.value.filter(i => i.layer === g.layer)
+  }))
+})
+
+async function showDetail(row) {
   currentRow.value = row
   detailVisible.value = true
+  detailImages.value = []
+  try {
+    const res = await getOrderImages(row.order_id)
+    detailImages.value = (res && res.data) || []
+  } catch (e) {
+    /* 图片加载失败不影响详情展示 */
+  }
 }
 
 function closeDetail() {
   detailVisible.value = false
   currentRow.value = null
+  detailImages.value = []
 }
 
 function exportExcel() {
@@ -306,6 +352,50 @@ onMounted(() => {
 
 .detail-row.refund .v {
   color: #f56c6c;
+}
+
+/* 订单图片：三端分类展示 */
+.detail-section {
+  margin-top: 14px;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 10px;
+}
+
+.detail-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.img-group {
+  margin-bottom: 10px;
+}
+
+.img-group-label {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 6px;
+}
+
+.img-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.img-item {
+  width: 70px;
+  height: 70px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #ebeef5;
+  background: #f5f7fa;
+}
+
+.img-empty {
+  font-size: 12px;
+  color: #c0c4cc;
 }
 
 /* 抽屉滑入动画 */

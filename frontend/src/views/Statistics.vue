@@ -147,6 +147,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Statistics' })
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/store/user';

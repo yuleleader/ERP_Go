@@ -53,6 +53,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Logs' })
 import { formatDate, formatDateTime } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'

@@ -57,6 +57,12 @@
 
       <el-table :data="orders" v-loading="loading" style="width: 100%;" :height="tableHeight" class="uniform-row-height">
         <!-- 固定前置展示字段：所有角色通用 -->
+        <!-- 0. 序号 -->
+        <el-table-column label="序号" width="60" align="center">
+          <template #default="{ $index }">
+            <span>{{ $index + 1 }}</span>
+          </template>
+        </el-table-column>
         <!-- 1. 订单二维码 -->
         <el-table-column label="二维码" width="80" align="center">
           <template #default="{ row }">
@@ -215,11 +221,11 @@
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="订单号" v-if="orderForm.order_id">
-                <el-input v-model="orderForm.order_id" disabled class="w-full" />
+              <el-form-item label="追溯码" v-if="orderForm.order_id">
+                <el-input v-model="orderForm.order_id" disabled class="w-full trace-input" />
               </el-form-item>
               <el-form-item v-else>
-                <el-tag type="info" class="w-full text-center">订单号将自动生成</el-tag>
+                <el-tag type="info" class="w-full text-center">追溯码将自动生成</el-tag>
               </el-form-item>
             </el-col>
           </el-row>
@@ -251,11 +257,17 @@
             <el-col :span="8">
               <el-form-item label="状态">
                 <el-select v-model="orderForm.shipping_status" placeholder="请选择状态" class="w-full" :disabled="isFieldReadonly('shipping_status')" @change="onStatusChange">
-                  <!-- 已发货/已虚拟发货后不允许改回未发货；已发货仅可改为已退货/退款；已发货锁定单只显示这两个选项 -->
-                  <el-option v-if="!isShippedLocked && orderForm.shipping_status !== 'shipped' && orderForm.shipping_status !== 'virtual'" label="未发货" value="pending" />
-                  <el-option label="已发货" value="shipped" />
-                  <el-option v-if="!isShippedLocked && (orderForm.shipping_status === 'pending' || orderForm.shipping_status === 'virtual')" label="虚拟发货" value="virtual" />
-                  <el-option label="已退货/退款" value="refunded" />
+                  <!-- 新建订单只能选"未发货"；编辑时才显示完整可流转状态 -->
+                  <template v-if="dialogMode === 'create'">
+                    <el-option label="未发货" value="pending" />
+                  </template>
+                  <template v-else>
+                    <!-- 已发货后不允许改回未发货；已发货仅可改为已退货/退款；已发货锁定单只显示这两个选项 -->
+                    <el-option v-if="!isShippedLocked && orderForm.shipping_status !== 'shipped' && orderForm.shipping_status !== 'virtual'" label="未发货" value="pending" />
+                    <el-option label="已发货" value="shipped" />
+                    <el-option v-if="!isShippedLocked && (orderForm.shipping_status === 'pending' || orderForm.shipping_status === 'virtual')" label="虚拟发货" value="virtual" />
+                    <el-option label="已退货/退款" value="refunded" />
+                  </template>
                 </el-select>
               </el-form-item>
             </el-col>
@@ -572,6 +584,14 @@
               alt="订单二维码"
               style="width: 130px; height: 130px; margin-bottom: 10px;"
             />
+            <!-- 追溯码（=订单号）：标签与数字分行，数字单行不换行 -->
+            <div style="margin-bottom: 10px;">
+              <div style="font-size: 11px; color: #999; margin-bottom: 2px;">追溯码</div>
+              <div
+                :title="currentOrder.order_id"
+                style="font-size: 11px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Consolas', 'Courier New', monospace;"
+              >{{ currentOrder.order_id }}</div>
+            </div>
             <div style="padding-top: 10px; border-top: 1px dashed #eee;">
               <span style="font-size: 12px; color: #666;">发货状态：</span>
               <el-tag :type="getStatusType(currentOrder.shipping_status)" size="small">
@@ -745,7 +765,7 @@ import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
  * - 工厂端：查看全部订单、不可编辑订单基础信息、仅可上传/删除生产进度图片
  */
 
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getOrders, createOrder, updateOrder, deleteOrder, getOrder, markOrderPrinted } from '@/api/order'
@@ -2202,6 +2222,36 @@ onMounted(async () => {
   }, 60000)
 })
 
+// 路由 query 变化（如工作台点击另一张卡片跳转 /orders）时重新应用筛选并刷新数据。
+// 组件被 keep-alive 缓存，onMounted 不会再次触发，必须监听路由参数变化。
+watch(
+  () => route.query,
+  () => {
+    // 先重置全部筛选，再重新读取路由预置条件，避免上一张卡片的条件残留
+    filters.shippingStatus = ''
+    filters.produceStatus = ''
+    filters.keyword = ''
+    filters.createdBy = ''
+    filters.overdue = false
+
+    if (route.query.shipping_status) {
+      filters.shippingStatus = String(route.query.shipping_status)
+    }
+    if (route.query.produce_status) {
+      filters.produceStatus = String(route.query.produce_status)
+    }
+    if (route.query.keyword) {
+      filters.keyword = String(route.query.keyword)
+    }
+    if (route.query.overdue) {
+      filters.overdue = true
+    }
+
+    pagination.page = 1
+    fetchOrders()
+  }
+)
+
 onUnmounted(() => {
   window.removeEventListener('resize', calculateTableHeight)
   if (daysTimer) {
@@ -2625,5 +2675,10 @@ defineExpose({ filterBy, setFilters })
   border-radius: 12px;
   font-size: 14px;
   z-index: 10;
+}
+
+/* 追溯码输入框：22 位订单号在 1/3 宽列里放不下，调小字号保证完整显示 */
+.trace-input :deep(.el-input__inner) {
+  font-size: 12px;
 }
 </style>

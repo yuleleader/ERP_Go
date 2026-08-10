@@ -1,30 +1,37 @@
 <template>
   <div class="categories-page">
-    <!-- 顶部面包屑 + 关闭按钮 -->
-    <div class="page-header">
-      <div class="breadcrumb">
-        <span class="bc-current">类别</span>
-      </div>
-      <el-button class="close-btn" link @click="goBack" title="关闭">
-        <el-icon><Close /></el-icon>
-      </el-button>
-    </div>
-
     <div class="page-body">
-      <!-- 左：所有类别 -->
+      <!-- 左：所有类别（品牌式平铺列表，一级 + 二级缩进） -->
       <div class="left-panel">
         <div class="left-title">所有类别</div>
-        <div class="left-tree" v-loading="loading">
-          <el-tree
-            ref="treeRef"
-            :data="categoryTree"
-            :props="{ label: 'treeLabel', children: 'children' }"
-            node-key="id"
-            highlight-current
-            :expand-on-click-node="false"
-            :default-expand-all="false"
-            @node-click="onTreeSelect"
-          />
+        <div class="left-list" v-loading="loading">
+          <div
+            class="left-item"
+            :class="{ active: !selectedNode }"
+            @click="onTreeSelect(null)"
+          >
+            全部
+          </div>
+          <template v-for="cat in categoryTree" :key="cat.id">
+            <div
+              class="left-item"
+              :class="{ active: selectedNode && selectedNode.id === cat.id }"
+              @click="onTreeSelect(cat)"
+            >
+              <span class="item-name">{{ cat.category_name }}</span>
+              <span class="item-code">{{ cat.category_code }}</span>
+            </div>
+            <div
+              v-for="child in cat.children || []"
+              :key="child.id"
+              class="left-item left-item-child"
+              :class="{ active: selectedNode && selectedNode.id === child.id }"
+              @click="onTreeSelect(child)"
+            >
+              <span class="item-name">{{ child.category_name }}</span>
+              <span class="item-code">{{ child.category_code }}</span>
+            </div>
+          </template>
           <div v-if="!loading && (!categoryTree || categoryTree.length === 0)" class="left-empty">
             暂无类别
           </div>
@@ -113,41 +120,37 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Categories' })
 /**
  * 类别管理（导航管理 > 类别）
- * - 顶部面包屑 + 关闭
- * - 左：所有类别树（一级 + 二级）
- * - 右：按左树选中层级切换右表内容（根=一级 / 选一级=父类自身+其下二级 / 选二级=商品）
+ * - 左：所有类别列表（品牌式平铺，一级 + 二级缩进）
+ * - 右：按左侧选中层级切换右表内容（根=一级 / 选一级=父类自身+其下二级 / 选二级=商品）
  * - 操作：新增/修改/删除
  * - 删除：有子项禁删
  * - 查询：输入关键字点击"查询"（或回车）过滤当前右表
  */
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Close } from '@element-plus/icons-vue'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '@/api/category'
 import { getProducts, createProduct } from '@/api/product'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const treeRef = ref(null)
 const loading = ref(false)
 const saving = ref(false)
 
 const categoryTree = ref([])
 const selectedNode = ref(null)
 
-// ===== 类别树加载 =====
+// ===== 类别列表加载 =====
 async function fetchCategories() {
   loading.value = true
   try {
-    const res = await getCategories()
-    decorate(res)
-    categoryTree.value = res || []
+    categoryTree.value = (await getCategories()) || []
   } catch (e) {
     ElMessage.error('加载类别失败')
   } finally {
@@ -155,15 +158,7 @@ async function fetchCategories() {
   }
 }
 
-// 给每个节点加 treeLabel（[编码]名称），方便 el-tree 直接渲染
-function decorate(nodes) {
-  for (const n of nodes || []) {
-    n.treeLabel = `[${n.category_code}]${n.category_name}`
-    if (n.children && n.children.length) decorate(n.children)
-  }
-}
-
-// 在树中按 id 查找节点（重新加载后用此恢复选中）
+// 在列表中按 id 查找节点（重新加载后用此恢复选中）
 function findNodeById(nodes, id) {
   for (const n of nodes) {
     if (n.id === id) return n
@@ -426,27 +421,13 @@ async function confirmDelete() {
   }
 }
 
-// ===== 面包屑与关闭 =====
-function goBack() {
-  if (window.history.length > 1) {
-    router.back()
-  } else {
-    router.push('/dashboard')
-  }
-}
-
 // ===== 通用刷新 =====
 async function refreshAll() {
   const prevId = selectedNode.value?.id
   await fetchCategories()
   // 恢复选中
   if (prevId) {
-    const node = findNodeById(categoryTree.value, prevId)
-    selectedNode.value = node || null
-    if (node) {
-      await nextTick()
-      treeRef.value?.setCurrentKey(node.id)
-    }
+    selectedNode.value = findNodeById(categoryTree.value, prevId)
   }
   await loadRightRows()
 }
@@ -469,57 +450,13 @@ onMounted(async () => {
   padding: 16px 20px;
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #fff;
-  padding: 10px 16px;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.breadcrumb {
-  font-size: 13px;
-  color: #606266;
-}
-
-.bc-link {
-  color: #409EFF;
-  cursor: pointer;
-  margin-right: 4px;
-}
-.bc-link:hover {
-  text-decoration: underline;
-}
-
-.bc-sep {
-  margin: 0 6px;
-  color: #c0c4cc;
-}
-
-.bc-plain {
-  color: #606266;
-}
-
-.bc-current {
-  color: #303133;
-  font-weight: 600;
-}
-
-.close-btn {
-  font-size: 16px;
-  color: #909399;
-}
-
 .page-body {
   display: flex;
   gap: 12px;
   align-items: flex-start;
 }
 
-/* ===== 左侧类别树 ===== */
+/* ===== 左侧类别列表（品牌式） ===== */
 .left-panel {
   width: 260px;
   flex-shrink: 0;
@@ -538,9 +475,43 @@ onMounted(async () => {
   margin-bottom: 8px;
 }
 
-.left-tree {
+.left-list {
   max-height: calc(100vh - 240px);
   overflow-y: auto;
+}
+
+.left-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #303133;
+  transition: background-color 0.15s;
+}
+
+.left-item:hover {
+  background-color: #f5f7fa;
+}
+
+.left-item.active {
+  background-color: #ecf5ff;
+  color: #409EFF;
+  font-weight: 600;
+}
+
+/* 二级类别缩进，保持层级感 */
+.left-item-child {
+  padding-left: 30px;
+}
+
+.item-code {
+  font-size: 11px;
+  color: #a8abb2;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .left-empty {

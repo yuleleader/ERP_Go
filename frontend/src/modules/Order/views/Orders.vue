@@ -3,6 +3,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Orders' })
 /**
  * 订单列表页面
  *

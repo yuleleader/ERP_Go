@@ -16,6 +16,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'SystemInfo' })
 // 系统信息展示页（位于"系统设置 → 关于本系统"分组下）
 </script>
 

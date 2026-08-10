@@ -4,7 +4,9 @@
   </transition>
 </template>
 
-<script setup>import { ref, watch } from 'vue';
+<script setup>
+defineOptions({ name: 'Dashboard' })
+import { ref, watch } from 'vue';
 import { useUserStore } from '@/store/user';
 const userStore = useUserStore();
 const currentDashboard = ref(null);

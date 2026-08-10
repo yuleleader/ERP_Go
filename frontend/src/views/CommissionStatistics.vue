@@ -142,6 +142,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'CommissionStatistics' })
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'

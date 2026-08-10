@@ -155,6 +155,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'SalarySettlement' })
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { commissionSettlementApi } from '@/api'

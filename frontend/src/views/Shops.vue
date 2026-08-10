@@ -75,6 +75,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Shops' })
 import { ref, reactive, computed } from 'vue'
 import { getShops, createShop, updateShop, deleteShop } from '@/api/shop'
 import { ElMessage, ElMessageBox } from 'element-plus'

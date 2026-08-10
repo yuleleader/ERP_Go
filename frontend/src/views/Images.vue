@@ -76,6 +76,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Images' })
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/utils/request'
 import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'

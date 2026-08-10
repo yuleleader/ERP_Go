@@ -157,6 +157,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'DataCleanup' })
 import { formatDateTime } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

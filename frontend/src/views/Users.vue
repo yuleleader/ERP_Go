@@ -159,6 +159,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Users' })
 import { ref, reactive, computed } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { resetPassword } from '@/api/auth'

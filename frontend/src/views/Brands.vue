@@ -1,15 +1,5 @@
 <template>
   <div class="brands-page">
-    <!-- 顶部面包屑 + 关闭按钮 -->
-    <div class="page-header">
-      <div class="breadcrumb">
-        <span class="bc-current">品牌</span>
-      </div>
-      <el-button class="close-btn" link @click="goBack" title="关闭">
-        <el-icon><Close /></el-icon>
-      </el-button>
-    </div>
-
     <div class="page-body">
       <!-- 左：所有品牌 -->
       <div class="left-panel">
@@ -118,6 +108,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Brands' })
 /**
  * 品牌管理（导航管理 > 品牌），布局与类别管理一致
  * - 顶部面包屑 + 关闭
@@ -131,7 +122,6 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Close } from '@element-plus/icons-vue'
 import { getBrands, createBrand, updateBrand, deleteBrand } from '@/api/brand'
 import { getProducts, createProduct } from '@/api/product'
 
@@ -362,15 +352,6 @@ async function confirmDelete() {
   }
 }
 
-// ===== 面包屑与关闭 =====
-function goBack() {
-  if (window.history.length > 1) {
-    router.back()
-  } else {
-    router.push('/dashboard')
-  }
-}
-
 // ===== 通用刷新 =====
 async function refreshAll() {
   const prevId = selectedBrand.value?.id
@@ -397,50 +378,6 @@ onMounted(async () => {
 <style scoped>
 .brands-page {
   padding: 16px 20px;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #fff;
-  padding: 10px 16px;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.breadcrumb {
-  font-size: 13px;
-  color: #606266;
-}
-
-.bc-link {
-  color: #409EFF;
-  cursor: pointer;
-  margin-right: 4px;
-}
-.bc-link:hover {
-  text-decoration: underline;
-}
-
-.bc-sep {
-  margin: 0 6px;
-  color: #c0c4cc;
-}
-
-.bc-plain {
-  color: #606266;
-}
-
-.bc-current {
-  color: #303133;
-  font-weight: 600;
-}
-
-.close-btn {
-  font-size: 16px;
-  color: #909399;
 }
 
 .page-body {

@@ -121,6 +121,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'SalesStatistics' })
 import { ref, reactive, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 import { getSalesSummary, getSalesSummaryOptions, getSummaryOrderDetails } from '@/api/statistics'

@@ -296,6 +296,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Notifications' })
 import { formatDate, formatDateTime } from '@/utils/format'
 import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ref, reactive, computed, onMounted } from 'vue'
@@ -353,7 +354,7 @@ const lastPrintText = computed(() => {
 const canNotifChangeProduceStatus = computed(() => {
   const d = orderDetailData.value
   if (!d) return false
-  if (d.shipping_status === 'shipped' || d.shipping_status === 'virtual' || d.shipping_status === 'virtual_shipped') {
+  if (d.shipping_status === 'shipped' || d.shipping_status === 'virtual') {
     return false
   }
   if (userStore.role === 'sales') {
@@ -479,12 +480,12 @@ async function handleDelete(notification) {
 
 // 发货状态类型
 function getStatusType(status) {
-  return { pending: 'warning', shipped: 'success', virtual: 'info' }[status] || ''
+  return { pending: 'warning', shipped: 'success', virtual: 'info', refunded: 'danger' }[status] || ''
 }
 
 // 发货状态文本
 function getStatusText(status) {
-  return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货' }[status] || status
+  return { pending: '待发货', shipped: '已发货', virtual: '虚拟发货', refunded: '已退货/退款' }[status] || status
 }
 
 // 生产状态类型
