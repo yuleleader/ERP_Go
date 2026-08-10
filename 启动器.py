@@ -38,10 +38,12 @@ from pathlib import Path
 
 from PySide6.QtCore import (
     Qt, QObject, Signal, QTimer, QSize, QByteArray, QUrl, QPoint, QEvent,
+    QPointF, QRectF,
 )
 from PySide6.QtGui import (
     QIcon, QPixmap, QPainter, QPen, QBrush, QColor, QFont, QAction, QDesktopServices,
-    QImage, QMouseEvent, QPaintEvent, QResizeEvent, QTextCursor,
+    QImage, QMouseEvent, QPaintEvent, QResizeEvent, QTextCursor, QIntValidator,
+    QPainterPath, QLinearGradient, QRadialGradient, QFontMetrics,
 )
 from PySide6.QtWidgets import (
     QApplication, QWidget, QFrame, QLabel, QPushButton, QLineEdit, QComboBox,
@@ -290,20 +292,6 @@ class ServiceTile(QFrame):
         info.addWidget(self.status_lbl)
         root.addLayout(info, 1)
 
-        # 右侧控制列
-        ctrl = QVBoxLayout()
-        ctrl.setSpacing(5)
-        ctrl.setAlignment(Qt.AlignVCenter)
-        self.gauge = GaugeWidget()
-        self.gauge.setFixedHeight(26)
-        self.gauge.setMinimumWidth(110)
-        ctrl.addWidget(self.gauge)
-        self.toggle = QLabel()
-        self.toggle.setFixedSize(40, 20)
-        ctrl.addWidget(self.toggle, alignment=Qt.AlignRight)
-        root.addLayout(ctrl, 1)
-        self._draw_toggle(TEXT3)
-
     def _draw_icon(self):
         pix = QPixmap(48, 48)
         pix.fill(Qt.transparent)
@@ -316,30 +304,228 @@ class ServiceTile(QFrame):
         p.end()
         self.icon_lbl.setPixmap(pix)
 
-    def _draw_toggle(self, fg):
-        on = fg in (GREEN, ORANGE, BLUE)
-        pix = QPixmap(40, 20)
-        pix.fill(Qt.transparent)
-        p = QPainter(pix)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(Qt.NoPen)
-        p.setBrush(QBrush(QColor(GREEN if on else '#e9e9ea')))
-        p.drawRoundedRect(0, 0, 40, 20, 10, 10)
-        kx = 30 if on else 10
-        p.setBrush(QBrush(QColor('#ffffff')))
-        p.drawEllipse(kx - 8, 10 - 8, 16, 16)
-        p.end()
-        self.toggle.setPixmap(pix)
-
     def set_state(self, word, fg):
         self.status_lbl.setText(word)
         self.status_lbl.setStyleSheet(f"color:{fg}; font: 11px {FONT};")
-        self._draw_toggle(fg)
 
     def set_progress(self, width, state, color):
-        self.gauge.set_progress(width, state, color)
+        # 进度/均衡控件已移除，保留方法以兼容 on_progress 信号连接
         self._color = color
-        self._draw_icon()
+
+
+# ─────────────────────────────────────────
+# 波浪进度条（绿色流体渐变 + 内部波浪循环 + 左侧圆形滑块 + 右端"运行中"标签）
+# ─────────────────────────────────────────
+class WaveBar(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._progress = 0        # 0-100
+        self._color = GREEN
+        self._phase = 0.0
+        self._label = ''
+        self.setMinimumHeight(22)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)  # 新增
+
+    def set_progress(self, p, color):
+        self._progress = max(0, min(100, p))
+        self._color = color
+        self.update()
+
+    def set_phase(self, phase):
+        self._phase = phase
+
+    def set_label(self, text):
+        self._label = text
+        self.update()
+
+    def paintEvent(self, e):
+        import math
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        r = h / 2
+
+        # 1) 背景轨道（白色胶囊 + 浅灰描边，未运行时显示白色）
+        p.setPen(QPen(QColor('#e5e5ea'), 1.2))
+        p.setBrush(QBrush(QColor('#ffffff')))
+        p.drawRoundedRect(QRectF(1, 1, w - 2, h - 2), r, r)
+
+        # 2) 进度填充（绿色渐变胶囊，直接 drawRoundedRect 画完整圆角矩形，避免手画弧方向错）
+        if self._progress > 0:
+            base = QColor(self._color)
+            fw = int(w * self._progress / 100)
+            # 渐变（亮→暗）
+            grad = QLinearGradient(0, 0, max(fw, 1), 0)
+            grad.setColorAt(0, base.lighter(115))
+            grad.setColorAt(1, base.darker(108))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(grad))
+            p.drawRoundedRect(QRectF(0, 0, fw, h), r, r)
+            # 3) 波浪（3 条白色半透明 sin 曲线；error 模式按 _phase 闪烁脉动）
+            is_alert = self._color in (ORANGE, RED)
+            pulse = 0.5 + 0.5 * math.sin(self._phase * 2.0)   # 0~1
+            wave_paths = []
+            for k, (amp_k, alpha, phase_off, wl_k) in enumerate([
+                (h * 0.20, 90, 0.0, 0.55),
+                (h * 0.14, 60, 2.2, 0.35),
+                (h * 0.10, 40, 4.2, 0.75),
+            ]):
+                wp = QPainterPath()
+                wavelength = max(fw * wl_k, 1)
+                step = 3
+                first = True
+                for x in range(0, fw + 2, step):
+                    y = h/2 + amp_k * math.sin(2 * math.pi * x / wavelength + self._phase + phase_off)
+                    if first:
+                        wp.moveTo(QPointF(x, y))
+                        first = False
+                    else:
+                        wp.lineTo(QPointF(x, y))
+                if is_alert:
+                    alpha = int(alpha * (0.35 + 0.65 * pulse))
+                wave_paths.append((wp, alpha))
+            for wp, alpha in wave_paths:
+                p.setPen(QPen(QColor(255, 255, 255, alpha), 2.0, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+                p.setBrush(Qt.NoBrush)
+                p.drawPath(wp)
+
+        # 4) 左侧装饰滑块（固定在最左，浅绿白带柔光）
+        slide_r = h * 0.36
+        sx = slide_r + 4
+        sy = h / 2
+        # 外圈柔光
+        glow = QRadialGradient(sx, sy, slide_r * 1.6)
+        glow.setColorAt(0, QColor(255, 255, 255, 200))
+        glow.setColorAt(1, QColor(255, 255, 255, 0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(glow))
+        p.drawEllipse(QPointF(sx, sy), slide_r * 1.5, slide_r * 1.5)
+        # 滑块本体（浅绿白 #f2ffe9 + 浅绿边框 #e0f8dc）
+        p.setBrush(QBrush(QColor('#f2ffe9')))
+        p.setPen(QPen(QColor('#e0f8dc'), 1.5))
+        p.drawEllipse(QPointF(sx, sy), slide_r, slide_r)
+        # 高光（左上）
+        hl = QRadialGradient(sx - slide_r * 0.25, sy - slide_r * 0.3, slide_r * 0.9)
+        hl.setColorAt(0, QColor(255, 255, 255, 240))
+        hl.setColorAt(1, QColor(255, 255, 255, 0))
+        p.setBrush(QBrush(hl))
+        p.drawEllipse(QPointF(sx, sy), slide_r, slide_r)
+
+        # 5) 右侧嵌入"运行中"标签（半透明白底 + 白色文字，参考 Tkinter stipple 效果）
+        if self._label:
+            font = QFont()
+            font.setFamilies(['Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', 'Arial', 'sans-serif'])
+            font.setPointSizeF(8.5)
+            font.setBold(True)
+            fm = QFontMetrics(font)
+            tw = fm.horizontalAdvance(self._label) + 18
+            th = h - 10
+            tx = w - tw - 6
+            ty = (h - th) / 2
+            tr = th / 2
+            p.setBrush(QBrush(QColor(255, 255, 255, 150)))
+            p.setPen(Qt.NoPen)
+            p.drawRoundedRect(QRectF(tx, ty, tw, th), tr, tr)
+            p.setPen(QPen(QColor('#ffffff')))
+            p.setFont(font)
+            p.drawText(QRectF(tx, ty, tw, th), Qt.AlignCenter, self._label)
+
+        p.end()
+
+
+# ─────────────────────────────────────────
+# 服务状态卡片（标题 + WaveBar + 底部状态文本）
+# ─────────────────────────────────────────
+class ServiceStatusCard(QFrame):
+    STATE_MAP = {
+        GREEN: ('running', 100),
+        GREEN_L: ('running', 100),   # 脉冲亮绿 → 仍属正常运行
+        BLUE: ('running', 100),      # 启动中合并到"正常运行"
+        BLUE_L: ('running', 100),
+        ORANGE: ('error', 25),
+        RED: ('error', 25),
+        TEXT3: ('off', 0),
+    }
+    LABEL_MAP = {
+        'running': '运行中',
+        'error':   '异常告警',
+        'off':     '已停止',
+    }
+
+    def __init__(self, side, parent=None):
+        super().__init__(parent)
+        self.side = side
+        self._state = 'off'
+        self._color = TEXT3
+        self._progress = 0
+        self._phase = 0.0
+        self.setObjectName('status_card')
+        self.setStyleSheet(
+            f"QFrame#status_card{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:10px;}}")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(14, 10, 14, 12)
+        v.setSpacing(8)
+
+        # 标题（限宽 2/3，居中）
+        title_row = QHBoxLayout()
+        title_row.setSpacing(0)
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title = QLabel("服务状态")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT}; background:transparent; border:none;")
+        title_row.addWidget(title, 2)
+        title_row.addStretch(1)
+        v.addLayout(title_row)
+
+        # 进度条：自适应拉伸铺满全宽
+        bar_row = QHBoxLayout()
+        bar_row.setSpacing(0)
+        bar_row.setContentsMargins(0, 0, 0, 0)
+        self.bar = WaveBar()
+        self.bar.setFixedHeight(30)
+        bar_row.addWidget(self.bar)
+        v.addLayout(bar_row)
+
+        # 动画定时器（按状态切换频率）
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._on_tick)
+
+    def _on_tick(self):
+        if self._state == 'running':
+            self._phase = (self._phase + 0.04) % (2 * 3.14159)   # 缓慢波浪
+        elif self._state == 'error':
+            self._phase = (self._phase + 0.18) % (2 * 3.14159)   # 高频闪烁
+        self.bar.set_phase(self._phase)
+        self.bar.update()
+
+    def start_anim(self):
+        if self._timer.isActive():
+            self._timer.stop()
+        if self._state == 'running':
+            self._timer.start(40)   # 缓慢
+        elif self._state == 'error':
+            self._timer.start(20)   # 高频
+
+    def stop_anim(self):
+        if self._timer.isActive():
+            self._timer.stop()
+
+    def set_state(self, word, fg):
+        if fg in self.STATE_MAP:
+            self._state, self._progress = self.STATE_MAP[fg]
+        else:
+            self._state, self._progress = 'off', 0
+        self._color = fg
+        # 标签按规格表固定显示
+        self._label_text = self.LABEL_MAP.get(self._state, '已停止')
+        self.bar.set_progress(self._progress, self._color)
+        self.bar.set_label(self._label_text)
+        self.bar.set_phase(self._phase)
+        self.bar.update()
+        if self._state in ('running', 'error'):
+            self.start_anim()
+        else:
+            self.stop_anim()
 
 
 # ─────────────────────────────────────────
@@ -525,12 +711,12 @@ class TitleBar(QFrame):
         if e.button() == Qt.LeftButton:
             if self._parent.isMaximized():
                 self._parent.showNormal()
-            self._drag_pos = e.globalPos() - self._parent.pos()
+            self._drag_pos = e.globalPosition().toPoint() - self._parent.pos()
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e):
         if self._drag_pos is not None and (e.buttons() & Qt.LeftButton):
-            self._parent.move(e.globalPos() - self._drag_pos)
+            self._parent.move(e.globalPosition().toPoint() - self._drag_pos)
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e):
@@ -745,15 +931,21 @@ class LauncherApp(QWidget):
         left_card, left_body = self._make_card("服务概览")
         right_card, right_body = self._make_card("实时日志")
         content.addWidget(left_card, 1)
-        content.addWidget(right_card, 1)
+        content.addWidget(right_card, 2)
         root.addLayout(content, 1)
 
         # 服务磁贴
         self.backend_tile = ServiceTile("后端接口服务", "SRV-01 · API", "server", GREEN)
         self.frontend_tile = ServiceTile("前端网页客户端", "SRV-02 · WEB", "window", BLUE)
+        self.backend_status_card = ServiceStatusCard('backend')
+        self.frontend_status_card = ServiceStatusCard('frontend')
         left_body.addWidget(self.backend_tile)
-        left_body.addSpacing(10)
+        left_body.addSpacing(8)
+        left_body.addWidget(self.backend_status_card)
+        left_body.addSpacing(12)
         left_body.addWidget(self.frontend_tile)
+        left_body.addSpacing(8)
+        left_body.addWidget(self.frontend_status_card)
         left_body.addStretch()
 
         # 实时日志：页签 + 搜索 + 4 通道
@@ -916,7 +1108,9 @@ class LauncherApp(QWidget):
     # ── 服务状态 / 进度（信号槽）──
     def on_service(self, which, word, fg):
         tile = self.backend_tile if which == 'backend' else self.frontend_tile
+        card = self.backend_status_card if which == 'backend' else self.frontend_status_card
         tile.set_state(word, fg)
+        card.set_state(word, fg)
         hdr = self.hdr_backend_lbl if which == 'backend' else self.hdr_frontend_lbl
         hdr.setStyleSheet(f"font: 12px {FONT}; color:{fg};")
         if which == 'backend':
@@ -971,12 +1165,18 @@ class LauncherApp(QWidget):
 
     def _pulse_tick(self):
         self._pulse_on = not self._pulse_on
-        for which, tile in (('backend', self.backend_tile), ('frontend', self.frontend_tile)):
+        for which in ('backend', 'frontend'):
+            tile = self.backend_tile if which == 'backend' else self.frontend_tile
+            card = self.backend_status_card if which == 'backend' else self.frontend_status_card
             word = self.backend_status if which == 'backend' else self.frontend_status
             if word == '运行中':
-                tile.set_state(word, GREEN_L if self._pulse_on else GREEN)
+                color = GREEN_L if self._pulse_on else GREEN
+                tile.set_state(word, color)
+                card.set_state(word, color)
             elif word == '启动中...':
-                tile.set_state(word, BLUE_L if self._pulse_on else BLUE)
+                color = BLUE_L if self._pulse_on else BLUE
+                tile.set_state(word, color)
+                card.set_state(word, color)
 
     # ── 服务状态检测 ──
     def detect_service_status(self):
@@ -1405,7 +1605,8 @@ class LauncherApp(QWidget):
         base = os.path.dirname(os.path.abspath(__file__))
         default_dir = os.path.join(base, 'backend', 'data', 'backup')
         default = {'backup_dir': default_dir, 'auto_backup': {'enabled': False, 'period': 'daily',
-                                                             'time': '02:00', 'weekday': 0, 'day': 1}}
+                                                             'time': '02:00', 'weekday': 0, 'day': 1,
+                                                             'interval': 4}}
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
@@ -1469,6 +1670,13 @@ class LauncherApp(QWidget):
         period = cfg.get('period', 'daily')
         hour, minute = map(int, cfg.get('time', '02:00').split(':'))
         now = datetime.now()
+        if period == 'interval':
+            # 每隔几小时：以当前整点对齐，每 N 小时执行一次（N 限制 1-24）
+            try:
+                interval = max(1, min(24, int(cfg.get('interval', 4))))
+            except (ValueError, TypeError):
+                interval = 4
+            return now + timedelta(hours=interval)
         if period == 'daily':
             c = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
             if c <= now:
@@ -1550,10 +1758,9 @@ class LauncherApp(QWidget):
         dv = QVBoxLayout(dlg)
         dv.setContentsMargins(18, 14, 18, 14)
         dv.setSpacing(7)
-        t1 = QLabel("恢复出厂需要管理员验证")
+        t1 = QLabel("请输入特殊操作密码")
+        t1.setAlignment(Qt.AlignCenter)
         t1.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT};")
-        t2 = QLabel("请输入密码：")
-        t2.setStyleSheet(f"font: 11px {FONT}; color:{TEXT2};")
         pwd = QLineEdit()
         pwd.setEchoMode(QLineEdit.Password)
         pwd.setAlignment(Qt.AlignCenter)
@@ -1658,7 +1865,7 @@ class LauncherApp(QWidget):
         # 自动备份配置卡
         c2, b2 = self._make_card_settings("自动备份配置")
         auto = self.backup_config.get('auto_backup', {})
-        plabels = {'daily': '每日', 'weekly': '每周', 'monthly': '每月'}
+        plabels = {'daily': '每日', 'weekly': '每周', 'monthly': '每月', 'interval': '每隔几小时'}
         wlabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         self.settings_auto_enabled = QCheckBox("启用自动备份")
         self.settings_auto_enabled.setChecked(auto.get('enabled', False))
@@ -1672,9 +1879,8 @@ class LauncherApp(QWidget):
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(8)
         grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(3, 1)
 
-        l_period = QLabel("周期:")
+        l_period = QLabel("备份模式:")
         l_period.setStyleSheet(lbl_style)
         self.period_combo = QComboBox()
         self.period_combo.addItems(list(plabels.values()))
@@ -1684,15 +1890,17 @@ class LauncherApp(QWidget):
         grid.addWidget(l_period, 0, 0)
         grid.addWidget(self.period_combo, 0, 1)
 
-        l_time = QLabel("时间:")
-        l_time.setStyleSheet(lbl_style)
+        # 每日/每周/每月 共用时间选择器
+        self.time_label = QLabel("执行时间:")
+        self.time_label.setStyleSheet(lbl_style)
         self.time_combo = QComboBox()
         self.time_combo.addItems([f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)])
         self.time_combo.setCurrentText(auto.get('time', '02:00'))
         self._style_combo(self.time_combo)
-        grid.addWidget(l_time, 0, 2)
-        grid.addWidget(self.time_combo, 0, 3)
+        grid.addWidget(self.time_label, 1, 0)
+        grid.addWidget(self.time_combo, 1, 1)
 
+        # 每周：星期选择
         self.weekday_container = QWidget()
         wcv = QHBoxLayout(self.weekday_container)
         wcv.setContentsMargins(0, 0, 0, 0)
@@ -1706,8 +1914,9 @@ class LauncherApp(QWidget):
         wcv.addWidget(l_week)
         wcv.addWidget(self.weekday_combo)
         wcv.addStretch()
-        grid.addWidget(self.weekday_container, 1, 0, 1, 2)
+        grid.addWidget(self.weekday_container, 2, 0, 1, 2)
 
+        # 每月：日期选择
         self.day_container = QWidget()
         dcv = QHBoxLayout(self.day_container)
         dcv.setContentsMargins(0, 0, 0, 0)
@@ -1721,7 +1930,27 @@ class LauncherApp(QWidget):
         dcv.addWidget(l_day)
         dcv.addWidget(self.day_combo)
         dcv.addStretch()
-        grid.addWidget(self.day_container, 1, 2, 1, 2)
+        grid.addWidget(self.day_container, 2, 0, 1, 2)
+
+        # 每隔几小时：间隔输入（仅允许 1-24 整数）
+        self.interval_container = QWidget()
+        ivc = QHBoxLayout(self.interval_container)
+        ivc.setContentsMargins(0, 0, 0, 0)
+        ivc.setSpacing(8)
+        l_interval = QLabel("间隔小时:")
+        l_interval.setStyleSheet(lbl_style)
+        self.interval_edit = QLineEdit()
+        self.interval_edit.setText(str(auto.get('interval', 4)))
+        self.interval_edit.setFixedWidth(72)
+        self.interval_edit.setValidator(QIntValidator(1, 24, self.interval_edit))
+        self.interval_edit.setStyleSheet(
+            f"QLineEdit{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:7px; "
+            f"padding:3px 8px; font:11px {FONT}; color:{TEXT};}}")
+        ivc.addWidget(l_interval)
+        ivc.addWidget(self.interval_edit)
+        ivc.addWidget(QLabel("小时"), alignment=Qt.AlignLeft)
+        ivc.addStretch()
+        grid.addWidget(self.interval_container, 2, 0, 1, 2)
 
         b2.addLayout(grid)
         b2.addSpacing(4)
@@ -1806,19 +2035,32 @@ class LauncherApp(QWidget):
         return btn
 
     def _update_settings_ui(self, *args):
-        pmap = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly'}
+        pmap = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly', '每隔几小时': 'interval'}
         wlabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         period = pmap.get(self.period_combo.currentText(), 'daily')
         self.weekday_container.setVisible(period == 'weekly')
         self.day_container.setVisible(period == 'monthly')
+        self.interval_container.setVisible(period == 'interval')
+        # 每日/每周/每月显示时间选择器；每隔几小时不显示
+        self.time_label.setVisible(period != 'interval')
+        self.time_combo.setVisible(period != 'interval')
         try:
+            interval_val = 4
+            try:
+                interval_val = int(self.interval_edit.text().strip())
+            except (ValueError, AttributeError):
+                pass
             cfg = {'enabled': self.settings_auto_enabled.isChecked(), 'period': period,
                    'time': self.time_combo.currentText(),
                    'weekday': wlabels.index(self.weekday_combo.currentText()),
-                   'day': int(self.day_combo.currentText())}
+                   'day': int(self.day_combo.currentText()),
+                   'interval': interval_val}
             if cfg['enabled']:
                 nxt = self._compute_next_backup_time(cfg)
-                self.settings_next_backup.setText(f"下次备份: {nxt.strftime('%Y-%m-%d %H:%M')}")
+                if period == 'interval':
+                    self.settings_next_backup.setText(f"下次备份: {nxt.strftime('%Y-%m-%d %H:%M')}（每 {interval_val} 小时）")
+                else:
+                    self.settings_next_backup.setText(f"下次备份: {nxt.strftime('%Y-%m-%d %H:%M')}")
             else:
                 self.settings_next_backup.setText("自动备份未启用")
         except Exception:
@@ -1913,15 +2155,27 @@ class LauncherApp(QWidget):
             self._log_backup(f"还原失败: {e}", 'error')
 
     def _save_auto_backup_settings(self):
-        pmap = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly'}
+        pmap = {'每日': 'daily', '每周': 'weekly', '每月': 'monthly', '每隔几小时': 'interval'}
         wlabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
         try:
             period = pmap.get(self.period_combo.currentText(), 'daily')
+            # 每隔几小时模式：间隔必须是 1-24 整数，否则拦截弹窗
+            interval = 4
+            if period == 'interval':
+                raw = self.interval_edit.text().strip()
+                try:
+                    interval = int(raw)
+                except ValueError:
+                    QMessageBox.warning(self, "输入无效", "间隔小时数必须是 1-24 之间的整数")
+                    return
+                if not (1 <= interval <= 24):
+                    QMessageBox.warning(self, "输入无效", "间隔小时数必须在 1-24 之间")
+                    return
             time_str = self.time_combo.currentText()
             datetime.strptime(time_str, '%H:%M')
             cfg = {'enabled': self.settings_auto_enabled.isChecked(), 'period': period,
                    'time': time_str, 'weekday': wlabels.index(self.weekday_combo.currentText()),
-                   'day': int(self.day_combo.currentText())}
+                   'day': int(self.day_combo.currentText()), 'interval': interval}
             self.backup_config['auto_backup'] = cfg
             self._save_backup_config()
             self._start_backup_scheduler()
@@ -2102,13 +2356,13 @@ class LauncherApp(QWidget):
         if e.button() == Qt.LeftButton:
             w, h = self.width(), self.height()
             edge = 6
-            x, y = e.x(), e.y()
+            x, y = e.position().x(), e.position().y()
             if y < 40:
                 return
             left = x <= edge
             right = x >= w - edge
             bottom = y >= h - edge
-            child = self.childAt(e.pos())
+            child = self.childAt(e.position().toPoint())
             interactive = (QPushButton, QComboBox, QLineEdit, QListWidget, QTextEdit, QCheckBox)
             if child is not None and isinstance(child, interactive):
                 return
@@ -2125,16 +2379,16 @@ class LauncherApp(QWidget):
             else:
                 self._resize_edge = None
             if self._resize_edge:
-                self._rx = e.globalPos().x()
-                self._ry = e.globalPos().y()
+                self._rx = e.globalPosition().x()
+                self._ry = e.globalPosition().y()
                 self._rw = w
                 self._rh = h
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e):
         if getattr(self, '_resize_edge', None):
-            dx = e.globalPos().x() - self._rx
-            dy = e.globalPos().y() - self._ry
+            dx = e.globalPosition().x() - self._rx
+            dy = e.globalPosition().y() - self._ry
             nw, nh = self._rw, self._rh
             nx, ny = self.x(), self.y()
             if 'e' in self._resize_edge:
@@ -2146,14 +2400,14 @@ class LauncherApp(QWidget):
                 nx = self.x() + (self._rw - nw)
             self.setGeometry(nx, ny, nw, nh)
         else:
-            if e.y() < 40:
+            if e.position().y() < 40:
                 self.setCursor(Qt.ArrowCursor)
             else:
                 w, h = self.width(), self.height()
                 edge = 6
-                left = e.x() <= edge
-                right = e.x() >= w - edge
-                bottom = e.y() >= h - edge
+                left = e.position().x() <= edge
+                right = e.position().x() >= w - edge
+                bottom = e.position().y() >= h - edge
                 if (left and bottom) or (right and bottom):
                     self.setCursor(Qt.SizeFDiagCursor if (left ^ right) else Qt.SizeFDiagCursor)
                 elif left or right:
@@ -2233,8 +2487,6 @@ def main():
 
     app = QApplication([])
     app.setStyle('Fusion')
-    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app.setStyleSheet(f"""
         QFrame#card{{background:{CARD}; border:1px solid {CARD_BORDER}; border-radius:16px;}}
         QLabel{{background:transparent;}}
