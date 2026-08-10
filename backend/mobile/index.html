@@ -165,7 +165,7 @@
   "use strict";
   const API = "";
   const PRODUCE_MAP = { unproduce:"未生产", producing:"生产中", produced:"生产完成" };
-  const SHIP_MAP = { pending:"待发货", shipped:"已发货", virtual:"虚拟发货", virtual_shipped:"虚拟发货" };
+  const SHIP_MAP = { pending:"待发货", shipped:"已发货", virtual:"虚拟发货" };
   const ROLE_LABEL = { sales:"销售", factory:"工厂", shipping:"发货", boss:"管理员" };
   const LAYER_LABEL = { sales:"商品图", factory:"生产实拍", shipping:"发货凭证" };
   const DISPLAY = [
@@ -398,6 +398,8 @@
       }
       state.order = order;
       state.orderId = order.order_id || id;
+      // 记录原始发货状态：原状态为已发货时整单锁定（与 PC 端一致），仅允许改状态/退款备注
+      state.origShippingStatus = order.shipping_status;
       renderOrder();
     }catch(err){
       const m=(err&&err.message)?err.message:"加载失败";
@@ -423,7 +425,11 @@
     loadImages();
   }
   function renderEdit(o){
-    const fields=editableFields(state.user.role);
+    let fields=editableFields(state.user.role);
+    // 已发货订单锁定（与 PC 端一致）：仅允许修改发货状态，切换为已退货时可填退款备注
+    if(state.origShippingStatus==="shipped"){
+      fields = fields.filter(f=>f==="shipping_status"||f==="refund_note");
+    }
     if(!fields.length){ $("editBox").classList.add("hidden"); return; }
     $("editBox").classList.remove("hidden");
     let html="";
@@ -454,12 +460,17 @@
     $("editForm").innerHTML=html;
   }
   async function saveEdit(){
-    const fields=editableFields(state.user.role);
+    let fields=editableFields(state.user.role);
+    // 已发货订单锁定：与渲染一致，只提交发货状态与退款备注
+    if(state.origShippingStatus==="shipped"){
+      fields = fields.filter(f=>f==="shipping_status"||f==="refund_note");
+    }
     const body={};
     fields.forEach(f=>{ const el=$("edit-"+f); if(el) body[f]=el.value; });
     try{
       await api("/api/orders/"+encodeURIComponent(state.orderId),{ method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
       state.order = await api("/api/orders/"+encodeURIComponent(state.orderId));
+      state.origShippingStatus = state.order.shipping_status; // 保存后按新状态决定后续是否锁定
       renderOrder();
       toast("保存成功");
     }catch(err){ toast(err.message); }

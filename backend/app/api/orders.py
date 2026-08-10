@@ -51,7 +51,7 @@ _FROZEN_DAYS_STATUSES = ("shipped", "refunded")
 def effective_order_days(order) -> int:
     """
     下单时长（滞留天数）展示值：
-    - 未发货（pending/virtual/virtual_shipped 等）：实时计算，随日期推移自动增长；
+    - 未发货（pending/virtual 等）：实时计算，随日期推移自动增长；
     - 已发货 / 已退款：返回冻结值（数据库保存的数值），不再随时间变化。
     """
     if getattr(order, "shipping_status", None) in _FROZEN_DAYS_STATUSES:
@@ -310,8 +310,15 @@ async def get_orders(
         query = query.where(Order.shipping_status == shipping_status)
         count_query = count_query.where(Order.shipping_status == shipping_status)
     if produce_status:
-        query = query.where(Order.produce_status == produce_status)
-        count_query = count_query.where(Order.produce_status == produce_status)
+        # 按生产状态筛选时排除已退款订单（生产统计口径：退款订单退出生产流程）
+        query = query.where(
+            Order.produce_status == produce_status,
+            Order.shipping_status != "refunded"
+        )
+        count_query = count_query.where(
+            Order.produce_status == produce_status,
+            Order.shipping_status != "refunded"
+        )
     if shop_id:
         query = query.where(Order.shop_id == shop_id)
         count_query = count_query.where(Order.shop_id == shop_id)
@@ -334,8 +341,10 @@ async def get_orders(
     total = count_result.scalar()
 
     # 排序规则（用户确认）：
-    #   未完成订单（未发货 pending / 虚拟发货 virtual）优先排前面，按下单时间升序（最早在前，优先处理超期）；
-    #   已完成订单（已虚拟发货/已发货/已退货）沉底排后面，按下单时间升序保持时间连贯。
+    #   未完成订单（未发货 pending / 虚拟发货 virtual）优先排前面，
+    #   按下单时间升序（最早在前，优先处理超期）；
+    #   已完成订单（已发货/已退货）沉底排后面，按下单时间升序保持时间连贯。
+    #   注：虚拟发货与未发货地位一致——工厂未按时生产、用虚拟单号占位催单。
     active_statuses = ["pending", "virtual"]
     status_group = case(
         (Order.shipping_status.in_(active_statuses), 0),

@@ -65,9 +65,10 @@ async def get_dashboard_overview(
     pending_result = await db.execute(pending_query)
     pending_orders = pending_result.scalar() or 0
     
-    # 获取生产中订单数
+    # 获取生产中订单数（已退款订单不计入生产统计）
     producing_query = select(func.count(Order.id)).filter(
         Order.produce_status == "producing",
+        Order.shipping_status != "refunded",
         Order.created_at >= start_date
     )
     producing_result = await db.execute(producing_query)
@@ -75,7 +76,7 @@ async def get_dashboard_overview(
     
     # 获取虚拟发货订单数
     virtual_query = select(func.count(Order.id)).filter(
-        Order.shipping_status.in_(["virtual", "virtual_shipped"]),
+        Order.shipping_status.in_(["virtual"]),
         Order.created_at >= start_date
     )
     virtual_result = await db.execute(virtual_query)
@@ -501,11 +502,12 @@ async def get_dashboard_overdue_orders(
         Order.platform_order_no,
         Order.created_at,
         Order.shipping_status,
+        Order.produce_status,
         Order.shop_id,
         Order.product_name,
         Order.sales_amount
     ).filter(
-        Order.shipping_status.in_(["pending", "virtual", "virtual_shipped"])
+        Order.shipping_status.in_(["pending", "virtual"])
     ).order_by(
         # 下单越早 = 超期越久，升序取最超期的前 N 条
         asc(Order.created_at)
@@ -535,6 +537,8 @@ async def get_dashboard_overdue_orders(
             "created_at": created_at.strftime("%Y-%m-%d %H:%M") if created_at else "-",
             "shipping_status": row.shipping_status,
             "shipping_status_text": "待发货" if row.shipping_status == "pending" else "虚拟发货",
+            "produce_status": row.produce_status,
+            "produce_status_text": {"unproduce": "未生产", "producing": "生产中", "produced": "生产完成"}.get(row.produce_status, "未生产"),
             "shop_id": row.shop_id,
             "product_name": row.product_name or "-",
             "sales_amount": row.sales_amount or 0,

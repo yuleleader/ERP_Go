@@ -52,7 +52,7 @@ async def get_dashboard_overview(
     pending_orders = pending_result.scalar() or 0
     
     # 获取虚拟发货订单数
-    virtual_query = select(func.count(Order.id)).filter(Order.shipping_status.in_(["virtual", "virtual_shipped"]))
+    virtual_query = select(func.count(Order.id)).filter(Order.shipping_status.in_(["virtual"]))
     virtual_result = await db.execute(virtual_query)
     virtual_orders = virtual_result.scalar() or 0
 
@@ -607,21 +607,30 @@ async def get_factory_dashboard_stats(
     )
     refunded_orders = refunded_result.scalar() or 0
 
-    # 未生产（produce_status = unproduce）
+    # 未生产（produce_status = unproduce；已退款订单不计入生产统计）
     unproduce_result = await db.execute(
-        select(func.count(Order.id)).filter(Order.produce_status == "unproduce")
+        select(func.count(Order.id)).filter(
+            Order.produce_status == "unproduce",
+            Order.shipping_status != "refunded"
+        )
     )
     unproduce_orders = unproduce_result.scalar() or 0
 
-    # 生产中（produce_status = producing）
+    # 生产中（produce_status = producing；已退款订单不计入生产统计）
     producing_result = await db.execute(
-        select(func.count(Order.id)).filter(Order.produce_status == "producing")
+        select(func.count(Order.id)).filter(
+            Order.produce_status == "producing",
+            Order.shipping_status != "refunded"
+        )
     )
     producing_orders = producing_result.scalar() or 0
 
-    # 生产完成（produce_status = produced）
+    # 生产完成（produce_status = produced；已退款订单不计入生产统计）
     produced_result = await db.execute(
-        select(func.count(Order.id)).filter(Order.produce_status == "produced")
+        select(func.count(Order.id)).filter(
+            Order.produce_status == "produced",
+            Order.shipping_status != "refunded"
+        )
     )
     produced_orders = produced_result.scalar() or 0
 
@@ -690,8 +699,8 @@ async def get_process_flow_stats(
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
 
-    async def count(filter_expr):
-        result = await db.execute(select(func.count(Order.id)).filter(filter_expr))
+    async def count(*filter_exprs):
+        result = await db.execute(select(func.count(Order.id)).filter(*filter_exprs))
         return result.scalar() or 0
 
     # 销售段
@@ -700,10 +709,10 @@ async def get_process_flow_stats(
     sales_virtual = await count(Order.shipping_status == "virtual")
     sales_refunded = await count(Order.shipping_status == "refunded")
 
-    # 生产段
-    produce_unproduce = await count(Order.produce_status == "unproduce")
-    produce_producing = await count(Order.produce_status == "producing")
-    produce_produced = await count(Order.produce_status == "produced")
+    # 生产段（已退款订单退出生产流程，不计入生产统计）
+    produce_unproduce = await count(Order.produce_status == "unproduce", Order.shipping_status != "refunded")
+    produce_producing = await count(Order.produce_status == "producing", Order.shipping_status != "refunded")
+    produce_produced = await count(Order.produce_status == "produced", Order.shipping_status != "refunded")
 
     # 发货段
     shipping_pending = await count(Order.shipping_status == "pending")
@@ -1435,7 +1444,6 @@ _ORDER_STATUS_TEXT = {
     "pending": "待发货",
     "shipped": "已发货",
     "virtual": "虚拟发货",
-    "virtual_shipped": "已虚拟发货",
     "refunded": "已退货/退款"
 }
 
