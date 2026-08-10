@@ -36,8 +36,8 @@ def calculate_order_days(order_date: datetime) -> int:
     """
     if not order_date:
         return 0
-    # 获取当前时间的自然日（归零时分秒）
-    now = datetime.now()
+    # 获取当前时间的自然日（归零时分秒），统一使用北京时间口径
+    now = beijing_now()
     today_start = datetime(now.year, now.month, now.day)
     # 获取订单时间的自然日（归零时分秒）
     order_date_start = datetime(order_date.year, order_date.month, order_date.day)
@@ -563,7 +563,6 @@ async def update_order(
     if "created_at" in update_data and isinstance(update_data["created_at"], str):
         from datetime import datetime as dt
         update_data["created_at"] = dt.fromisoformat(update_data["created_at"].split('T')[0])
-        print(f"[DEBUG] converted created_at to datetime: {update_data['created_at']}")
 
     if current_user.role == "shipping":
         allowed_fields = {"shipping_status", "logistics_company", "logistics_no", "logistics_no_2", "freight", "remark"}

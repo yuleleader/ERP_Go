@@ -32,7 +32,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import quote
 
@@ -253,13 +253,19 @@ async def compute_import_errors(db: AsyncSession, row: OrderImport, batch_seen: 
         errors.append("生产状态不合法")
 
     # 7) 网店：定位正式 shop_id
-    shop_id = await _resolve_shop_id(db, row)
+    shop_id, shop_status = await _resolve_shop_id(db, row)
     row.shop_id = shop_id
-    if shop_id is None:
+    if shop_status == "multiple":
+        errors.append("匹配到多个网店，请同时填写名称与账号")
+    elif shop_status == "none":
         if not (row.shop_name or "").strip() and not (row.shop_account or "").strip():
             errors.append("网店名称/网店账号未填写")
         else:
             errors.append("网店不存在，请检查名称/账号")
+    else:  # ok：唯一匹配成功，补充「已关店」校验（与手工建单一致）
+        shop = await db.get(Shop, shop_id)
+        if shop and shop.status == "closed":
+            errors.append("该网店已关店，无法导入")
 
     # 8) 业务规则
     if row.shipping_status in ("shipped", "virtual") and row.produce_status != "produced":
@@ -272,29 +278,39 @@ async def compute_import_errors(db: AsyncSession, row: OrderImport, batch_seen: 
     return errors
 
 
-async def _resolve_shop_id(db: AsyncSession, row: OrderImport) -> Optional[str]:
-    """按名称+账号组合优先、其次账号、再次名称定位正式网店 shop_id；返回 None 表示未匹配。"""
+async def _resolve_shop_id(db: AsyncSession, row: OrderImport):
+    """按名称+账号组合优先、其次账号、再次名称定位正式网店 shop_id。
+
+    返回 (shop_id, status)：
+      - (shop_id, "ok")       唯一匹配成功
+      - (None, "multiple")    账号或名称命中多个网店（需同时填名称+账号）
+      - (None, "none")        未匹配到任何网店
+    """
     shop_name = (row.shop_name or "").strip()
     shop_account = (row.shop_account or "").strip()
     if not shop_name and not shop_account:
-        return None
+        return (None, "none")
 
     if shop_name and shop_account:
         s = (await db.execute(
             select(Shop).where(Shop.shop_name == shop_name, Shop.shop_account == shop_account)
         )).scalar_one_or_none()
         if s:
-            return s.shop_id
+            return (s.shop_id, "ok")
         # 组合未匹配：退化为账号/名称分别尝试（组合匹配不到的多半是账号或名称写错）
     if shop_account:
         rows = (await db.execute(select(Shop).where(Shop.shop_account == shop_account))).scalars().all()
+        if len(rows) > 1:
+            return (None, "multiple")
         if len(rows) == 1:
-            return rows[0].shop_id
+            return (rows[0].shop_id, "ok")
     if shop_name:
         rows = (await db.execute(select(Shop).where(Shop.shop_name == shop_name))).scalars().all()
+        if len(rows) > 1:
+            return (None, "multiple")
         if len(rows) == 1:
-            return rows[0].shop_id
-    return None
+            return (rows[0].shop_id, "ok")
+    return (None, "none")
 
 
 def _check_import_perm(current_user):
@@ -472,9 +488,10 @@ async def list_order_imports(
             OrderImport.product_name.like(f"%{kw}%"),
         ))
     if only_abnormal:
-        query = query.where(or_(
-            OrderImport.errors.is_(None) == False,  # noqa: E712 存在 errors
-            OrderImport.errors != "",
+        # 仅看有异常的行：errors 非空且不是空数组 "[]"
+        query = query.where(and_(
+            OrderImport.errors.isnot(None),
+            OrderImport.errors != "[]",
         ))
 
     from sqlalchemy import func as sa_func

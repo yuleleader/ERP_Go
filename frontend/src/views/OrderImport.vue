@@ -200,10 +200,10 @@
         </div>
         <div class="form-row">
           <el-form-item label="下单时间">
-            <el-date-picker v-model="editForm.order_time" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="选择下单时间" style="width: 100%" />
+            <el-date-picker v-model="editForm.order_time" type="date" value-format="YYYY-MM-DD" placeholder="选择下单时间" style="width: 100%" />
           </el-form-item>
           <el-form-item label="发货时间">
-            <el-date-picker v-model="editForm.shipping_time" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="可空" clearable style="width: 100%" />
+            <el-date-picker v-model="editForm.shipping_time" type="date" value-format="YYYY-MM-DD" placeholder="可空" clearable style="width: 100%" />
           </el-form-item>
         </div>
         <el-form-item label="收货地址">
@@ -425,6 +425,10 @@ function openEdit(row) {
     shipping_time: row.shipping_time || '',
     errors: row.errors || []
   })
+  // 记录原始时间字符串：date-only 选择器解析不了「带时分秒」的值时会变 null，
+  // 保存时回退到原始值，避免误清空（仅当用户确实清空了原本就为空的字段才存空）
+  editForm._orig_order_time = row.order_time || ''
+  editForm._orig_shipping_time = row.shipping_time || ''
   editVisible.value = true
 }
 
@@ -438,9 +442,13 @@ async function saveEdit() {
     const payload = { ...editForm }
     delete payload.id
     delete payload.errors
-    // 时间空串转空值
+    delete payload._orig_order_time
+    delete payload._orig_shipping_time
+    // 时间兜底：选择器解析失败(null)但存在原始值时回退，避免误清空
     ;['order_time', 'shipping_time'].forEach((k) => {
-      if (!payload[k]) payload[k] = ''
+      if (!payload[k] && editForm['_orig_' + k]) {
+        payload[k] = editForm['_orig_' + k]
+      }
     })
     const row = await updateOrderImport(editForm.id, payload)
     ElMessage.success('已保存并重新审核')

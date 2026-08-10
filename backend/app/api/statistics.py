@@ -11,12 +11,6 @@ from ..api.settings import read_setting
 
 router = APIRouter(prefix="/api/statistics", tags=["数据统计"])
 
-# ==================== 测试接口 ====================
-@router.get("/test")
-async def test_statistics_api():
-    """测试接口 - 用于验证statistics模块是否正确加载"""
-    return {"status": "success", "message": "Statistics API is working", "timestamp": beijing_now().isoformat()}
-
 # ==================== 智慧大屏专用接口 ====================
 
 @router.get("/dashboard/overview")

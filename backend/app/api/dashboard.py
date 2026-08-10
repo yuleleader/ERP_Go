@@ -16,12 +16,6 @@ from ..models.models import Order, User, Shop
 
 router = APIRouter(prefix="/api/dashboard", tags=["智慧大屏"])
 
-# ==================== 测试接口 ====================
-@router.get("/test")
-async def test_dashboard_api():
-    """测试接口 - 用于验证智慧大屏API是否正确加载"""
-    return {"status": "success", "message": "Dashboard API is working", "timestamp": beijing_now().isoformat()}
-
 # ==================== 订单总览 ====================
 @router.get("/overview")
 async def get_dashboard_overview(

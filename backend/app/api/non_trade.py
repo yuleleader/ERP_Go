@@ -38,7 +38,7 @@ class NonTradeCreate(BaseModel):
     code_id: int
     shop_id: str = ""
     trans_type: str = "expense"  # income / expense
-    amount: float = Field(..., ge=0)
+    amount: float = Field(..., gt=0, description="金额必须大于0")
     remark: str = ""
 
 
@@ -46,7 +46,7 @@ class NonTradeUpdate(BaseModel):
     code_id: int
     shop_id: str = ""
     trans_type: str = "expense"
-    amount: float = Field(..., ge=0)
+    amount: float = Field(..., gt=0, description="金额必须大于0")
     remark: str = ""
 
 
@@ -278,10 +278,12 @@ async def list_non_trade_transactions(
             conds.append(NonTradeTransaction.code_id.in_(match_ids))
         query = query.where(or_(*conds))
 
-    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
-    rows = (await db.execute(
-        query.order_by(NonTradeTransaction.id.desc()).offset(skip).limit(limit)
-    )).scalars().all()
+    # 取全部（带筛选）行，用于汇总合计；再按分页截取当前页
+    rows_all = (await db.execute(query.order_by(NonTradeTransaction.id.desc()))).scalars().all()
+    total = len(rows_all)
+    income_total = round(sum((r.amount or 0) for r in rows_all if r.trans_type == "income"), 2)
+    expense_total = round(sum((r.amount or 0) for r in rows_all if r.trans_type == "expense"), 2)
+    rows = rows_all[skip: skip + limit]
 
     codes = await _code_map(db)
     shop_ids = {t.shop_id for t in rows if t.shop_id}
@@ -295,6 +297,8 @@ async def list_non_trade_transactions(
 
     return {
         "total": total,
+        "income_total": income_total,
+        "expense_total": expense_total,
         "items": [await _tx_to_dict(db, t, codes, shops, user_map) for t in rows],
     }
 
@@ -312,8 +316,8 @@ async def create_non_trade_transaction(
         raise HTTPException(status_code=400, detail="账务代码不存在")
     if payload.trans_type not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="trans_type 只能是 income 或 expense")
-    if payload.amount < 0:
-        raise HTTPException(status_code=400, detail="金额不能为负数")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="金额必须大于0")
     shop_id = (payload.shop_id or "").strip()
     if shop_id:
         shop = (await db.execute(select(Shop).where(Shop.shop_id == shop_id))).scalar_one_or_none()
@@ -353,6 +357,8 @@ async def update_non_trade_transaction(
     code = (await db.execute(select(AccountingCode).where(AccountingCode.id == payload.code_id))).scalar_one_or_none()
     if not code:
         raise HTTPException(status_code=400, detail="账务代码不存在")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="金额必须大于0")
     if payload.trans_type not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="trans_type 只能是 income 或 expense")
     shop_id = (payload.shop_id or "").strip()

@@ -26,7 +26,7 @@
     </div>
 
     <!-- 筛选区 -->
-    <el-card class="list-card">
+    <el-card class="list-card" ref="cardRef">
       <template #header>
         <div class="card-header">
           <span>预警明细（超期 {{ data.overdue_days }} 天，即下单超过该天数仍未发货/未生产完成）</span>
@@ -49,34 +49,34 @@
             <el-tag type="danger" size="small" class="group-tag">超期未生产 {{ g.unproduced_count }}</el-tag>
             <el-tag type="warning" size="small" class="group-tag">超期未发货 {{ g.unsent_count }}</el-tag>
           </div>
-          <el-table :data="g.unsent" border size="small" class="group-table" @row-click="row => goOrder(row)">
-            <el-table-column label="序号" width="52" align="center">
+          <el-table ref="tableRef" :data="g.unsent" border size="small" class="group-table" @row-click="row => goOrder(row)">
+            <el-table-column label="序号" min-width="55" align="center">
               <template #default="{ $index }">{{ $index + 1 }}</template>
             </el-table-column>
-            <el-table-column prop="platform_order_no" label="平台订单号" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="platform_order_no" label="平台订单号" min-width="130" show-overflow-tooltip />
             <el-table-column prop="product_name" label="商品名称" min-width="130" show-overflow-tooltip>
               <template #default="{ row }">{{ row.product_name || '—' }}</template>
             </el-table-column>
-            <el-table-column prop="shop_name" label="网店" min-width="150" show-overflow-tooltip>
+            <el-table-column prop="shop_name" label="网店" min-width="130" show-overflow-tooltip>
               <template #default="{ row }">{{ row.shop_name || '—' }}</template>
             </el-table-column>
-            <el-table-column prop="sales_amount" label="销售金额" width="100" align="right">
+            <el-table-column prop="sales_amount" label="销售金额" min-width="95" align="right">
               <template #default="{ row }">{{ row.sales_amount ? '¥' + row.sales_amount : '—' }}</template>
             </el-table-column>
-            <el-table-column label="下单时间" width="150" align="center">
+            <el-table-column label="下单时间" min-width="140" align="center">
               <template #default="{ row }">{{ row.created_at || '—' }}</template>
             </el-table-column>
-            <el-table-column label="下单时长" width="90" align="center">
+            <el-table-column label="下单时长" min-width="80" align="center">
               <template #default="{ row }">
                 <span class="overdue-days">{{ row.order_days }}天</span>
               </template>
             </el-table-column>
-            <el-table-column prop="shipping_status_text" label="发货状态" width="100" align="center">
+            <el-table-column prop="shipping_status_text" label="发货状态" min-width="90" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.shipping_status === 'virtual' ? 'info' : 'warning'" size="small">{{ row.shipping_status_text }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="produce_status_text" label="生产状态" width="100" align="center">
+            <el-table-column prop="produce_status_text" label="生产状态" min-width="90" align="center">
               <template #default="{ row }">
                 <el-tag
                   :type="{ unproduce: 'warning', producing: 'primary', produced: 'success' }[row.produce_status] || 'info'"
@@ -84,14 +84,14 @@
                 >{{ row.produce_status_text }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="预警类型" width="130" align="center">
+            <el-table-column label="预警类型" min-width="110" align="center">
               <template #default="{ row }">
                 <el-tag v-if="row.produce_status !== 'produced'" type="danger" size="small" effect="plain">未生产</el-tag>
                 <el-tag type="warning" size="small" effect="plain" style="margin-left: 4px">未发货</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="created_by_name" label="销售员" width="90" align="center" v-if="isBoss" />
-            <el-table-column label="操作" width="80" align="center">
+            <el-table-column prop="created_by_name" label="销售员" min-width="80" align="center" v-if="isBoss" />
+            <el-table-column label="操作" min-width="75" align="center">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click.stop="goOrder(row)">查看</el-button>
               </template>
@@ -105,7 +105,7 @@
 
 <script setup>
 defineOptions({ name: 'WarningCenter' })
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Warning, Van, User } from '@element-plus/icons-vue'
@@ -120,6 +120,20 @@ const loading = ref(false)
 const data = ref({ total_unproduced: 0, total_unsent: 0, sales_count: 0, overdue_days: 7, groups: [] })
 const groups = computed(() => data.value.groups || [])
 const days = ref(null)
+
+// 表格自适应：el-table 仅监听 window resize，不监听容器自身变化；
+// 用 ResizeObserver 监听卡片容器尺寸变化（含窗口缩放、布局变动），强制重新布局避免横向滚动条
+const tableRef = ref(null)
+const cardRef = ref(null)
+let resizeObserver = null
+function relayout() {
+  nextTick(() => {
+    const t = tableRef.value
+    const arr = Array.isArray(t) ? t : (t ? [t] : [])
+    arr.forEach(el => el && el.doLayout && el.doLayout())
+  })
+}
+watch(groups, relayout)
 
 async function fetchWarnings() {
   loading.value = true
@@ -146,6 +160,17 @@ function goOrders() {
 
 onMounted(() => {
   fetchWarnings()
+  nextTick(() => {
+    const el = cardRef.value && (cardRef.value.$el || cardRef.value)
+    if (el && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => relayout())
+      resizeObserver.observe(el)
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  if (resizeObserver) resizeObserver.disconnect()
 })
 </script>
 

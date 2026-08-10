@@ -226,8 +226,9 @@ async function fetchList() {
     const res = await getNonTradeTransactions(params)
     items.value = res.items || []
     totalCount.value = res.total || 0
-    incomeTotal.value = items.value.filter((i) => i.trans_type === 'income').reduce((s, i) => s + Number(i.amount || 0), 0)
-    expenseTotal.value = items.value.filter((i) => i.trans_type === 'expense').reduce((s, i) => s + Number(i.amount || 0), 0)
+    // 合计由后端按全量筛选结果汇总返回，避免仅统计当前分页导致偏小
+    incomeTotal.value = res.income_total || 0
+    expenseTotal.value = res.expense_total || 0
   } catch (e) {
     ElMessage.error(e?.response?.data?.detail || '加载失败')
   } finally {
@@ -277,8 +278,8 @@ async function save() {
     ElMessage.warning('请选择账务代码')
     return
   }
-  if (form.amount === null || form.amount === undefined || form.amount < 0) {
-    ElMessage.warning('请输入正确的金额')
+  if (form.amount === null || form.amount === undefined || form.amount <= 0) {
+    ElMessage.warning('金额必须大于0')
     return
   }
   saving.value = true
