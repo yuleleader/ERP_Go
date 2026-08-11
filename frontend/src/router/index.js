@@ -155,6 +155,12 @@ const routes = [
         meta: { title: '站内信管理' }
       },
       {
+        path: 'system-backup',
+        name: 'SystemBackup',
+        component: () => import('@/views/SystemBackup.vue'),
+        meta: { title: '系统备份', roles: ['boss'] }
+      },
+      {
         path: 'system-info',
         name: 'SystemInfo',
         component: () => import('@/views/SystemInfo.vue'),

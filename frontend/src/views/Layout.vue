@@ -389,15 +389,6 @@ const menuGroups = computed(() => {
       title: '系统设置',
       groups: [
         {
-          title: '系统运维',
-          items: pick([
-            { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss },
-            { label: '日志清理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss },
-            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
-            { label: '数据导入', path: '/order-imports', desc: 'Excel 批量导入订单（临时表审核后合并）', show: isBoss || isSales }
-          ])
-        },
-        {
           title: '账号权限',
           items: pick([
             { label: '用户管理', path: '/users', desc: '账号、角色与权限维护', show: isBoss }
@@ -406,7 +397,17 @@ const menuGroups = computed(() => {
         {
           title: '消息通讯',
           items: pick([
-            { label: '站内信管理', path: '/notifications', desc: '消息收发与已读状态', show: true }
+            { label: '站内信管理', path: '/notifications', desc: '消息收发与已读状态', show: true },
+            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
+            { label: '系统备份', path: '/system-backup', desc: '查看备份日志并配置自动备份（联动桌面启动器）', show: isBoss }
+          ])
+        },
+        {
+          title: '系统运维',
+          items: pick([
+            { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss },
+            { label: '日志清理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss },
+            { label: '数据导入', path: '/order-imports', desc: 'Excel 批量导入订单（临时表审核后合并）', show: isBoss || isSales }
           ])
         },
         {

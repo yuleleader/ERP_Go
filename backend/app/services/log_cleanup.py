@@ -36,23 +36,25 @@ class LogCleanupService:
     async def get_retention_days(db: AsyncSession) -> int:
         """
         获取日志保留天数配置
-        优先从系统设置读取，失败则返回默认值
+        优先读 log_retention_days（标准键）；兼容历史键 log_cleanup_retention_days；
+        均未配置则返回默认值。
         """
-        try:
-            result = await db.execute(
-                select(SystemSetting.value).where(
-                    SystemSetting.key == "log_retention_days"
+        for key in ("log_retention_days", "log_cleanup_retention_days"):
+            try:
+                result = await db.execute(
+                    select(SystemSetting.value).where(
+                        SystemSetting.key == key
+                    )
                 )
-            )
-            value = result.scalar_one_or_none()
-            if value:
-                days = int(value)
-                if days < 30:  # 最小保留30天
-                    logger.warning(f"保留天数配置 {days} 小于30天，使用默认值")
-                    return DEFAULT_RETENTION_DAYS
-                return days
-        except (ValueError, SQLAlchemyError) as e:
-            logger.warning(f"读取保留天数配置失败: {e}")
+                value = result.scalar_one_or_none()
+                if value:
+                    days = int(value)
+                    if days < 30:  # 最小保留30天
+                        logger.warning(f"保留天数配置 {days} 小于30天，使用默认值")
+                        return DEFAULT_RETENTION_DAYS
+                    return days
+            except (ValueError, SQLAlchemyError) as e:
+                logger.warning(f"读取保留天数配置({key})失败: {e}")
 
         return DEFAULT_RETENTION_DAYS
 

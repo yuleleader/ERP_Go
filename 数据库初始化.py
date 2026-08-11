@@ -20,6 +20,12 @@ import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+# 强制 UTF-8 输出：脚本内含 ✓/✗ 等符号，在 Windows 管道(GBK)下 print 会 UnicodeEncodeError 崩溃
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # ==================== 路径配置 ====================
 BASE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = BASE_DIR / "backend"
@@ -54,185 +60,36 @@ def create_directories():
 
 # ==================== 建表 ====================
 def create_tables(conn: sqlite3.Connection):
+    """创建/确认全部数据表结构。
+
+    方案A：直接委托后端 SQLAlchemy ORM（backend/app/models/models.py）建表，
+    与运行时模型永远同步（18 张表 + 全部新列），避免手写 SQL 滞后。
+    """
     cursor = conn.cursor()
 
-    tables_sql = [
-        # 用户表
-        """CREATE TABLE IF NOT EXISTS users (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            username        VARCHAR(50)  NOT NULL UNIQUE,
-            password_hash   VARCHAR(255) NOT NULL,
-            real_name       VARCHAR(100),
-            role            VARCHAR(20)  NOT NULL DEFAULT 'sales',
-            commission_rate INTEGER,
-            is_active       BOOLEAN      DEFAULT 1,
-            created_at      TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            updated_at      TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
+    # 让后端模型可导入：把 backend 目录加入 sys.path
+    backend_dir = str(BACKEND_DIR)
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
 
-        # 网店表
-        """CREATE TABLE IF NOT EXISTS shops (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            shop_id      VARCHAR(100) NOT NULL UNIQUE,
-            shop_name    VARCHAR(100) NOT NULL,
-            shop_account VARCHAR(100) NOT NULL,
-            status       VARCHAR(20)  DEFAULT 'normal',
-            creator      VARCHAR(50)  NOT NULL,
-            create_time  TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            update_time  TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
+    # 导入 Base 与全部模型（import 模型类即注册到 Base.metadata）
+    from app.core.database import Base
+    import app.models.models  # noqa: F401  触发全部 __tablename__ 注册
+    from sqlalchemy import create_engine
 
-        # 订单表
-        """CREATE TABLE IF NOT EXISTS orders (
-            id                       INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id                 VARCHAR(100) NOT NULL UNIQUE,
-            shop_id                  VARCHAR(100),
-            product_name             VARCHAR(255),
-            platform_order_no        VARCHAR(100) NOT NULL UNIQUE,
-            sales_amount             VARCHAR(20),
-            shipping_status          VARCHAR(20)  DEFAULT 'pending',
-            logistics_company        VARCHAR(100),
-            logistics_no             VARCHAR(100),
-            shipping_operator        VARCHAR(50),
-            shipping_time            TIMESTAMP,
-            receiver_address         TEXT,
-            remark                   TEXT,
-            commission_rate          INTEGER,
-            commission_amount        VARCHAR(20),
-            created_by               VARCHAR(50),
-            created_at               TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            order_days               INTEGER      DEFAULT 0,
-            commission_paid          BOOLEAN      DEFAULT 0,
-            produce_status           VARCHAR(20)  DEFAULT 'unproduce',
-            produce_status_update_at TIMESTAMP,
-            produce_status_update_user VARCHAR(50),
-            updated_at               TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
+    # 用独立的同步 engine 指向同一 SQLite 文件执行 create_all
+    # （不能用后端 AsyncEngine.sync_engine：它是异步驱动包装，脱离 greenlet 上下文会报错）
+    sync_engine = create_engine(f"sqlite:///{DB_PATH}")
+    Base.metadata.create_all(sync_engine)
+    sync_engine.dispose()
 
-        # 图片表
-        """CREATE TABLE IF NOT EXISTS images (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id      VARCHAR(100),
-            temp_id       VARCHAR(100),
-            image_type    VARCHAR(50),
-            image_url     VARCHAR(500),
-            thumbnail_url VARCHAR(500),
-            image_hash    VARCHAR(64),
-            is_main       INTEGER DEFAULT 0,
-            uploaded_by   VARCHAR(50),
-            is_locked     INTEGER DEFAULT 0,
-            layer         VARCHAR(20)  DEFAULT 'sales',
-            created_at    TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            updated_at    TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
-
-        # 操作日志表
-        """CREATE TABLE IF NOT EXISTS operation_logs (
-            id                INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id           INTEGER,
-            username          VARCHAR(50),
-            operation_type    VARCHAR(50) NOT NULL,
-            operation_content TEXT,
-            ip_address        VARCHAR(50),
-            user_agent        TEXT,
-            created_at        TIMESTAMP   DEFAULT (datetime('now', 'localtime'))
-        )""",
-
-        # 登录日志表
-        """CREATE TABLE IF NOT EXISTS login_logs (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            username   VARCHAR(50) NOT NULL,
-            login_time TIMESTAMP   DEFAULT (datetime('now', 'localtime')),
-            ip_address VARCHAR(50),
-            user_agent TEXT,
-            status     VARCHAR(20) DEFAULT 'success'
-        )""",
-
-        # 系统设置表
-        """CREATE TABLE IF NOT EXISTS system_settings (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            key         VARCHAR(100) NOT NULL UNIQUE,
-            value       TEXT,
-            description VARCHAR(255),
-            created_at  TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            updated_at  TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
-
-        # 物流公司表
-        """CREATE TABLE IF NOT EXISTS logistics_companies (
-            id             INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_code   VARCHAR(50)  NOT NULL UNIQUE,
-            company_name   VARCHAR(100) NOT NULL UNIQUE,
-            contact_person VARCHAR(50),
-            contact_phone  VARCHAR(20),
-            status         VARCHAR(20)  DEFAULT 'active',
-            created_by     VARCHAR(50),
-            created_at     TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            updated_at     TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
-
-        # 日志清理记录表
-        """CREATE TABLE IF NOT EXISTS log_cleanup_records (
-            id                INTEGER PRIMARY KEY AUTOINCREMENT,
-            cleanup_type      VARCHAR(50)  NOT NULL,
-            retention_days    INTEGER      NOT NULL,
-            deleted_count     INTEGER      DEFAULT 0,
-            status            VARCHAR(20)  DEFAULT 'pending',
-            error_message     TEXT,
-            start_time        TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            end_time          TIMESTAMP,
-            triggered_by      VARCHAR(50),
-            operator_username VARCHAR(50)
-        )""",
-
-        # 站内信表
-        """CREATE TABLE IF NOT EXISTS notifications (
-            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-            recipient_username VARCHAR(50)  NOT NULL,
-            order_id           VARCHAR(100),
-            event_type         VARCHAR(50)  NOT NULL,
-            title              VARCHAR(200) NOT NULL,
-            content            TEXT         NOT NULL,
-            is_read            BOOLEAN      DEFAULT 0,
-            read_at            TIMESTAMP,
-            created_at         TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
-
-        # 商品表
-        """CREATE TABLE IF NOT EXISTS products (
-            id             INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_code   VARCHAR(50)  NOT NULL UNIQUE,
-            product_name   VARCHAR(100) NOT NULL,
-            product_remark TEXT,
-            status         VARCHAR(20)  DEFAULT 'active',
-            created_by     VARCHAR(50),
-            created_at     TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            updated_at     TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
-
-        # 网店提现记录表
-        """CREATE TABLE IF NOT EXISTS shop_withdraw_record (
-            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-            shop_id              VARCHAR(64)  NOT NULL,
-            withdraw_date        VARCHAR(20)  NOT NULL,
-            withdraw_amount      VARCHAR(20)  NOT NULL,
-            remark               VARCHAR(500),
-            create_operator_name VARCHAR(50)  NOT NULL,
-            create_operator_id   INTEGER      NOT NULL,
-            update_operator_name VARCHAR(50),
-            update_operator_id   INTEGER,
-            create_time          TIMESTAMP    DEFAULT (datetime('now', 'localtime')),
-            update_time          TIMESTAMP    DEFAULT (datetime('now', 'localtime'))
-        )""",
-    ]
-
-    for idx, sql in enumerate(tables_sql):
-        table_name = sql.split("TABLE IF NOT EXISTS")[1].strip().split("(")[0].strip()
-        cursor.execute(sql)
-        print(f"  [{idx + 1:02d}] {table_name}")
-
+    # 打印已存在的表清单（供界面/日志反馈）
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+    tables = [row[0] for row in cursor.fetchall()]
+    for i, t in enumerate(tables, 1):
+        print(f"  [{i:02d}] {t}")
     conn.commit()
-    print(f"✓ 共 {len(tables_sql)} 张数据表创建/确认完成")
+    print(f"✓ 共 {len(tables)} 张数据表创建/确认完成（由 SQLAlchemy ORM 生成）")
 
 
 # ==================== 初始数据 ====================
@@ -262,8 +119,10 @@ def seed_system_settings(conn: sqlite3.Connection):
         ("qr_code_access_expire_minutes", "60", "二维码临时访问链接有效期（分钟）"),
         ("backup_retention_days", "30", "备份文件保留天数"),
         ("auto_backup_enabled", "true", "是否启用每日自动备份"),
-        ("log_cleanup_retention_days", "90", "操作日志保留天数"),
+        ("log_retention_days", "90", "操作日志保留天数"),
         ("system_version", "1.0.0", "当前系统版本号"),
+        ("default_commission_rate", "10", "默认销售提成率（%）"),
+        ("overdue_order_days", "7", "超期订单预警天数（预警中心用）"),
     ]
 
     cursor = conn.cursor()
@@ -316,12 +175,17 @@ def seed_default_category_brand(conn: sqlite3.Connection):
 # ==================== 兼容性检查 ====================
 def ensure_columns(conn: sqlite3.Connection):
     """
-    向后兼容：为旧数据库补充缺失字段。
-    如果数据库已存在但缺少某字段，自动 ALTER TABLE 添加。
+    向后兼容：为旧数据库补充缺失字段（仅当数据库已存在且缺列时执行）。
+    新库由 ORM create_all 直接建全，无需迁移。
     """
     cursor = conn.cursor()
 
     migrations = {
+        "users": [
+            ("commission_rate", "INTEGER"),
+            ("price_permissions", "VARCHAR(100)"),
+            ("data_permissions", "TEXT"),
+        ],
         "orders": [
             ("order_days", "INTEGER DEFAULT 0"),
             ("commission_paid", "BOOLEAN DEFAULT 0"),
@@ -330,9 +194,22 @@ def ensure_columns(conn: sqlite3.Connection):
             ("produce_status", "VARCHAR(20) DEFAULT 'unproduce'"),
             ("produce_status_update_at", "TIMESTAMP"),
             ("produce_status_update_user", "VARCHAR(50)"),
+            ("logistics_no_2", "VARCHAR(100)"),
+            ("freight", "VARCHAR(20)"),
+            ("detected_country", "VARCHAR(100)"),
+            ("refund_note", "TEXT"),
+            ("last_print_at", "TIMESTAMP"),
+            ("gross_profit", "FLOAT"),
         ],
-        "users": [
-            ("commission_rate", "INTEGER"),
+        "products": [
+            ("category_id", "INTEGER"),
+            ("brand_id", "INTEGER"),
+            ("cost_price", "FLOAT"),
+            ("retail_price", "FLOAT"),
+            ("min_price", "FLOAT"),
+            ("remark1", "VARCHAR(500)"),
+            ("remark2", "VARCHAR(500)"),
+            ("remark3", "VARCHAR(500)"),
         ],
     }
 
@@ -374,6 +251,9 @@ def clean_user_data(conn: sqlite3.Connection):
         ("operation_logs", "操作日志"),
         ("images", "图片记录"),
         ("product_images", "商品图片记录"),
+        ("order_imports", "订单导入临时表"),
+        ("non_trade_transactions", "非交易收支流水"),
+        ("accounting_codes", "账务代码"),
         ("orders", "订单"),
         ("shops", "网店"),
         ("products", "商品"),
@@ -532,8 +412,299 @@ def init_database(reset: bool = False):
     return True
 
 
+# ==================== 可视化交互窗口（PySide6） ====================
+def _db_status() -> dict:
+    """读取数据库当前状态，返回统计信息（库不存在时返回空字典）。"""
+    if not DB_PATH.exists():
+        return {"exists": False}
+    try:
+        conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True, timeout=5)
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        tables = [r[0] for r in c.fetchall()]
+        counts = {}
+        for t in tables:
+            try:
+                c.execute(f"SELECT COUNT(*) FROM {t}")
+                counts[t] = c.fetchone()[0]
+            except Exception:
+                counts[t] = None
+        admin = None
+        try:
+            c.execute("SELECT username, role FROM users WHERE username='1001'")
+            admin = c.fetchone()
+        except Exception:
+            pass
+        settings = None
+        try:
+            c.execute("SELECT COUNT(*) FROM system_settings")
+            settings = c.fetchone()[0]
+        except Exception:
+            pass
+        conn.close()
+        return {
+            "exists": True,
+            "tables": tables,
+            "counts": counts,
+            "admin": admin,
+            "settings": settings,
+            "size_kb": DB_PATH.stat().st_size / 1024 if DB_PATH.exists() else 0,
+        }
+    except Exception as e:
+        return {"exists": True, "error": str(e)}
+
+
+def run_gui():
+    """启动可视化交互窗口（状态总览 + 一键初始化 + 实时日志）。"""
+    from PySide6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QPushButton, QTextEdit, QFrame, QGridLayout, QMessageBox,
+    )
+    from PySide6.QtCore import Qt, QThread, Signal, QObject
+
+    class Worker(QObject):
+        """后台执行初始化，print 输出通过信号回传主线程。"""
+        line = Signal(str)
+        done = Signal(bool, str)
+
+        def __init__(self, reset=False):
+            super().__init__()
+            self.reset = reset
+
+        def _hook_print(self, text='', **kw):
+            self.line.emit(str(text))
+
+        def run(self):
+            import builtins
+            orig_print = builtins.print
+            builtins.print = lambda *a, **k: self._hook_print(' '.join(str(x) for x in a))
+            try:
+                ok = init_database(reset=self.reset)
+                self.done.emit(True, '初始化完成' if ok else '初始化返回失败')
+            except Exception as e:
+                self.done.emit(False, f'初始化失败: {e}')
+            finally:
+                builtins.print = orig_print
+
+    class InitWindow(QMainWindow):
+        def __init__(self):
+            super().__init__()
+            self.setWindowTitle("数据库初始化工具 - 电商产销协同管理系统")
+            self.resize(760, 620)
+            self._build_ui()
+            self._thread = None
+            self._worker = None
+            self.refresh_status()
+
+        def _build_ui(self):
+            central = QWidget()
+            self.setCentralWidget(central)
+            root = QVBoxLayout(central)
+            root.setContentsMargins(18, 16, 18, 16)
+            root.setSpacing(12)
+
+            # 标题
+            title = QLabel("数据库初始化工具")
+            title.setStyleSheet("font: bold 20px 'Microsoft YaHei'; color:#1f2329;")
+            root.addWidget(title)
+            sub = QLabel("创建/校验全部数据表，补充默认管理员、系统参数与基础数据。操作幂等，可重复执行。")
+            sub.setStyleSheet("font: 12px 'Microsoft YaHei'; color:#646a73;")
+            root.addWidget(sub)
+
+            # 状态总览卡片
+            card = QFrame()
+            card.setStyleSheet(
+                "QFrame{background:#f7f8fa; border:1px solid #e5e6eb; border-radius:10px;}")
+            cv = QVBoxLayout(card)
+            cv.setContentsMargins(16, 14, 16, 14)
+            cv.setSpacing(8)
+            cv.addWidget(QLabel("📊 数据库状态总览"))
+            self.grid = QGridLayout()
+            self.grid.setHorizontalSpacing(24)
+            self.grid.setVerticalSpacing(6)
+            cv.addLayout(self.grid)
+            root.addWidget(card)
+
+            # 按钮行
+            btns = QHBoxLayout()
+            btns.setSpacing(10)
+            self.init_btn = QPushButton("▶ 执行初始化")
+            self.init_btn.setFixedHeight(42)
+            self.init_btn.setStyleSheet(
+                "QPushButton{background:#3370ff; color:#fff; border:none; border-radius:8px;"
+                " font: bold 14px 'Microsoft YaHei'; padding:0 28px;}"
+                "QPushButton:hover{background:#4c82ff;}"
+                "QPushButton:disabled{background:#a8c2ff;}")
+            self.init_btn.clicked.connect(self._on_init)
+            btns.addWidget(self.init_btn)
+            self.refresh_btn = QPushButton("刷新状态")
+            self.refresh_btn.setFixedHeight(42)
+            self.refresh_btn.setStyleSheet(
+                "QPushButton{background:#ffffff; color:#1f2329; border:1px solid #d0d3d9;"
+                " border-radius:8px; font: 13px 'Microsoft YaHei'; padding:0 20px;}"
+                "QPushButton:hover{background:#f2f3f5;}")
+            self.refresh_btn.clicked.connect(self.refresh_status)
+            btns.addWidget(self.refresh_btn)
+            btns.addStretch()
+            root.addLayout(btns)
+
+            # 日志区
+            log_label = QLabel("运行日志：")
+            log_label.setStyleSheet("font: bold 12px 'Microsoft YaHei'; color:#1f2329;")
+            root.addWidget(log_label)
+            self.log_text = QTextEdit()
+            self.log_text.setReadOnly(True)
+            self.log_text.setStyleSheet(
+                "QTextEdit{background:#1e1e1e; color:#d4d4d4; border-radius:8px;"
+                " font: 12px Consolas, 'Courier New'; padding:10px;}")
+            root.addWidget(self.log_text, 1)
+
+        def _set_grid(self, key, val):
+            r = self.grid.rowCount()
+            k = QLabel(key)
+            k.setStyleSheet("font: 12px 'Microsoft YaHei'; color:#646a73;")
+            v = QLabel(str(val))
+            v.setStyleSheet("font: bold 12px 'Microsoft YaHei'; color:#1f2329;")
+            v.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            self.grid.addWidget(k, r, 0)
+            self.grid.addWidget(v, r, 1)
+
+        def refresh_status(self):
+            # 清空旧格子
+            while self.grid.count():
+                item = self.grid.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            st = _db_status()
+            if not st.get("exists"):
+                self._set_grid("数据库", "不存在（首次运行将自动创建）")
+                self._set_grid("表数量", "0")
+                self._set_grid("管理员", "未创建")
+                self._set_grid("系统参数", "未创建")
+                return
+            if "error" in st:
+                self._set_grid("数据库", f"读取异常: {st['error']}")
+                return
+            tables = st["tables"]
+            counts = st["counts"]
+            self._set_grid("数据库", f"存在（{st['size_kb']:.1f} KB）")
+            self._set_grid("数据表", f"{len(tables)} 张")
+            admin = st["admin"]
+            self._set_grid("管理员", f"{admin[0]} ({admin[1]})" if admin else "未创建")
+            self._set_grid("系统参数", f"{st['settings']} 条" if st["settings"] is not None else "—")
+            # 关键表数据量
+            table_labels = [
+                ("users", "用户"),
+                ("orders", "订单"),
+                ("shops", "网店"),
+                ("products", "商品"),
+                ("categories", "类别"),
+                ("brands", "品牌"),
+                ("product_images", "商品图片"),
+                ("order_imports", "订单导入"),
+                ("non_trade_transactions", "非交易收支"),
+                ("accounting_codes", "账务代码"),
+                ("notifications", "站内信"),
+                ("login_logs", "登录日志"),
+                ("operation_logs", "操作日志"),
+            ]
+            for t, label in table_labels:
+                if t in counts:
+                    self._set_grid(label, f"{counts[t]} 条")
+            self.log_text.append(f"✅ 状态已刷新：{len(tables)} 张表，{st['settings']} 条系统参数")
+
+        def _append_log(self, text):
+            self.log_text.append(text)
+            sb = self.log_text.verticalScrollBar()
+            sb.setValue(sb.maximum())
+
+        def _verify_password(self):
+            """验证特殊操作密码（当日日期 YYYYMMDD）。输入正确返回 True，取消/错误返回 False。"""
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QDialogButtonBox, QLineEdit
+            today = datetime.now().strftime('%Y%m%d')
+
+            def to_half_width(s):
+                out = []
+                for ch in s:
+                    code = ord(ch)
+                    if code == 0x3000:
+                        code = 0x20
+                    elif 0xFF01 <= code <= 0xFF5E:
+                        code -= 0xFEE0
+                    out.append(chr(code))
+                return ''.join(out)
+
+            def ask_password(title, label):
+                """中文按钮的自定义密码输入对话框，返回 (text, ok)。"""
+                dlg = QDialog(self)
+                dlg.setWindowTitle(title)
+                layout = QVBoxLayout(dlg)
+                layout.addWidget(QLabel(label))
+                edit = QLineEdit()
+                edit.setEchoMode(QLineEdit.Password)
+                layout.addWidget(edit)
+                btn_box = QDialogButtonBox()
+                btn_box.addButton("确认", QDialogButtonBox.AcceptRole)
+                btn_box.addButton("取消", QDialogButtonBox.RejectRole)
+                btn_box.accepted.connect(dlg.accept)
+                btn_box.rejected.connect(dlg.reject)
+                layout.addWidget(btn_box)
+                edit.returnPressed.connect(dlg.accept)  # 回车直接确认
+                ok = (dlg.exec() == QDialog.Accepted)
+                return edit.text(), ok
+
+            for attempt in range(3):
+                text, ok = ask_password("身份验证", "请输入特殊操作密码")
+                if not ok:
+                    return False
+                if to_half_width(text.strip()) == today:
+                    return True
+                if attempt < 2:
+                    QMessageBox.warning(self, "密码错误", "密码错误，请重试")
+            QMessageBox.warning(self, "验证失败", "密码错误次数过多，已取消初始化")
+            return False
+
+        def _on_init(self):
+            if self._thread and self._thread.isRunning():
+                return
+            # 密码验证：特殊操作密码 = 当日日期 YYYYMMDD（如 20260810）
+            if not self._verify_password():
+                self._append_log("已取消初始化（密码验证未通过）")
+                return
+            self.init_btn.setEnabled(False)
+            self.refresh_btn.setEnabled(False)
+            self._append_log("开始执行初始化…")
+
+            self._thread = QThread()
+            self._worker = Worker(reset=False)
+            self._worker.moveToThread(self._thread)
+            self._thread.started.connect(self._worker.run)
+            self._worker.line.connect(self._append_log)
+            self._worker.done.connect(self._on_done)
+            self._thread.start()
+
+        def _on_done(self, ok, msg):
+            self._append_log(f"\n{'✅' if ok else '❌'} {msg}")
+            self.init_btn.setEnabled(True)
+            self.refresh_btn.setEnabled(True)
+            if self._thread:
+                self._thread.quit()
+                self._thread.wait()
+            self.refresh_status()
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+    win = InitWindow()
+    win.show()
+    sys.exit(app.exec())
+
+
 # ==================== 入口 ====================
 if __name__ == "__main__":
+    # 默认：无参数启动可视化窗口；带 --cli/--force/--reset 走命令行模式
+    if "--gui" in sys.argv or not any(a in sys.argv for a in ("--force", "--reset", "--cli")):
+        run_gui()
+        sys.exit(0)
+
     force = "--force" in sys.argv
     reset = "--reset" in sys.argv
 

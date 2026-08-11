@@ -584,12 +584,12 @@
               alt="订单二维码"
               style="width: 130px; height: 130px; margin-bottom: 10px;"
             />
-            <!-- 追溯码（=订单号）：标签与数字分行，数字单行不换行 -->
+            <!-- 追溯码（=订单号）：标签与数字分行，38位数字在窄卡片内允许换行展示完整 -->
             <div style="margin-bottom: 10px;">
               <div style="font-size: 11px; color: #999; margin-bottom: 2px;">追溯码</div>
               <div
                 :title="currentOrder.order_id"
-                style="font-size: 11px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Consolas', 'Courier New', monospace;"
+                style="font-size: 11px; color: #333; word-break: break-all; line-height: 1.45; font-family: 'Consolas', 'Courier New', monospace;"
               >{{ currentOrder.order_id }}</div>
             </div>
             <div style="padding-top: 10px; border-top: 1px dashed #eee;">

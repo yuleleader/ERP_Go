@@ -86,19 +86,19 @@
           @selection-change="handleSelectionChange"
         >
           <el-table-column v-if="canDeleteProducts" type="selection" width="45" />
-          <el-table-column prop="product_code" label="商品编码" width="130" />
-          <el-table-column prop="product_name" label="商品名称" min-width="160" />
-          <el-table-column label="类别" width="120">
+          <el-table-column prop="product_code" label="商品编码" min-width="110" />
+          <el-table-column prop="product_name" label="商品名称" min-width="150" />
+          <el-table-column label="类别" min-width="90">
             <template #default="{ row }">
               {{ categoryName(row.category_id) }}
             </template>
           </el-table-column>
-          <el-table-column label="品牌" width="110">
+          <el-table-column label="品牌" min-width="90">
             <template #default="{ row }">
               {{ brandName(row.brand_id) }}
             </template>
           </el-table-column>
-          <el-table-column label="售价" width="100">
+          <el-table-column label="售价" min-width="80">
             <template #default="{ row }">
               <span v-if="canSeePrice('retail_price') && row.retail_price != null">¥{{ Number(row.retail_price).toFixed(2) }}</span>
               <span v-else>***</span>
@@ -124,12 +124,12 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="170">
+          <el-table-column prop="created_at" label="创建时间" min-width="150">
             <template #default="{ row }">
               {{ formatDateTime(row.created_at) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="170" fixed="right">
+          <el-table-column label="操作" min-width="150" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="viewProduct(row)">查看</el-button>
               <el-button v-if="canEditProducts" link type="primary" size="small" @click="editProduct(row)">编辑</el-button>
@@ -886,7 +886,7 @@ onMounted(() => {
 
 /* ===== 左侧面板 ===== */
 .left-panel {
-  width: 240px;
+  width: 180px;
   flex-shrink: 0;
   background: #fff;
   border: 1px solid #ebeef5;

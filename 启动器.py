@@ -16,8 +16,7 @@
   2. 左侧侧边栏（logo + 状态/备份/初始 三导航 + 版本号）
   3. 运行监控视图（服务磁贴 + 四通道实时日志 + 启停/打开/刷新按钮）
   4. 备份设置视图（立即备份/自动备份计划/还原/操作日志）
-  5. 恢复出厂视图（密码验证 + 确认选项 + 执行日志）
-  6. 核心服务管理（依赖检查/启动/停止/自愈看门狗/健康检查）
+  5. 核心服务管理（依赖检查/启动/停止/自愈看门狗/健康检查）
 线程安全：子线程一律通过 Qt 信号槽(emit→slot)更新 UI，绝不跨线程碰控件。
 """
 
@@ -35,6 +34,7 @@ import time
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from PySide6.QtCore import (
     Qt, QObject, Signal, QTimer, QSize, QByteArray, QUrl, QPoint, QEvent,
@@ -106,6 +106,71 @@ BTN_SPEC = {
 # ─────────────────────────────────────────
 # 模块级工具函数（与框架无关，原样保留）
 # ─────────────────────────────────────────
+
+# ── 系统备份本地接口（供后台「系统备份」页面读取/控制）──
+BACKUP_API_PORT = 25998
+BACKUP_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'backend', 'data', 'backup_logs.jsonl')
+
+
+class BackupHttpHandler(BaseHTTPRequestHandler):
+    """仅监听 127.0.0.1 的极简 JSON 接口：/backup/state /backup/run /backup/config。"""
+    app_ref = None  # 由 LauncherApp 注入实例引用
+
+    def log_message(self, *args):
+        pass
+
+    def _send(self, code, payload):
+        data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        app = self.app_ref
+        if app is not None and self.path.split('?')[0] == '/backup/state':
+            self._send(200, {
+                'ok': True,
+                'backup_dir': app.backup_config.get('backup_dir', ''),
+                'auto_backup': app.backup_config.get('auto_backup', {}),
+                'next_backup': app._next_backup_text(),
+                'logs': app._load_backup_logs(200),
+            })
+        else:
+            self._send(404, {'ok': False, 'message': 'not found'})
+
+    def do_POST(self):
+        app = self.app_ref
+        if app is None:
+            self._send(503, {'ok': False, 'message': '启动器未就绪'})
+            return
+        length = int(self.headers.get('Content-Length') or 0)
+        raw = self.rfile.read(length) if length else b'{}'
+        try:
+            data = json.loads(raw or b'{}')
+        except Exception:
+            data = {}
+        path = self.path.split('?')[0]
+        if path == '/backup/run':
+            app._do_backup_now()
+            self._send(200, {'ok': True, 'message': '已开始备份'})
+        elif path == '/backup/config':
+            ac = data.get('auto_backup')
+            if not isinstance(ac, dict):
+                self._send(400, {'ok': False, 'message': 'auto_backup 参数缺失'})
+                return
+            try:
+                app._apply_auto_backup_config(ac)
+                self._send(200, {'ok': True, 'message': '自动备份设置已保存',
+                                 'auto_backup': app.backup_config.get('auto_backup', {})})
+            except Exception as e:
+                self._send(400, {'ok': False, 'message': f'设置保存失败: {e}'})
+        else:
+            self._send(404, {'ok': False, 'message': 'not found'})
+
+
 def is_port_open(port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -206,7 +271,6 @@ class Bridge(QObject):
     service = Signal(str, str, str)       # which, word, fg
     progress = Signal(str, int, str)      # which, width(0-180), color
     button = Signal(str, str)             # name(start/stop/open), state(enabled/disabled)
-    resetlog = Signal(str)                # text
     settingslog = Signal(str, str)        # text, level
     backuplist = Signal()
     uicall = Signal(object)               # callable
@@ -741,7 +805,6 @@ class LauncherApp(QWidget):
         self.bridge.service.connect(self.on_service)
         self.bridge.progress.connect(self.on_progress)
         self.bridge.button.connect(self.on_button)
-        self.bridge.resetlog.connect(self.on_resetlog)
         self.bridge.settingslog.connect(self.on_settingslog)
         self.bridge.backuplist.connect(self._refresh_backup_list)
         self.bridge.uicall.connect(lambda fn: fn() if callable(fn) else None)
@@ -759,7 +822,6 @@ class LauncherApp(QWidget):
         self._watchdog_started = False
         self._last_watchdog_restart = 0.0
         self._stop_in_progress = False
-        self._reset_running = False
         self._zoomed = False
 
         # 日志存储与渲染状态
@@ -776,13 +838,13 @@ class LauncherApp(QWidget):
 
         self._current_view = 'home'
         self._settings_built = False
-        self._reset_built = False
         self._settings_view_open = False
 
         self._build_ui()
         self.detect_service_status()
         self._start_pulse()
         self._start_backup_scheduler()
+        self._start_backup_http_service()
         self._center_window()
 
     # ── UI 构建 ──
@@ -804,10 +866,8 @@ class LauncherApp(QWidget):
         self.content_stack.setStyleSheet(f"background:{BG}; border:none;")
         self._build_home()
         self.settings_page = QWidget()
-        self.reset_page = QWidget()
         self.content_stack.addWidget(self.home_page)
         self.content_stack.addWidget(self.settings_page)
-        self.content_stack.addWidget(self.reset_page)
         mid.addWidget(self.content_stack, 1)
         main_v.addLayout(mid, 1)
 
@@ -867,9 +927,7 @@ class LauncherApp(QWidget):
         v.addStretch()
 
         self.nav_settings = NavItem('备份', 'folder', self.open_settings, self.sidebar)
-        self.nav_reset = NavItem('初始', 'restore', self._open_reset_view, self.sidebar)
         v.addWidget(self.nav_settings)
-        v.addWidget(self.nav_reset)
 
         v.addSpacing(8)
         ver = QLabel('v3.0')
@@ -1145,6 +1203,8 @@ class LauncherApp(QWidget):
         self.start_btn.set_enabled(start == 'enabled')
         self.stop_btn.set_enabled(stop == 'enabled')
         self.open_btn.set_enabled(open == 'enabled')
+        # 刷新状态按钮始终可用（修复：原代码从未启用它，导致点击无任何反馈）
+        self.refresh_btn.set_enabled(True)
         self.bridge.button.emit('start', start)
         self.bridge.button.emit('stop', stop)
         self.bridge.button.emit('open', open)
@@ -1155,6 +1215,7 @@ class LauncherApp(QWidget):
     def _log_backup(self, text, level='info'):
         self.add_log(text, level, channel='backup')
         self.bridge.settingslog.emit(text, level)
+        self._append_backup_log_file(text, level)
 
     # ── 脉冲动画（状态点闪烁）──
     def _start_pulse(self):
@@ -1220,33 +1281,43 @@ class LauncherApp(QWidget):
             if is_service_healthy('http://localhost:8000/health'):
                 self._ui_set_service('backend', "运行中", GREEN)
                 self._update_progress('backend', 180, GREEN)
+                self.backend_status = "运行中"
                 self.add_log("后端服务: 健康运行 (端口 8000)", 'success')
             else:
                 self._ui_set_service('backend', "异常", ORANGE)
                 self._update_progress('backend', 100, ORANGE)
+                self.backend_status = "异常"
                 self.add_log("后端服务: 端口已占用但无响应，可能存在进程残留，请重启", 'warning')
         else:
             self._ui_set_service('backend', "未启动", TEXT3)
             self._update_progress('backend', 0, TEXT3)
+            self.backend_status = "未启动"
             self.add_log("后端服务: 未启动 (端口 8000)", 'warning')
         frontend_open = is_port_open(5173)
         if frontend_open:
             if is_service_healthy('http://localhost:5173'):
                 self._ui_set_service('frontend', "运行中", GREEN)
                 self._update_progress('frontend', 180, GREEN)
+                self.frontend_status = "运行中"
                 self.add_log("前端服务: 健康运行 (端口 5173)", 'success')
             else:
                 self._ui_set_service('frontend', "异常", ORANGE)
                 self._update_progress('frontend', 100, ORANGE)
+                self.frontend_status = "异常"
                 self.add_log("前端服务: 端口已占用但无响应，可能存在进程残留，请重启", 'warning')
         else:
             self._ui_set_service('frontend', "未启动", TEXT3)
             self._update_progress('frontend', 0, TEXT3)
+            self.frontend_status = "未启动"
             self.add_log("前端服务: 未启动 (端口 5173)", 'warning')
         if backend_open or frontend_open:
             self._set_button_state(start='enabled', stop='enabled', open='enabled')
         else:
             self._set_button_state(start='enabled', stop='disabled', open='disabled')
+        # 汇总一行显示到「综合」页签，并自动切换过去，便于一眼看到全部服务状态
+        summary = f"▍后端={self.backend_status} ｜ 前端={self.frontend_status}"
+        self.add_log(summary, 'system')
+        self._switch_tab(0)
         self.add_log("状态刷新完成", 'system')
 
     # ── 服务进程管理（与旧版逻辑一致）──
@@ -1600,6 +1671,96 @@ class LauncherApp(QWidget):
         except Exception:
             pass
 
+    # ── 系统备份本地接口（供后台「系统备份」页面联动）──
+    def _start_backup_http_service(self):
+        try:
+            handler = BackupHttpHandler
+            handler.app_ref = self
+            self._backup_http_server = ThreadingHTTPServer(('127.0.0.1', BACKUP_API_PORT), handler)
+            threading.Thread(target=self._backup_http_server.serve_forever, daemon=True).start()
+            self.add_log(f"系统备份本地接口已启动 (127.0.0.1:{BACKUP_API_PORT})", 'system')
+        except OSError as e:
+            self._backup_http_server = None
+            self.add_log(f"备份本地接口启动失败（端口 {BACKUP_API_PORT} 可能被占用）: {e}", 'warning')
+
+    def _append_backup_log_file(self, text, level='info'):
+        """备份日志落盘（backup_logs.jsonl，保留最近 500 条），供后台页面读取。"""
+        try:
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            with open(BACKUP_LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({'ts': ts, 'level': level, 'text': text}, ensure_ascii=False) + '\n')
+            # 截断：仅保留最近 500 行
+            try:
+                with open(BACKUP_LOG_FILE, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                if len(lines) > 500:
+                    with open(BACKUP_LOG_FILE, 'w', encoding='utf-8') as f:
+                        f.writelines(lines[-500:])
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _load_backup_logs(self, limit=200):
+        try:
+            with open(BACKUP_LOG_FILE, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            out = []
+            for ln in lines[-limit:]:
+                try:
+                    out.append(json.loads(ln))
+                except Exception:
+                    pass
+            return out
+        except Exception:
+            return []
+
+    def _next_backup_text(self):
+        cfg = self.backup_config.get('auto_backup', {})
+        if not cfg.get('enabled'):
+            return ''
+        try:
+            nxt = self._compute_next_backup_time(cfg)
+            return nxt.strftime('%Y-%m-%d %H:%M')
+        except Exception:
+            return ''
+
+    def _apply_auto_backup_config(self, cfg):
+        """从「系统备份」页面下发自动备份设置（校验后应用并持久化）。"""
+        period = cfg.get('period', 'daily')
+        if period not in ('daily', 'weekly', 'monthly', 'interval'):
+            raise ValueError('备份模式非法')
+        time_str = cfg.get('time', '02:00')
+        datetime.strptime(time_str, '%H:%M')
+        weekday = int(cfg.get('weekday', 0))
+        if not (0 <= weekday <= 6):
+            raise ValueError('星期取值非法')
+        day = int(cfg.get('day', 1))
+        if not (1 <= day <= 31):
+            raise ValueError('日期取值非法')
+        interval = int(cfg.get('interval', 4))
+        if not (1 <= interval <= 24):
+            raise ValueError('间隔小时必须在 1-24 之间')
+        new_cfg = {'enabled': bool(cfg.get('enabled', False)), 'period': period,
+                   'time': time_str, 'weekday': weekday, 'day': day, 'interval': interval}
+        self.backup_config['auto_backup'] = new_cfg
+        self._save_backup_config()
+        self._start_backup_scheduler()
+        self._log_backup("自动备份设置已保存（系统备份页面）", 'success')
+        # 若启动器备份设置界面已打开，同步 UI 显示
+        if getattr(self, '_settings_view_open', False) and hasattr(self, 'settings_auto_enabled'):
+            try:
+                pmap_rev = {'daily': '每日', 'weekly': '每周', 'monthly': '每月', 'interval': '每隔几小时'}
+                self.settings_auto_enabled.setChecked(new_cfg['enabled'])
+                self.period_combo.setCurrentText(pmap_rev[period])
+                self.time_combo.setCurrentText(time_str)
+                self.weekday_combo.setCurrentIndex(weekday)
+                self.day_combo.setCurrentText(str(day))
+                self.interval_edit.setText(str(interval))
+                self._update_settings_ui()
+            except Exception:
+                pass
+
     # ── 备份 / 还原配置 ──
     def _load_backup_config(self):
         base = os.path.dirname(os.path.abspath(__file__))
@@ -1732,7 +1893,6 @@ class LauncherApp(QWidget):
     def _refresh_nav(self):
         self.nav_home.set_active(self._current_view == 'home')
         self.nav_settings.set_active(self._current_view == 'settings')
-        self.nav_reset.set_active(self._current_view == 'reset')
 
     def _show_home_view(self):
         self.content_stack.setCurrentWidget(self.home_page)
@@ -1747,79 +1907,6 @@ class LauncherApp(QWidget):
         self.content_stack.setCurrentWidget(self.settings_page)
         self._current_view = 'settings'
         self._settings_view_open = True
-        self._refresh_nav()
-
-    def _open_reset_view(self):
-        today = datetime.now().strftime('%Y%m%d')
-        dlg = QDialog(self)
-        dlg.setWindowTitle("管理员验证")
-        dlg.setFixedSize(340, 190)
-        dlg.setStyleSheet(f"QDialog{{background:{BG};}}")
-        dv = QVBoxLayout(dlg)
-        dv.setContentsMargins(18, 14, 18, 14)
-        dv.setSpacing(7)
-        t1 = QLabel("请输入特殊操作密码")
-        t1.setAlignment(Qt.AlignCenter)
-        t1.setStyleSheet(f"font: bold 13px {FONT}; color:{TEXT};")
-        t2 = QLabel("恢复出厂设置需验证身份（特殊操作密码为当天日期 YYYYMMDD）")
-        t2.setAlignment(Qt.AlignCenter)
-        t2.setStyleSheet(f"font: 10px {FONT}; color:{TEXT2};")
-        pwd = QLineEdit()
-        pwd.setEchoMode(QLineEdit.Password)
-        pwd.setAlignment(Qt.AlignCenter)
-        pwd.setStyleSheet(
-            f"QLineEdit{{border:1px solid {CARD_BORDER}; border-radius:7px; padding:6px; "
-            f"font:11pt 'Segoe UI'; background:{CARD};}}")
-        err = QLabel("")
-        err.setStyleSheet(f"color:{RED}; font: 10px {FONT};")
-
-        def to_half_width(s):
-            out = []
-            for ch in s:
-                code = ord(ch)
-                if code == 0x3000:
-                    code = 0x20
-                elif 0xFF01 <= code <= 0xFF5E:
-                    code -= 0xFEE0
-                out.append(chr(code))
-            return ''.join(out)
-
-        def on_confirm():
-            if to_half_width(pwd.text().strip()) == today:
-                dlg.accept()
-            else:
-                err.setText("密码错误，请重试")
-
-        btns = QHBoxLayout()
-        btns.addStretch()
-        cancel = QPushButton("取消")
-        ok = QPushButton("确定")
-        for b in (cancel, ok):
-            b.setFixedWidth(76)
-            b.setCursor(Qt.PointingHandCursor)
-            b.setStyleSheet(f"QPushButton{{background:{CARD}; border:1px solid {CARD_BORDER}; "
-                            f"border-radius:7px; padding:5px; font:11px {FONT};}}"
-                            f"QPushButton:hover{{background:#e8e8ed;}}")
-        cancel.clicked.connect(dlg.reject)
-        ok.clicked.connect(on_confirm)
-        pwd.returnPressed.connect(on_confirm)
-        btns.addWidget(cancel)
-        btns.addWidget(ok)
-        dv.addWidget(t1)
-        dv.addWidget(t2)
-        dv.addWidget(pwd)
-        dv.addWidget(err)
-        dv.addLayout(btns)
-        if dlg.exec() == QDialog.Accepted:
-            self._switch_to_reset_view()
-            pwd.setText("")
-
-    def _switch_to_reset_view(self):
-        if not self._reset_built:
-            self._build_reset_view()
-            self._reset_built = True
-        self.content_stack.setCurrentWidget(self.reset_page)
-        self._current_view = 'reset'
         self._refresh_nav()
 
     # ── 备份设置视图 ──
@@ -2186,138 +2273,6 @@ class LauncherApp(QWidget):
             self._log_backup("自动备份设置已保存", 'success')
         except Exception as e:
             QMessageBox.critical(self, "保存失败", f"设置保存失败: {e}")
-
-    # ── 恢复出厂视图 ──
-    def _build_reset_view(self):
-        page = self.reset_page
-        root = QVBoxLayout(page)
-        root.setContentsMargins(14, 12, 14, 12)
-        root.setSpacing(7)
-        h = QVBoxLayout()
-        h.setSpacing(0)
-        t1 = QLabel("恢复出厂设置")
-        t1.setStyleSheet(f"font: bold 14px {FONT}; color:{RED};")
-        t2 = QLabel("清空全部业务数据并重建系统（等同于重新初始化数据库）")
-        t2.setStyleSheet(f"font: 10px 'Segoe UI'; color:{TEXT2};")
-        h.addWidget(t1)
-        h.addWidget(t2)
-        root.addLayout(h)
-
-        warn = QFrame()
-        warn.setStyleSheet(f"QFrame{{background:#fff8f7; border-left:4px solid {RED}; border-radius:7px;}}")
-        wv = QVBoxLayout(warn)
-        wv.setContentsMargins(10, 8, 10, 8)
-        wv.setSpacing(1)
-        w1 = QLabel("⚠ 危险操作，不可恢复！")
-        w1.setStyleSheet(f"font: bold 12px {FONT}; color:{RED};")
-        w2 = QLabel("执行后将清空以下内容，且无法找回，请先确认已做好备份：")
-        w2.setStyleSheet(f"font:10px {FONT}; color:{TEXT};")
-        w3 = QLabel("订单、网店、商品、类别、品牌、物流公司、图片、日志、站内信、提现记录、除1001外的账号")
-        w3.setStyleSheet(f"font:10px {FONT}; color:{TEXT2};")
-        w3.setWordWrap(True)
-        w4 = QLabel("保留：管理员账号(1001)、系统配置、默认类别(999-其他类别)、默认品牌(999-默认品牌)")
-        w4.setStyleSheet(f"font:10px {FONT}; color:{GREEN};")
-        w4.setWordWrap(True)
-        for w in (w1, w2, w3, w4):
-            wv.addWidget(w)
-        root.addWidget(warn)
-
-        opt = QVBoxLayout()
-        opt.setSpacing(1)
-        self.reset_opt_data = QCheckBox("清空业务数据（订单/网店/商品/类别/品牌/日志等）")
-        self.reset_opt_images = QCheckBox("清理图片文件（订单/商品/临时图片）")
-        self.reset_opt_restart = QCheckBox("执行后重新启动后端与前端")
-        self.reset_opt_data.setChecked(True)
-        self.reset_opt_images.setChecked(True)
-        self.reset_opt_restart.setChecked(False)
-        for c in (self.reset_opt_data, self.reset_opt_images, self.reset_opt_restart):
-            c.setStyleSheet(f"font:11px {FONT}; color:{TEXT};")
-            opt.addWidget(c)
-        root.addLayout(opt)
-
-        act = QHBoxLayout()
-        self.reset_exec_btn = QPushButton("执行恢复出厂")
-        self.reset_exec_btn.setFixedHeight(32)
-        self.reset_exec_btn.setCursor(Qt.PointingHandCursor)
-        self.reset_exec_btn.setStyleSheet(
-            f"QPushButton{{background:{RED}; color:#fff; border:none; border-radius:7px; "
-            f"font: bold 11px {FONT}; padding:0 16px;}}"
-            f"QPushButton:hover{{background:{RED_L};}} QPushButton:pressed{{background:{RED_D};}}")
-        self.reset_exec_btn.clicked.connect(self._do_factory_reset)
-        act.addWidget(self.reset_exec_btn)
-        act.addStretch()
-        root.addLayout(act)
-
-        rl = QLabel("执行日志：")
-        rl.setStyleSheet(f"font: bold 11px {FONT}; color:{TEXT};")
-        root.addWidget(rl)
-        log_frame = QFrame()
-        lf = QVBoxLayout(log_frame)
-        lf.setContentsMargins(0, 0, 0, 0)
-        self.reset_log_text = QTextEdit()
-        self.reset_log_text.setReadOnly(True)
-        self.reset_log_text.setStyleSheet(
-            "QTextEdit{background:#1e1e1e; color:#d4d4d4; border-radius:7px; "
-            "font:9pt Consolas; padding:6px;}")
-        lf.addWidget(self.reset_log_text)
-        root.addWidget(log_frame, 1)
-        self.on_resetlog("待命。点击「执行恢复出厂」开始（将先停止后端/前端服务）。")
-
-    def on_resetlog(self, text):
-        if getattr(self, 'reset_log_text', None):
-            self.reset_log_text.moveCursor(QTextCursor.End)
-            self.reset_log_text.insertPlainText(text + "\n")
-            self.reset_log_text.moveCursor(QTextCursor.End)
-
-    def _do_factory_reset(self):
-        if getattr(self, '_reset_running', False):
-            return
-        if not (self.reset_opt_data.isChecked() and self.reset_opt_images.isChecked()):
-            self.on_resetlog("❌ 请勾选「清空业务数据」与「清理图片文件」以确认执行恢复出厂。")
-            return
-        want_restart = self.reset_opt_restart.isChecked()
-        self._reset_running = True
-        self.reset_exec_btn.setEnabled(False)
-        self.on_resetlog("========================================")
-        self.on_resetlog("开始恢复出厂…")
-
-        def worker():
-            self._stop_requested = True
-            try:
-                self.bridge.uicall.emit(lambda: self.on_resetlog("[1/3] 停止后端(8000)与前端(5173)…"))
-                try:
-                    kill_process_on_port(8000)
-                    kill_process_on_port(5173)
-                except Exception as e:
-                    self.bridge.uicall.emit(lambda e=e: self.on_resetlog(f"  停止服务提示: {e}"))
-                self.bridge.uicall.emit(lambda: self.on_resetlog("  服务端口已释放"))
-                self.bridge.uicall.emit(lambda: self.on_resetlog("[2/3] 执行数据库初始化（恢复出厂）…"))
-                base = os.path.dirname(os.path.abspath(__file__))
-                script = os.path.join(base, "数据库初始化.py")
-                proc = subprocess.Popen([sys.executable, script, "--force"],
-                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                        text=True, encoding='utf-8', errors='replace',
-                                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-                for line in proc.stdout:
-                    line = line.rstrip()
-                    if line:
-                        self.bridge.uicall.emit(lambda line=line: self.on_resetlog(line))
-                proc.wait()
-                self.bridge.uicall.emit(lambda rc=proc.returncode: self.on_resetlog(f"  初始化脚本退出码: {rc}"))
-                if want_restart:
-                    self.bridge.uicall.emit(lambda: self.on_resetlog("[3/3] 重新启动后端与前端…"))
-                    self.bridge.uicall.emit(self.start_services)
-                else:
-                    self.bridge.uicall.emit(lambda: self.on_resetlog("[3/3] 跳过自动重启（可稍后在主界面手动启动）"))
-                self.bridge.uicall.emit(lambda: self.on_resetlog("✅ 恢复出厂完成，系统已重置为初始状态。"))
-            except Exception as e:
-                self.bridge.uicall.emit(lambda e=e: self.on_resetlog(f"❌ 恢复出厂失败: {e}"))
-            finally:
-                self._stop_requested = False
-                self._reset_running = False
-                self.bridge.uicall.emit(lambda: self.reset_exec_btn.setEnabled(True))
-
-        threading.Thread(target=worker, daemon=True).start()
 
     # ── 窗口控制（最大化走 Qt 原生，彻底规避合成器 bug）──
     def _on_minimize(self):
