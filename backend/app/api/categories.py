@@ -14,26 +14,30 @@ CODE_WIDTH = 3  # 每一级编码占三位，如一级 002、二级 002001
 
 
 async def _next_root_code(db: AsyncSession) -> str:
-    """生成下一个一级类别编码（三位补零）"""
+    """生成下一个一级类别编码（三位补零）。
+    注意：编码可能超过 3 位（如 999 -> 1000），必须按完整数字比较，
+    不能只取前三位（"1000"[:3]="100" 会导致 max 计算错误、生成重复编码）。
+    """
     result = await db.execute(select(Category.category_code).where(Category.level == 1))
     codes = [str(c) for c in result.scalars().all() if c]
     max_seq = 0
     for code in codes:
         try:
-            max_seq = max(max_seq, int(code[:CODE_WIDTH]))
+            max_seq = max(max_seq, int(code))
         except ValueError:
             continue
     return str(max_seq + 1).zfill(CODE_WIDTH)
 
 
 async def _next_child_code(db: AsyncSession, parent: Category) -> str:
-    """生成下一个二级类别编码：父编码 + 三位序号，如 002001"""
+    """生成下一个二级类别编码：父编码 + 三位序号，如 002001（父编码超三位时按完整父编码截取）"""
     result = await db.execute(select(Category.category_code).where(Category.parent_id == parent.id))
     codes = [str(c) for c in result.scalars().all() if c]
+    prefix_len = len(str(parent.category_code))
     max_seq = 0
     for code in codes:
         try:
-            max_seq = max(max_seq, int(code[CODE_WIDTH:]))
+            max_seq = max(max_seq, int(code[prefix_len:]))
         except ValueError:
             continue
     return f"{parent.category_code}{str(max_seq + 1).zfill(CODE_WIDTH)}"

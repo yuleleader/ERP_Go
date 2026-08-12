@@ -199,6 +199,8 @@ async def create_order(
             sales_amount=order_data.sales_amount,
             freight=order_data.freight,
             shipping_status=order_data.shipping_status,
+            # 创建即「已发货」时生产状态同步锁定为生产完成（与发货动作锁定规则一致，避免数据不一致）
+            produce_status="produced" if order_data.shipping_status == "shipped" else "unproduce",
             receiver_address=order_data.receiver_address,
             remark=order_data.remark,
             refund_note=order_data.refund_note,
@@ -247,7 +249,10 @@ async def create_order(
             "creator_real_name": current_user.real_name or current_user.username,
             "created_at": new_order.created_at,
             "order_days": effective_order_days(new_order),
-            "refund_note": new_order.refund_note
+            "refund_note": new_order.refund_note,
+            "produce_status": new_order.produce_status,
+            "produce_status_update_at": new_order.produce_status_update_at,
+            "produce_status_update_user": new_order.produce_status_update_user
         }
         
         try:
