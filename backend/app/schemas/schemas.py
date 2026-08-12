@@ -17,7 +17,7 @@ class UserBase(BaseModel):
     commission_rate: Optional[int] = Field(None, ge=1, le=100)
     # 价格权限：逗号分隔，如 "cost_price,retail_price,min_price"；None/空=全部可见
     price_permissions: Optional[str] = None
-    # 数据权限：JSON 文本，如 {"category":["add"],"brand":["add","edit"],"product":["delete"]}；None/空=无权限；boss 恒全权
+    # 数据权限：JSON 文本，如 {"/orders":["query","export"],"/products":["query","add","edit","delete"]}；兼容旧键 category/brand/product；None/空=无权限；boss 恒全权
     data_permissions: Optional[str] = None
     is_active: bool = True
 

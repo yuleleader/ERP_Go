@@ -18,7 +18,7 @@
         <el-menu-item index="/dashboard">
           <span>工作台</span>
         </el-menu-item>
-        <el-menu-item index="/orders" v-if="userStore.role !== 'factory' && userStore.role !== 'shipping'">
+        <el-menu-item index="/orders" v-if="userStore.role !== 'factory' && userStore.role !== 'shipping' && canQuery(userStore.userInfo, '/orders')">
           <span>订单管理</span>
         </el-menu-item>
         <el-menu-item v-if="menuGroups['basic-info'].groups.some((g) => g.items.length)" index="group:basic-info">
@@ -150,6 +150,7 @@ import ScientificCalculator from '@/modules/Common/components/ScientificCalculat
 import CalcFloatWindow from '@/components/CalcFloatWindow.vue'
 import SubMenuDrawer from '@/components/SubMenuDrawer.vue'
 import { getUnreadCount } from '@/api/notification'
+import { canQuery } from '@/utils/dataPerm'
 import { Bell, ArrowRight, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -350,9 +351,12 @@ watch(
 
 // ========== 抽屉式二级菜单 ==========
 // 一级菜单点击后从右侧弹出抽屉展示二级菜单，点击二级菜单跳转到对应功能页面
+// 可见性 = 角色权限（show）∩ 数据权限（canQuery 查询门禁）；老板端 canQuery 恒 true
 const menuGroups = computed(() => {
   const isBoss = userStore.isBoss
   const isSales = userStore.isSales
+  const u = userStore.userInfo
+  const perm = (path) => canQuery(u, path)
   const pick = (arr) => arr.filter((item) => item.show !== false)
 
   return {
@@ -362,16 +366,16 @@ const menuGroups = computed(() => {
         {
           title: '商品资料',
           items: pick([
-            { label: '商品管理', path: '/products', desc: '商品资料与规格（所有人员可查看）', show: true },
-            { label: '类别管理', path: '/categories', desc: '两级类别与编码维护（操作按数据权限）', show: true },
-            { label: '品牌管理', path: '/brands', desc: '品牌编码与名称维护（操作按数据权限）', show: true }
+            { label: '商品管理', path: '/products', desc: '商品资料与规格（操作按数据权限）', show: perm('/products') },
+            { label: '类别管理', path: '/categories', desc: '两级类别与编码维护（操作按数据权限）', show: perm('/categories') },
+            { label: '品牌管理', path: '/brands', desc: '品牌编码与名称维护（操作按数据权限）', show: perm('/brands') }
           ])
         },
         {
           title: '店铺物流',
           items: pick([
-            { label: '网店信息', path: '/shops', desc: '管理店铺账号与归属', show: isBoss || isSales },
-            { label: '物流管理', path: '/logistics', desc: '维护物流商与运费信息', show: isBoss }
+            { label: '网店信息', path: '/shops', desc: '管理店铺账号与归属', show: (isBoss || isSales) && perm('/shops') },
+            { label: '物流管理', path: '/logistics', desc: '维护物流商与运费信息', show: isBoss && perm('/logistics') }
           ])
         }
       ].filter((g) => g.items.length)
@@ -382,29 +386,29 @@ const menuGroups = computed(() => {
         {
           title: '数据概览',
           items: pick([
-            { label: '数据总览', path: '/statistics', desc: '核心指标卡片与销售趋势图', show: true }
+            { label: '数据总览', path: '/statistics', desc: '核心指标卡片与销售趋势图', show: perm('/statistics') }
           ])
         },
         {
           title: '销售分析',
           items: pick([
-            { label: '销售统计', path: '/sales-statistics', desc: '人员/类别/品牌/商品销售汇总', show: isBoss },
-            { label: '毛利分析', path: '/gross-profit-analysis', desc: '按下单/发货时间核算毛利', show: isBoss },
-            { label: '网店销售统计', path: '/shop-sales-statistics', desc: '按网店汇总销售与退货', show: isBoss },
-            { label: '退款订单', path: '/refund-orders', desc: '已退货/退款订单明细', show: isBoss },
-            { label: '退款率分析', path: '/refund-rate-analysis', desc: '按网店统计退款率报表', show: isBoss }
+            { label: '销售统计', path: '/sales-statistics', desc: '人员/类别/品牌/商品销售汇总', show: isBoss && perm('/sales-statistics') },
+            { label: '毛利分析', path: '/gross-profit-analysis', desc: '按下单/发货时间核算毛利', show: isBoss && perm('/gross-profit-analysis') },
+            { label: '网店销售统计', path: '/shop-sales-statistics', desc: '按网店汇总销售与退货', show: isBoss && perm('/shop-sales-statistics') },
+            { label: '退款订单', path: '/refund-orders', desc: '已退货/退款订单明细', show: isBoss && perm('/refund-orders') },
+            { label: '退款率分析', path: '/refund-rate-analysis', desc: '按网店统计退款率报表', show: isBoss && perm('/refund-rate-analysis') }
           ])
         },
         {
           title: '预警管理',
           items: pick([
-            { label: '预警中心', path: '/warnings', desc: '超期未生产/未发货订单自动提醒', show: isBoss || isSales }
+            { label: '预警中心', path: '/warnings', desc: '超期未生产/未发货订单自动提醒', show: (isBoss || isSales) && perm('/warnings') }
           ])
         },
         {
           title: '提成核算',
           items: pick([
-            { label: '销售提成统计', path: '/commission-statistics', desc: '按发货时间核算销售提成', show: true }
+            { label: '销售提成统计', path: '/commission-statistics', desc: '按发货时间核算销售提成', show: perm('/commission-statistics') }
           ])
         }
       ].filter((g) => g.items.length)
@@ -415,22 +419,22 @@ const menuGroups = computed(() => {
         {
           title: '财务结算',
           items: pick([
-            { label: '工资结算', path: '/salary-settlement', desc: '销售提成核算与发放', show: isBoss },
-            { label: '账户提现', path: '/account-withdrawal', desc: '提现申请与审批记录', show: isBoss || isSales }
+            { label: '工资结算', path: '/salary-settlement', desc: '销售提成核算与发放', show: isBoss && perm('/salary-settlement') },
+            { label: '账户提现', path: '/account-withdrawal', desc: '提现申请与审批记录', show: (isBoss || isSales) && perm('/account-withdrawal') }
           ])
         },
         {
           title: '费用统计',
           items: pick([
-            { label: '运费统计', path: '/freight-statistics', desc: '按订单时间段统计运费', show: isBoss }
+            { label: '运费统计', path: '/freight-statistics', desc: '按订单时间段统计运费', show: isBoss && perm('/freight-statistics') }
           ])
         },
         {
           title: '非交易收支',
           items: pick([
-            { label: '账务代码', path: '/accounting-codes', desc: '非交易收入/支出类型字典维护', show: isBoss },
-            { label: '收支录入', path: '/non-trade-transactions', desc: '录入非交易收入/支出（每人维护自己的数据）', show: isBoss || isSales },
-            { label: '收支统计', path: '/non-trade-summary', desc: '按账务代码/人员汇总非交易收支', show: isBoss }
+            { label: '账务代码', path: '/accounting-codes', desc: '非交易收入/支出类型字典维护', show: isBoss && perm('/accounting-codes') },
+            { label: '收支录入', path: '/non-trade-transactions', desc: '录入非交易收入/支出（每人维护自己的数据）', show: (isBoss || isSales) && perm('/non-trade-transactions') },
+            { label: '收支统计', path: '/non-trade-summary', desc: '按账务代码/人员汇总非交易收支', show: isBoss && perm('/non-trade-summary') }
           ])
         }
       ].filter((g) => g.items.length)
@@ -441,29 +445,29 @@ const menuGroups = computed(() => {
         {
           title: '账号权限',
           items: pick([
-            { label: '用户管理', path: '/users', desc: '账号、角色与权限维护', show: isBoss }
+            { label: '用户管理', path: '/users', desc: '账号、角色与权限维护', show: isBoss && perm('/users') }
           ])
         },
         {
           title: '消息通讯',
           items: pick([
-            { label: '站内信管理', path: '/notifications', desc: '消息收发与已读状态', show: true },
-            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss },
-            { label: '系统备份', path: '/system-backup', desc: '查看备份日志并配置自动备份（联动桌面启动器）', show: isBoss }
+            { label: '站内信管理', path: '/notifications', desc: '消息收发与已读状态', show: perm('/notifications') },
+            { label: '日志管理', path: '/logs', desc: '操作日志与登录日志查询', show: isBoss && perm('/logs') },
+            { label: '系统备份', path: '/system-backup', desc: '查看备份日志并配置自动备份（联动桌面启动器）', show: isBoss && perm('/system-backup') }
           ])
         },
         {
           title: '系统运维',
           items: pick([
-            { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss },
-            { label: '日志清理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss },
-            { label: '数据导入', path: '/order-imports', desc: 'Excel 批量导入订单（临时表审核后合并）', show: isBoss || isSales }
+            { label: '系统参数', path: '/settings', desc: '提成比例、临时图片保留等配置', show: isBoss && perm('/settings') },
+            { label: '日志清理', path: '/data-cleanup', desc: '日志与站内信清理配置及记录', show: isBoss && perm('/data-cleanup') },
+            { label: '数据导入', path: '/order-imports', desc: 'Excel 批量导入订单（临时表审核后合并）', show: (isBoss || isSales) && perm('/order-imports') }
           ])
         },
         {
           title: '关于本系统',
           items: pick([
-            { label: '系统信息', path: '/system-info', desc: '版本、运行环境与数据概况', show: isBoss }
+            { label: '系统信息', path: '/system-info', desc: '版本、运行环境与数据概况', show: isBoss && perm('/system-info') }
           ])
         }
       ].filter((g) => g.items.length)

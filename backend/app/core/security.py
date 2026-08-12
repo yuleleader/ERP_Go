@@ -87,18 +87,36 @@ def require_role(*roles):
     return role_checker
 
 
-DATA_PERMISSION_MODULES = ("category", "brand", "product")
-DATA_PERMISSION_ACTIONS = ("add", "edit", "delete")
+# 全模块数据权限（2026-08-12 扩展）：键为前端路由路径。
+# 兼容旧键 category/brand/product（见 LEGACY_DATA_PERM_KEYS，自动映射为路径键）。
+DATA_PERMISSION_MODULES = (
+    "/orders", "/products", "/categories", "/brands", "/shops", "/logistics",
+    "/statistics", "/sales-statistics", "/gross-profit-analysis", "/shop-sales-statistics",
+    "/refund-orders", "/refund-rate-analysis", "/warnings", "/commission-statistics",
+    "/salary-settlement", "/account-withdrawal", "/freight-statistics",
+    "/accounting-codes", "/non-trade-transactions", "/non-trade-summary",
+    "/users", "/notifications", "/logs", "/system-backup", "/settings",
+    "/data-cleanup", "/order-imports", "/system-info",
+)
+DATA_PERMISSION_ACTIONS = ("query", "add", "edit", "delete", "export")
+# 旧版数据权限键 → 路径键（既有 {"category":["add"],...} 数据兼容）
+LEGACY_DATA_PERM_KEYS = {
+    "category": "/categories",
+    "brand": "/brands",
+    "product": "/products",
+}
 
 
 def has_data_permission(current_user: User, module: str, action: str) -> bool:
     """账号级数据权限校验（同步，读 current_user.data_permissions JSON）。
     - 老板端恒有全部权限
-    - data_permissions 如 {"category":["add"],"brand":["add","edit"],"product":["delete"]}
+    - data_permissions 如 {"/orders":["query","export"],"/products":["query","add","edit","delete"]}
+    - 兼容旧格式 {"category":["add"],...}：旧键映射为路径键，且旧数据只要有任一操作，查询权限视为通过
     - 未授权（空/缺失/不含该操作）一律 False
     """
     if current_user.role == "boss":
         return True
+    module = LEGACY_DATA_PERM_KEYS.get(module, module)
     if module not in DATA_PERMISSION_MODULES or action not in DATA_PERMISSION_ACTIONS:
         return False
     raw = getattr(current_user, "data_permissions", None)
@@ -108,8 +126,17 @@ def has_data_permission(current_user: User, module: str, action: str) -> bool:
         perms = json.loads(raw) if isinstance(raw, str) else (raw or {})
     except Exception:
         return False
-    actions = perms.get(module) or []
-    return action in actions
+    if not isinstance(perms, dict):
+        return False
+    # 兼容旧格式存储：路径键查不到时回退到旧键（category/brand/product）
+    legacy_key = next((k for k, v in LEGACY_DATA_PERM_KEYS.items() if v == module), None)
+    actions = perms.get(module)
+    if actions is None and legacy_key is not None:
+        actions = perms.get(legacy_key)
+    if action == "query" and legacy_key is not None and perms.get(legacy_key):
+        # 旧数据只要有任一操作，等价于可见该页（与前端 normalizePerms 一致）
+        return True
+    return action in (actions or [])
 
 
 def ensure_data_permission(current_user: User, module: str, action: str):

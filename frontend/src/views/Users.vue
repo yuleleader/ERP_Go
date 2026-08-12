@@ -133,19 +133,75 @@
           </div>
         </el-tab-pane>
 
-        <!-- 模块三：数据权限（与价格权限平级；红色字体提示注意） -->
+        <!-- 模块三：数据权限（全模块树形；与价格权限平级） -->
         <el-tab-pane label="数据权限" name="dataPermission">
           <div class="data-perm-block">
-            <div class="data-perm-module" v-for="m in dataPermModules" :key="m.key">
-              <div class="data-perm-module-name">{{ m.label }}</div>
-              <el-checkbox-group v-model="dataPermForm[m.key]">
-                <el-checkbox value="add">新增</el-checkbox>
-                <el-checkbox value="edit">修改</el-checkbox>
-                <el-checkbox value="delete">删除</el-checkbox>
-              </el-checkbox-group>
-              <div class="data-perm-module-hint">{{ m.hint }}</div>
+            <div class="perm-toolbar">
+              <el-button size="small" @click="setAllExpanded(true)">一键展开</el-button>
+              <el-button size="small" @click="setAllExpanded(false)">一键收缩</el-button>
+              <el-button size="small" type="primary" plain @click="setAllChecked(true)">全选（全页面）</el-button>
+              <el-button size="small" @click="setAllChecked(false)">清空</el-button>
             </div>
-            <div class="data-perm-tip">未勾选的操作，该账号在此模块看不到对应按钮、接口也会拒绝；老板端不受此限制；新建用户默认不勾选（即默认无任何数据权限）。</div>
+            <div class="data-perm-tip">勾选「查询」该页面才会显示菜单；未勾选查询时，该页面的新增 / 修改 / 删除 / 导出自动失效。老板端不受限制，始终可见全部。</div>
+            <div class="perm-tree">
+              <div class="perm-module" v-for="mod in PERM_TREE" :key="mod.key">
+                <div class="perm-module-head">
+                  <el-icon class="perm-arrow" :class="{ open: expanded[mod.key] }" @click="toggleModule(mod.key)"><ArrowRight /></el-icon>
+                  <span class="perm-module-title" @click="toggleModule(mod.key)">{{ mod.title }}</span>
+                  <el-checkbox
+                    class="perm-select-all"
+                    :model-value="moduleState(mod).checked"
+                    :indeterminate="moduleState(mod).indeterminate"
+                    @change="(v) => setModuleAll(mod, v)"
+                  >全选</el-checkbox>
+                </div>
+                <div v-show="expanded[mod.key]" class="perm-module-body">
+                  <template v-if="mod.pages">
+                    <div class="perm-page" v-for="p in mod.pages" :key="p.path">
+                      <div class="perm-page-name">{{ p.label }}</div>
+                      <el-checkbox-group
+                        :model-value="permForm[p.path]"
+                        @change="(v) => onPageChange(p, v)"
+                      >
+                        <el-checkbox
+                          v-for="a in p.actions"
+                          :key="a"
+                          :value="a"
+                          :disabled="a !== 'query' && !hasQuery(p)"
+                        >{{ ACTION_LABELS[a] }}</el-checkbox>
+                      </el-checkbox-group>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="perm-group" v-for="g in mod.groups" :key="g.title">
+                      <div class="perm-group-head">
+                        <span>{{ g.title }}</span>
+                        <el-checkbox
+                          class="perm-select-all"
+                          :model-value="groupState(g).checked"
+                          :indeterminate="groupState(g).indeterminate"
+                          @change="(v) => setGroupAll(g, v)"
+                        >全选</el-checkbox>
+                      </div>
+                      <div class="perm-page" v-for="p in g.pages" :key="p.path">
+                        <div class="perm-page-name">{{ p.label }}</div>
+                        <el-checkbox-group
+                          :model-value="permForm[p.path]"
+                          @change="(v) => onPageChange(p, v)"
+                        >
+                          <el-checkbox
+                            v-for="a in p.actions"
+                            :key="a"
+                            :value="a"
+                            :disabled="a !== 'query' && !hasQuery(p)"
+                          >{{ ACTION_LABELS[a] }}</el-checkbox>
+                        </el-checkbox-group>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -164,7 +220,9 @@ import { ref, reactive, computed } from 'vue'
 import { useUsersStore } from '@/store/users'
 import { resetPassword } from '@/api/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight } from '@element-plus/icons-vue'
 import { formatDateTime } from '@/utils/format'
+import { PERM_TREE, ACTION_LABELS, modulePages, allPages, normalizePerms } from '@/utils/permTree'
 
 const usersStore = useUsersStore()
 const users = computed(() => usersStore.users)
@@ -222,36 +280,65 @@ const userForm = reactive({
   is_active: true
 })
 
-// ===== 数据权限（类别/品牌/商品档案 × 增删改） =====
-const dataPermModules = [
-  { key: 'category', label: '类别', hint: '类别管理页面的新增 / 修改 / 删除' },
-  { key: 'brand', label: '品牌', hint: '品牌管理页面的新增 / 修改 / 删除' },
-  { key: 'product', label: '商品档案', hint: '商品管理页面的新建 / 编辑 / 删除' }
-]
-// 数据权限表单：{ category: [], brand: [], product: [] }
-// 新建账号时默认全空（用户要求"默认不勾选"，任何勾选都必须由创建者显式打开）
-const dataPermForm = reactive({ category: [], brand: [], product: [] })
+// ===== 数据权限（全模块树形：一级模块 → 分组 → 页面 × 按性质定制操作） =====
+// 权限表单：{ path: [操作码...] }；新建账号默认全空（任何勾选都必须由创建者显式打开）
+const permForm = reactive({})
+allPages().forEach((p) => { permForm[p.path] = [] })
 
-// JSON 字符串 → 对象（编辑回显）
-function parseDataPermissions(raw) {
-  const out = { category: [], brand: [], product: [] }
-  if (!raw) return out
-  try {
-    const o = typeof raw === 'string' ? JSON.parse(raw) : (raw || {})
-    dataPermModules.forEach(m => {
-      out[m.key] = Array.isArray(o[m.key]) ? o[m.key] : []
-    })
-  } catch (e) {
-    /* 解析失败按无权限 */
-  }
-  return out
+// 一级模块展开状态：默认全部展开
+const expanded = reactive({})
+PERM_TREE.forEach((mod) => { expanded[mod.key] = true })
+
+function toggleModule(key) { expanded[key] = !expanded[key] }
+function setAllExpanded(v) { PERM_TREE.forEach((m) => { expanded[m.key] = v }) }
+
+// 页面是否已勾「查询」
+function hasQuery(page) { return (permForm[page.path] || []).includes('query') }
+
+// 页面勾选变更：未勾「查询」时其余操作全部清空（增删改导出同步失效）
+function onPageChange(page, val) {
+  const arr = val || []
+  permForm[page.path] = arr.includes('query') ? arr : []
 }
 
-// 把数据权限三个数组归零（新建账号时使用）
+function pageCheckedCount(page) {
+  return (permForm[page.path] || []).filter((a) => page.actions.includes(a)).length
+}
+
+function groupState(group) {
+  let total = 0, checked = 0
+  group.pages.forEach((p) => { total += p.actions.length; checked += pageCheckedCount(p) })
+  return { checked: total > 0 && checked === total, indeterminate: checked > 0 && checked < total }
+}
+
+function moduleState(mod) {
+  const pages = modulePages(mod)
+  let total = 0, checked = 0
+  pages.forEach((p) => { total += p.actions.length; checked += pageCheckedCount(p) })
+  return { checked: total > 0 && checked === total, indeterminate: checked > 0 && checked < total }
+}
+
+function setGroupAll(group, v) {
+  group.pages.forEach((p) => { permForm[p.path] = v ? [...p.actions] : [] })
+}
+
+function setModuleAll(mod, v) {
+  modulePages(mod).forEach((p) => { permForm[p.path] = v ? [...p.actions] : [] })
+}
+
+function setAllChecked(v) {
+  allPages().forEach((p) => { permForm[p.path] = v ? [...p.actions] : [] })
+}
+
+// JSON 字符串/对象 → 权限表单（编辑回显，兼容旧格式）
+function parseDataPermissions(raw) {
+  const o = normalizePerms(raw)
+  allPages().forEach((p) => { permForm[p.path] = Array.isArray(o[p.path]) ? o[p.path] : [] })
+}
+
+// 全部权限归零（新建账号时使用）
 function resetDataPermissions() {
-  dataPermForm.category = []
-  dataPermForm.brand = []
-  dataPermForm.product = []
+  allPages().forEach((p) => { permForm[p.path] = [] })
 }
 
 const userRules = {
@@ -301,11 +388,8 @@ function editUser(row) {
   userForm.price_permissions = row.price_permissions
     ? row.price_permissions.split(',').filter(Boolean)
     : []
-  // 数据权限回显：JSON → 对象
-  const dp = parseDataPermissions(row.data_permissions)
-  dataPermForm.category = dp.category
-  dataPermForm.brand = dp.brand
-  dataPermForm.product = dp.product
+  // 数据权限回显：JSON → 权限表单（全模块树形）
+  parseDataPermissions(row.data_permissions)
   userForm.is_active = row.is_active
   userForm.password = ''
   dialogVisible.value = true
@@ -325,12 +409,12 @@ async function submitUser() {
         commission_rate: userForm.role === 'sales' ? userForm.commission_rate : null,
         // 价格权限：数组 → 逗号分隔字符串；全选时传空串（=全部可见）也可以，但显式传更清晰
         price_permissions: userForm.price_permissions.join(','),
-        // 数据权限：对象 → JSON 字符串（仅非空操作才写入；全空传空对象）
-        data_permissions: JSON.stringify({
-          category: dataPermForm.category,
-          brand: dataPermForm.brand,
-          product: dataPermForm.product
-        }),
+        // 数据权限：权限表单（{path:[操作码]}）→ JSON 字符串（仅非空操作才写入；全空传空对象）
+        data_permissions: JSON.stringify(
+          Object.fromEntries(
+            Object.entries(permForm).filter(([, v]) => Array.isArray(v) && v.length)
+          )
+        ),
         is_active: userForm.is_active
       }
 
@@ -372,9 +456,7 @@ function resetForm() {
   userForm.role = 'sales'
   userForm.commission_rate = 10
   userForm.price_permissions = []
-  dataPermForm.category = []
-  dataPermForm.brand = []
-  dataPermForm.product = []
+  resetDataPermissions()
   userForm.is_active = true
 }
 
@@ -500,38 +582,112 @@ usersStore.fetchUsers()
   margin-top: 10px;
 }
 
-/* 数据权限（独立 tab，与价格权限平级） */
+/* 数据权限（全模块树形，独立 tab，与价格权限平级） */
 .data-perm-block {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
-.data-perm-module {
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  padding: 14px 16px;
-  background: #fafbfc;
-}
-
-.data-perm-module-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.data-perm-module-hint {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 8px;
+.perm-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .data-perm-tip {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
-  margin-top: 4px;
+}
+
+/* 树形主体：超出部分滚动（弹窗尺寸保持不变） */
+.perm-tree {
+  max-height: 330px;
+  overflow-y: auto;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fff;
+  padding: 4px 0;
+}
+
+.perm-module {
+  border-bottom: 1px solid #f0f2f5;
+}
+.perm-module:last-child {
+  border-bottom: none;
+}
+
+.perm-module-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #f7f9fc;
+  cursor: pointer;
+  user-select: none;
+}
+
+.perm-arrow {
+  font-size: 13px;
+  color: #909399;
+  transition: transform 0.2s;
+}
+.perm-arrow.open {
+  transform: rotate(90deg);
+}
+
+.perm-module-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  flex: 1;
+}
+
+.perm-select-all {
+  margin-right: 0;
+}
+
+.perm-module-body {
+  padding: 6px 12px 10px 26px;
+}
+
+.perm-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+}
+
+.perm-page {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 4px;
+  border-top: 1px dashed #f0f2f5;
+}
+
+.perm-page-name {
+  font-size: 13px;
+  color: #303133;
+  white-space: nowrap;
+}
+
+.perm-page .el-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.perm-page .el-checkbox {
+  margin-right: 16px;
+}
+.perm-page .el-checkbox:last-child {
+  margin-right: 0;
 }
 
 /* 第三个 tab"数据权限"红色字体（与价格权限平级，提醒注意） */
