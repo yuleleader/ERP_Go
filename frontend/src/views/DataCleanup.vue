@@ -17,7 +17,7 @@
                 <el-form label-width="110px">
                   <el-form-item label="日志保留天数">
                     <el-input-number v-model="cleanupConfig.retentionDays" :min="30" :max="3650" />
-                    <el-button type="primary" @click="updateConfig" style="margin-left: 10px">更新配置</el-button>
+                    <el-button v-if="canEdit" type="primary" @click="updateConfig" style="margin-left: 10px">更新配置</el-button>
                   </el-form-item>
                   <el-form-item label="截止日期">
                     <span>{{ formatDateTime(cleanupConfig.cutoffDate) }}</span>
@@ -46,7 +46,7 @@
                   </el-form-item>
                   <el-form-item>
                     <el-button type="info" @click="previewCleanup">预览清理</el-button>
-                    <el-button type="warning" @click="confirmCleanup">执行清理</el-button>
+                    <el-button v-if="canEdit" type="warning" @click="confirmCleanup">执行清理</el-button>
                   </el-form-item>
                 </el-form>
 
@@ -71,7 +71,7 @@
                 <el-form label-width="110px">
                   <el-form-item label="保留天数">
                     <el-input-number v-model="notifConfig.retentionDays" :min="360" :max="3650" />
-                    <el-button type="primary" @click="updateNotificationConfig" style="margin-left: 10px">更新配置</el-button>
+                    <el-button v-if="canEdit" type="primary" @click="updateNotificationConfig" style="margin-left: 10px">更新配置</el-button>
                   </el-form-item>
                   <el-form-item label="截止日期">
                     <span>{{ formatDateTime(notifConfig.cutoffDate) }}</span>
@@ -92,7 +92,7 @@
                 <el-form label-width="100px">
                   <el-form-item>
                     <el-button type="info" @click="previewNotificationCleanup">预览清理</el-button>
-                    <el-button type="warning" @click="confirmNotificationCleanup">执行清理</el-button>
+                    <el-button v-if="canEdit" type="warning" @click="confirmNotificationCleanup">执行清理</el-button>
                   </el-form-item>
                 </el-form>
 
@@ -159,7 +159,9 @@
 <script setup>
 defineOptions({ name: 'DataCleanup' })
 import { formatDateTime } from '@/utils/format'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getCleanupConfig,
@@ -177,6 +179,9 @@ const recordsLoading = ref(false)
 const cleanupRecords = ref([])
 const cleanupType = ref('all')
 const activeCleanupTab = ref('log')
+
+const userStore = useUserStore()
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/data-cleanup', 'edit'))
 
 const cleanupConfig = reactive({
   retentionDays: 730,

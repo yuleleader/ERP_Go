@@ -27,7 +27,7 @@
         <template #header>
           <div class="card-header">
             <span>用户管理</span>
-            <el-button type="primary" @click="showCreateDialog">新建用户</el-button>
+            <el-button v-if="canAdd" type="primary" @click="showCreateDialog">新建用户</el-button>
           </div>
         </template>
 
@@ -74,9 +74,9 @@
           </el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="editUser(row)">编辑</el-button>
-              <el-button link type="warning" size="small" @click="resetUserPassword(row)">重置密码</el-button>
-              <el-button link type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
+              <el-button v-if="canEdit" link type="primary" size="small" @click="editUser(row)">编辑</el-button>
+              <el-button v-if="canEdit" link type="warning" size="small" @click="resetUserPassword(row)">重置密码</el-button>
+              <el-button v-if="canDelete" link type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -218,6 +218,8 @@
 defineOptions({ name: 'Users' })
 import { ref, reactive, computed } from 'vue'
 import { useUsersStore } from '@/store/users'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { resetPassword } from '@/api/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
@@ -225,6 +227,10 @@ import { formatDateTime } from '@/utils/format'
 import { PERM_TREE, ACTION_LABELS, modulePages, allPages, normalizePerms } from '@/utils/permTree'
 
 const usersStore = useUsersStore()
+const userStore = useUserStore()
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/users', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/users', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/users', 'delete'))
 const users = computed(() => usersStore.users)
 const loading = computed(() => usersStore.loading)
 

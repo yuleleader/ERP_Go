@@ -23,7 +23,7 @@
         </el-form-item>
 
         <el-form-item>
-          <el-button type="primary" @click="saveSettings" :loading="saving">保存设置</el-button>
+          <el-button v-if="canEdit" type="primary" @click="saveSettings" :loading="saving">保存设置</el-button>
           <el-button @click="resetSettings">重置</el-button>
         </el-form-item>
       </el-form>
@@ -33,9 +33,14 @@
 
 <script setup>
 defineOptions({ name: 'Settings' })
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage } from 'element-plus'
 import { getSettings, updateSettings } from '@/api/setting'
+
+const userStore = useUserStore()
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/settings', 'edit'))
 
 const loading = ref(false)
 const saving = ref(false)

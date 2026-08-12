@@ -6,7 +6,7 @@
           <span>非交易收入/支出录入</span>
           <div class="header-right">
             <span class="sub-tip">每人维护自己的数据</span>
-            <el-button type="primary" @click="openCreate">
+            <el-button v-if="canAdd" type="primary" @click="openCreate">
               <el-icon style="margin-right: 4px"><Plus /></el-icon>新增录入
             </el-button>
           </div>
@@ -97,8 +97,8 @@
         </el-table-column>
         <el-table-column label="操作" width="140" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canEdit" link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="canDelete" link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -150,6 +150,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import {
   getAccountingCodes,
   getMyShops,
@@ -162,6 +163,9 @@ import { getUsers } from '@/api/user'
 
 const userStore = useUserStore()
 const isBoss = computed(() => userStore.isBoss)
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/non-trade-transactions', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/non-trade-transactions', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/non-trade-transactions', 'delete'))
 
 const loading = ref(false)
 const items = ref([])

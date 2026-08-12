@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>账务代码管理（非交易收入/支出类型）</span>
-          <el-button type="primary" @click="openCreate">
+          <el-button v-if="canAdd" type="primary" @click="openCreate">
             <el-icon style="margin-right: 4px"><Plus /></el-icon>新增账务代码
           </el-button>
         </div>
@@ -38,8 +38,8 @@
         </el-table-column>
         <el-table-column label="操作" width="140" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canEdit" link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="canDelete" link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -75,9 +75,16 @@
 <script setup>
 defineOptions({ name: 'AccountingCodes' })
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getAccountingCodes, createAccountingCode, updateAccountingCode, deleteAccountingCode } from '@/api/nonTrade'
+
+const userStore = useUserStore()
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/accounting-codes', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/accounting-codes', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/accounting-codes', 'delete'))
 
 const loading = ref(false)
 const items = ref([])

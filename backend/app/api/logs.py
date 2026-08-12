@@ -5,7 +5,7 @@ from sqlalchemy import select, desc, func
 from typing import List, Optional
 from datetime import datetime
 from ..core.database import get_db
-from ..core.security import get_current_active_user, require_role
+from ..core.security import get_current_active_user, require_role, ensure_data_permission
 from ..models.models import (
     OperationLog,
     LoginLog,
@@ -185,6 +185,7 @@ async def update_cleanup_config(
     current_user = Depends(require_role("boss"))
 ):
     """更新日志清理配置"""
+    ensure_data_permission(current_user, '/data-cleanup', 'edit')
     try:
         username = getattr(current_user, "username", "unknown")
         await LogCleanupService.set_retention_days(db, retention_days, username)
@@ -242,6 +243,7 @@ async def execute_cleanup(
     :param cleanup_type: 清理类型
     :param confirm: 必须确认才会执行
     """
+    ensure_data_permission(current_user, '/data-cleanup', 'edit')
     if not confirm:
         raise HTTPException(
             status_code=400,
@@ -332,6 +334,7 @@ async def update_notification_cleanup_config(
     current_user = Depends(require_role("boss"))
 ):
     """更新站内信清理配置"""
+    ensure_data_permission(current_user, '/data-cleanup', 'edit')
     try:
         username = getattr(current_user, "username", "unknown")
         await LogCleanupService.set_notification_retention_days(db, retention_days, username)
@@ -387,6 +390,7 @@ async def execute_notification_cleanup(
     """
     手动触发站内信清理
     """
+    ensure_data_permission(current_user, '/data-cleanup', 'edit')
     if not confirm:
         raise HTTPException(
             status_code=400,

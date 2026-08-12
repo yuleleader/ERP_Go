@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, cast, Float
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Order, User
 from ..schemas.schemas import UserResponse
 
@@ -173,6 +173,7 @@ async def pay_commission(
 ):
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="只有老板端可以发放提成")
+    ensure_data_permission(current_user, '/salary-settlement', 'edit')
 
     # 并发保护：同一进程内串行发放，避免两次并发请求读到同一批未发订单、重复计入提成
     async with _pay_lock:

@@ -15,7 +15,7 @@ from sqlalchemy import select, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import AccountingCode, NonTradeTransaction, Shop, User, OperationLog
 
 router = APIRouter(tags=["非交易收支"])
@@ -142,6 +142,7 @@ async def create_accounting_code(
 ):
     """新增账务代码（老板端）。代码自动生成。"""
     _check_boss(current_user)
+    ensure_data_permission(current_user, '/accounting-codes', 'add')
     if payload.code_type not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="code_type 只能是 income 或 expense")
     code = await _gen_code(db, payload.code_type)
@@ -173,6 +174,7 @@ async def update_accounting_code(
 ):
     """编辑账务代码（老板端）。"""
     _check_boss(current_user)
+    ensure_data_permission(current_user, '/accounting-codes', 'edit')
     row = (await db.execute(select(AccountingCode).where(AccountingCode.id == code_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="账务代码不存在")
@@ -199,6 +201,7 @@ async def delete_accounting_code(
 ):
     """删除账务代码（老板端）。已被收支流水引用时禁止删除。"""
     _check_boss(current_user)
+    ensure_data_permission(current_user, '/accounting-codes', 'delete')
     row = (await db.execute(select(AccountingCode).where(AccountingCode.id == code_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="账务代码不存在")
@@ -311,6 +314,7 @@ async def create_non_trade_transaction(
 ):
     """录入非交易收入/支出（本人数据）。"""
     _check_perm(current_user)
+    ensure_data_permission(current_user, '/non-trade-transactions', 'add')
     code = (await db.execute(select(AccountingCode).where(AccountingCode.id == payload.code_id))).scalar_one_or_none()
     if not code:
         raise HTTPException(status_code=400, detail="账务代码不存在")
@@ -349,6 +353,7 @@ async def update_non_trade_transaction(
 ):
     """编辑收支流水（本人或老板）。"""
     _check_perm(current_user)
+    ensure_data_permission(current_user, '/non-trade-transactions', 'edit')
     row = (await db.execute(select(NonTradeTransaction).where(NonTradeTransaction.id == tx_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="收支记录不存在")
@@ -387,6 +392,7 @@ async def delete_non_trade_transaction(
 ):
     """删除收支流水（本人或老板）。"""
     _check_perm(current_user)
+    ensure_data_permission(current_user, '/non-trade-transactions', 'delete')
     row = (await db.execute(select(NonTradeTransaction).where(NonTradeTransaction.id == tx_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="收支记录不存在")

@@ -64,6 +64,7 @@
         <div class="card-header">
           <span>提成结算列表</span>
           <el-button
+            v-if="canPay"
             type="success"
             @click="handlePayAll"
             :disabled="!summaryData || summaryData.total_amount <= 0"
@@ -102,6 +103,7 @@
           <template #default="{ row }">
             <el-button size="small" @click="viewOrderDetail(row)">查看明细</el-button>
             <el-button
+              v-if="canPay"
               size="small"
               type="success"
               @click="handlePaySingle(row)"
@@ -156,10 +158,15 @@
 
 <script setup>
 defineOptions({ name: 'SalarySettlement' })
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { commissionSettlementApi } from '@/api'
 import { formatDate } from '@/utils/format'
+
+const userStore = useUserStore()
+const canPay = computed(() => checkDataPerm(userStore.userInfo, '/salary-settlement', 'edit'))
 
 const searchForm = reactive({
   dateRange: []

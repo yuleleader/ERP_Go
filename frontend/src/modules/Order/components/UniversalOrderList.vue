@@ -8,7 +8,7 @@
             <el-button type="primary" @click="showCreateDialog" v-if="canCreateOrder">
               新建订单
             </el-button>
-            <el-button @click="exportOrders" :loading="exporting">
+            <el-button @click="exportOrders" :loading="exporting" v-if="canExportOrders">
               导出Excel
             </el-button>
           </div>
@@ -768,6 +768,7 @@ import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { getOrders, createOrder, updateOrder, deleteOrder, getOrder, markOrderPrinted } from '@/api/order'
 import { getUsers } from '@/api/user'
 import { getShops } from '@/api/shop'
@@ -863,6 +864,11 @@ const isFullFieldRole = computed(() => {
 const canCreateOrder = computed(() => {
   return ['boss', 'sales'].includes(userStore.role)
 })
+
+/**
+ * 订单导出：老板恒可导出；其余角色需拥有 /orders 的 export 数据权限
+ */
+const canExportOrders = computed(() => checkDataPerm(userStore.userInfo, '/orders', 'export'))
 
 /**
  * 判断是否为销售角色

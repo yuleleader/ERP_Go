@@ -58,7 +58,7 @@
               <span class="info-value">{{ selectedShop.shop_id }}</span>
             </div>
             <div class="top-actions">
-              <el-button type="primary" @click="openAddDialog">
+              <el-button v-if="canAdd" type="primary" @click="openAddDialog">
                 <el-icon><Plus /></el-icon>新增提现记录
               </el-button>
               <el-button type="success" @click="handleExport">
@@ -111,8 +111,8 @@
               <el-table-column label="操作" width="200" fixed="right">
                 <template #default="{ row }">
                   <el-button size="small" @click="viewRecord(row)">详情</el-button>
-                  <el-button size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
-                  <el-button v-if="userStore.role === 'boss'" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+                  <el-button v-if="canEdit" size="small" type="primary" @click="openEditDialog(row)">编辑</el-button>
+                  <el-button v-if="userStore.role === 'boss' && canDelete" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -177,14 +177,18 @@
 
 <script setup>
 defineOptions({ name: 'AccountWithdrawal' })
-import { formatDate, formatDateTime } from '@/utils/format'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Download } from '@element-plus/icons-vue'
 import { withdrawApi } from '@/api'
+import { formatDate, formatDateTime } from '@/utils/format'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 
 const userStore = useUserStore()
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/account-withdrawal', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/account-withdrawal', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/account-withdrawal', 'delete'))
 
 const shopKeyword = ref('')
 const shopGroups = ref([])

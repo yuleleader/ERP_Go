@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
 from ..core.database import get_db
-from ..core.security import verify_password, get_password_hash, create_access_token, get_current_active_user
+from ..core.security import verify_password, get_password_hash, create_access_token, get_current_active_user, ensure_data_permission
 from ..models.models import User, LoginLog, OperationLog
 from ..schemas.schemas import Token, UserCreate, UserResponse, UserUpdate
 from pydantic import BaseModel, Field
@@ -103,6 +103,7 @@ async def register(
 ):
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="只有老板端可以创建账号")
+    ensure_data_permission(current_user, '/users', 'add')
 
     result = await db.execute(select(User).where(User.username == user_data.username))
     existing_user = result.scalar_one_or_none()

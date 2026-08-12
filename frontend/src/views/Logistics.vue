@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>物流公司管理</span>
-          <el-button type="primary" @click="showCreateDialog" v-if="canManage">
+          <el-button type="primary" @click="showCreateDialog" v-if="canAdd">
             新增物流公司
           </el-button>
         </div>
@@ -28,12 +28,12 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right" v-if="canManage">
+        <el-table-column label="操作" width="150" fixed="right" v-if="canEdit || canDelete">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="editCompany(row)">
+            <el-button v-if="canEdit" link type="primary" size="small" @click="editCompany(row)">
               编辑
             </el-button>
-            <el-button link type="danger" size="small" @click="deleteCompany(row)">
+            <el-button v-if="canDelete" link type="danger" size="small" @click="deleteCompany(row)">
               删除
             </el-button>
           </template>
@@ -79,6 +79,7 @@
 defineOptions({ name: 'Logistics' })
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { getLogisticsCompanies, createLogisticsCompany, updateLogisticsCompany, deleteLogisticsCompany as deleteCompanyApi } from '@/api/logistics'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDate } from '@/utils/format'
@@ -108,7 +109,10 @@ const companyRules = {
 
 const currentCompany = ref(null)
 
-const canManage = computed(() => ['boss'].includes(userStore.role))
+// 角色（老板）∩ 数据权限（/logistics 增删改）
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/logistics', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/logistics', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/logistics', 'delete'))
 
 async function fetchCompanies() {
   loading.value = true

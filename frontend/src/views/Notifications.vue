@@ -86,7 +86,7 @@
             </div>
           </div>
           <div class="notification-actions">
-            <el-button size="small" @click.stop="handleDelete(notification)">删除</el-button>
+            <el-button v-if="canDelete" size="small" @click.stop="handleDelete(notification)">删除</el-button>
           </div>
         </div>
 
@@ -307,9 +307,11 @@ import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNoti
 import { getOrder, updateOrder, markOrderPrinted } from '@/api/order'
 import { getOrderImages } from '@/api/image'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 
 const router = useRouter()
 const userStore = useUserStore()
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/notifications', 'delete'))
 
 // 筛选条件
 const filters = reactive({

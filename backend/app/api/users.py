@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from typing import List
 from ..core.database import get_db
-from ..core.security import get_current_active_user, require_role, get_password_hash
+from ..core.security import get_current_active_user, require_role, get_password_hash, ensure_data_permission
 from ..models.models import User, OperationLog
 from ..schemas.schemas import UserResponse, UserUpdate
 
@@ -60,6 +60,7 @@ async def update_user(
 ):
     if current_user.role != "boss" and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="您没有权限修改此用户")
+    ensure_data_permission(current_user, '/users', 'edit')
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -108,6 +109,7 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("boss"))
 ):
+    ensure_data_permission(current_user, '/users', 'delete')
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:

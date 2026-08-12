@@ -15,7 +15,7 @@
             :show-file-list="false"
             :http-request="handleUpload"
             accept=".xlsx,.xls"
-            :disabled="uploading"
+            :disabled="uploading || !canAdd"
           >
             <el-button type="primary" :loading="uploading">
               <el-icon style="margin-right: 4px"><Upload /></el-icon>{{ uploading ? '导入中…' : '上传 Excel 导入' }}
@@ -61,10 +61,10 @@
         <el-button type="primary" @click="fetchList">查询</el-button>
         <el-button @click="resetQuery">重置</el-button>
         <div class="filter-spacer" />
-        <el-button type="danger" plain :disabled="!selectedIds.length" @click="handleBatchDelete">
+        <el-button v-if="canDelete" type="danger" plain :disabled="!selectedIds.length" @click="handleBatchDelete">
           批量删除（{{ selectedIds.length }}）
         </el-button>
-        <el-button type="success" :disabled="!selectedIds.length" @click="handleMerge">
+        <el-button v-if="canEdit" type="success" :disabled="!selectedIds.length" @click="handleMerge">
           审核合并（{{ selectedIds.length }}）
         </el-button>
       </div>
@@ -134,8 +134,8 @@
         </el-table-column>
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canEdit" link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="canDelete" link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -285,6 +285,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Upload } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import {
   downloadImportTemplate,
   importOrderExcel,
@@ -297,6 +298,9 @@ import {
 
 const userStore = useUserStore()
 const isBoss = computed(() => userStore.isBoss)
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/order-imports', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/order-imports', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/order-imports', 'delete'))
 
 // ==================== 列表 ====================
 const loading = ref(false)

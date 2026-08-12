@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>基础信息 - 网店管理</span>
-          <el-button type="primary" @click="showShopCreateDialog">新建网店</el-button>
+          <el-button v-if="canAdd" type="primary" @click="showShopCreateDialog">新建网店</el-button>
         </div>
       </template>
 
@@ -42,8 +42,8 @@
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="editShop(row)">编辑</el-button>
-            <el-button link type="danger" size="small" @click="handleDeleteShop(row)">删除</el-button>
+            <el-button v-if="canEdit" link type="primary" size="small" @click="editShop(row)">编辑</el-button>
+            <el-button v-if="canDelete" link type="danger" size="small" @click="handleDeleteShop(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -77,9 +77,16 @@
 <script setup>
 defineOptions({ name: 'Shops' })
 import { ref, reactive, computed } from 'vue'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { getShops, createShop, updateShop, deleteShop } from '@/api/shop'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDateTime } from '@/utils/format'
+
+const userStore = useUserStore()
+const canAdd = computed(() => checkDataPerm(userStore.userInfo, '/shops', 'add'))
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/shops', 'edit'))
+const canDelete = computed(() => checkDataPerm(userStore.userInfo, '/shops', 'delete'))
 
 const shopLoading = ref(false)
 const shops = ref([])

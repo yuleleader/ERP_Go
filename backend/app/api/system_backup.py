@@ -17,7 +17,7 @@ import urllib.error
 
 from fastapi import APIRouter, Depends, Body
 
-from ..core.security import require_role
+from ..core.security import require_role, ensure_data_permission
 
 router = APIRouter(prefix="/api/system-backup", tags=["系统备份"])
 
@@ -56,14 +56,16 @@ async def get_backup_state(_=Depends(require_role("boss"))):
 
 
 @router.post("/run")
-async def run_backup(_=Depends(require_role("boss"))):
+async def run_backup(current_user=Depends(require_role("boss"))):
     """触发启动器立即备份"""
+    ensure_data_permission(current_user, '/system-backup', 'edit')
     result, _ = await _proxy('POST', '/backup/run')
     return result
 
 
 @router.post("/config")
-async def save_backup_config(payload: dict = Body(...), _=Depends(require_role("boss"))):
+async def save_backup_config(payload: dict = Body(...), current_user=Depends(require_role("boss"))):
     """保存自动备份设置（透传 auto_backup 配置）"""
+    ensure_data_permission(current_user, '/system-backup', 'edit')
     result, _ = await _proxy('POST', '/backup/config', payload)
     return result

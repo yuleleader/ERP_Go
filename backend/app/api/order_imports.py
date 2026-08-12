@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import quote
 
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Order, Shop, User, Product, OrderImport, OperationLog, beijing_now
 from ..api.orders import generate_order_id, calc_order_gross_profit, calculate_order_days
 from ..services.notification_service import NotificationService
@@ -361,6 +361,7 @@ async def import_orders(
 ):
     """上传 Excel → 解析 → 写入临时表（同批 batch_no），每行计算异常。返回批次统计。"""
     _check_import_perm(current_user)
+    ensure_data_permission(current_user, '/order-imports', 'add')
 
     filename = file.filename or ""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -521,6 +522,7 @@ async def update_order_import(
 ):
     """编辑临时表行：保存后重新计算全部异常，仍留在临时表，需再次审核。"""
     _check_import_perm(current_user)
+    ensure_data_permission(current_user, '/order-imports', 'edit')
     row = (await db.execute(select(OrderImport).where(OrderImport.id == row_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="临时订单不存在")
@@ -570,6 +572,7 @@ async def merge_order_imports(
 ):
     """审核合并：仅无异常行可合并。逐行生成追溯码写入正式 orders 表，成功后临时记录删除。"""
     _check_import_perm(current_user)
+    ensure_data_permission(current_user, '/order-imports', 'edit')
     ids = payload.ids
     if not ids:
         raise HTTPException(status_code=400, detail="请先勾选要合并的订单")
@@ -687,6 +690,7 @@ async def delete_order_import(
 ):
     """删除单条临时记录（异常单也可手动删除）。"""
     _check_import_perm(current_user)
+    ensure_data_permission(current_user, '/order-imports', 'delete')
     row = (await db.execute(select(OrderImport).where(OrderImport.id == row_id))).scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="临时订单不存在")
@@ -704,6 +708,7 @@ async def delete_batch_order_imports(
 ):
     """批量删除临时记录。"""
     _check_import_perm(current_user)
+    ensure_data_permission(current_user, '/order-imports', 'delete')
     ids = payload.ids
     if not ids:
         raise HTTPException(status_code=400, detail="请先勾选要删除的记录")

@@ -37,6 +37,7 @@
         </el-descriptions>
         <div style="margin-top: 16px;">
           <el-button
+            v-if="canEdit"
             type="primary"
             :loading="running"
             :disabled="!connected"
@@ -99,7 +100,7 @@
             <el-input-number v-model="form.interval" :min="1" :max="24" :disabled="!connected" />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading="saving" :disabled="!connected" @click="handleSaveConfig">
+            <el-button v-if="canEdit" type="primary" :loading="saving" :disabled="!connected" @click="handleSaveConfig">
               保存设置
             </el-button>
           </el-form-item>
@@ -131,8 +132,13 @@
 <script setup>
 defineOptions({ name: 'SystemBackup' })
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useUserStore } from '@/store/user'
+import { checkDataPerm } from '@/utils/dataPerm'
 import { ElMessage } from 'element-plus'
 import { getBackupState, runBackupNow, saveBackupConfig } from '@/api/systemBackup'
+
+const userStore = useUserStore()
+const canEdit = computed(() => checkDataPerm(userStore.userInfo, '/system-backup', 'edit'))
 
 const loading = ref(false)
 const running = ref(false)

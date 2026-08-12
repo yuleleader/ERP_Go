@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Shop, Order, OperationLog, User
 from ..schemas.schemas import ShopCreate, ShopUpdate, ShopResponse
 
@@ -105,6 +105,7 @@ async def create_shop(
 ):
     if current_user.role not in ["boss", "sales"]:
         raise HTTPException(status_code=403, detail="您没有权限创建网店")
+    ensure_data_permission(current_user, '/shops', 'add')
 
     # 唯一性校验：同邮箱可在不同平台（网店名不同）重复注册；仅"名称+账号"都相同才拦截
     result = await db.execute(
@@ -163,6 +164,7 @@ async def update_shop(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    ensure_data_permission(current_user, '/shops', 'edit')
     result = await db.execute(select(Shop).where(Shop.shop_id == shop_id))
     shop = result.scalar_one_or_none()
     if not shop:
@@ -231,6 +233,7 @@ async def delete_shop(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    ensure_data_permission(current_user, '/shops', 'delete')
     result = await db.execute(select(Shop).where(Shop.shop_id == shop_id))
     shop = result.scalar_one_or_none()
     if not shop:

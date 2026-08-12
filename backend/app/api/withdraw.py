@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, Float
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import Shop, ShopWithdrawRecord, OperationLog
 from ..schemas.schemas import UserResponse
 
@@ -153,6 +153,7 @@ async def create_withdraw_record(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
 ):
+    ensure_data_permission(current_user, '/account-withdrawal', 'add')
     shop_id = data.get("shop_id")
     withdraw_date = data.get("withdraw_date")
     withdraw_amount = data.get("withdraw_amount")
@@ -217,6 +218,7 @@ async def update_withdraw_record(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_active_user)
 ):
+    ensure_data_permission(current_user, '/account-withdrawal', 'edit')
     record = (await db.execute(select(ShopWithdrawRecord).where(ShopWithdrawRecord.id == record_id))).scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
@@ -268,6 +270,7 @@ async def delete_withdraw_record(
 ):
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="只有老板端可以删除")
+    ensure_data_permission(current_user, '/account-withdrawal', 'delete')
 
     record = (await db.execute(select(ShopWithdrawRecord).where(ShopWithdrawRecord.id == record_id))).scalar_one_or_none()
     if not record:

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..services.notification_service import NotificationService
 from ..models.models import User
 
@@ -119,6 +119,7 @@ async def delete_notification(
     """
     删除单条消息
     """
+    ensure_data_permission(current_user, '/notifications', 'delete')
     success = await NotificationService.delete_notification(
         db=db,
         notification_id=notification_id,

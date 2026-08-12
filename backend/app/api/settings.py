@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 from ..core.database import get_db
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import SystemSetting
 
 router = APIRouter(prefix="/api/settings", tags=["系统参数"])
@@ -75,6 +75,7 @@ async def update_settings(
     """批量更新系统参数（仅老板端）"""
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="权限不足，仅老板端可修改系统参数")
+    ensure_data_permission(current_user, '/settings', 'edit')
 
     for item in payload.items:
         row = (await db.execute(

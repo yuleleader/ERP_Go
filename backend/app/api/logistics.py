@@ -6,7 +6,7 @@ from typing import List
 from ..core.database import get_db
 from ..models.models import LogisticsCompany
 from ..schemas.logistics import LogisticsCompanyCreate, LogisticsCompanyUpdate, LogisticsCompanyResponse
-from ..core.security import get_current_active_user
+from ..core.security import get_current_active_user, ensure_data_permission
 from ..models.models import User
 
 router = APIRouter(prefix="/api/logistics", tags=["logistics"])
@@ -18,6 +18,7 @@ async def create_logistics_company(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    ensure_data_permission(current_user, '/logistics', 'add')
     # 检查公司代码是否已存在
     result = await db.execute(
         select(LogisticsCompany).where(
@@ -79,6 +80,7 @@ async def update_logistics_company(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    ensure_data_permission(current_user, '/logistics', 'edit')
     result = await db.execute(
         select(LogisticsCompany).where(LogisticsCompany.id == company_id)
     )
@@ -114,7 +116,7 @@ async def delete_logistics_company(
 ):
     if current_user.role != "boss":
         raise HTTPException(status_code=403, detail="只有管理员可以删除物流公司")
-
+    ensure_data_permission(current_user, '/logistics', 'delete')
     result = await db.execute(
         select(LogisticsCompany).where(LogisticsCompany.id == company_id)
     )
