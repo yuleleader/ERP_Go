@@ -38,9 +38,17 @@
           <el-icon class="group-arrow"><ArrowRight /></el-icon>
         </el-menu-item>
       </el-menu>
-      
-      <div class="exchange-wrapper">
-        <ExchangeCalculator />
+
+      <!-- 小工具：固定在侧栏最左下角，点击在按钮右侧展开二级菜单 -->
+      <div ref="toolDockRef" class="tool-dock-wrap" :class="{ active: toolMenuVisible }">
+        <div class="tool-dock" @click="toggleToolMenu">
+          <span class="tool-dock-label">小工具</span>
+          <el-icon class="tool-dock-arrow" :class="{ open: toolMenuVisible }"><ArrowRight /></el-icon>
+        </div>
+        <div v-show="toolMenuVisible" class="tool-submenu">
+          <div class="tool-submenu-item" @click="openCalc('exchange')">汇率计算器</div>
+          <div class="tool-submenu-item" @click="openCalc('scientific')">科学计算器</div>
+        </div>
       </div>
     </el-aside>
 
@@ -113,12 +121,22 @@
     </template>
   </el-dialog>
 
+  <!-- 小工具：汇率计算器 / 科学计算器 右下角浮动窗口（可拖动，仅手动关闭） -->
+  <CalcFloatWindow
+    :visible="calcDialogVisible"
+    :title="calcDialogType === 'exchange' ? '汇率计算器' : '科学计算器'"
+    @update:visible="calcDialogVisible = $event"
+  >
+    <ExchangeCalculator v-if="calcDialogType === 'exchange'" />
+    <ScientificCalculator v-else />
+  </CalcFloatWindow>
+
   <SubMenuDrawer
     v-model:visible="drawerVisible"
     :title="activeGroup.title"
     :groups="activeGroup.groups"
     :sidebar-width="200"
-    width="720"
+    :width="drawerWidth"
   />
 </template>
 
@@ -128,11 +146,41 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import ExchangeCalculator from '@/modules/Common/components/ExchangeCalculator.vue'
+import ScientificCalculator from '@/modules/Common/components/ScientificCalculator.vue'
+import CalcFloatWindow from '@/components/CalcFloatWindow.vue'
 import SubMenuDrawer from '@/components/SubMenuDrawer.vue'
 import { getUnreadCount } from '@/api/notification'
 import { Bell, ArrowRight, Close } from '@element-plus/icons-vue'
 
 const route = useRoute()
+
+// 小工具计算器弹窗状态
+const calcDialogVisible = ref(false)
+const calcDialogType = ref('exchange')
+
+// 右侧抽屉宽度：其他分组项子项较多，保持较宽
+const drawerWidth = ref(720)
+
+// 小工具二级菜单状态
+const toolMenuVisible = ref(false)
+const toolDockRef = ref(null)
+
+function toggleToolMenu() {
+  toolMenuVisible.value = !toolMenuVisible.value
+}
+
+function openCalc(type) {
+  calcDialogType.value = type
+  calcDialogVisible.value = true
+  toolMenuVisible.value = false
+}
+
+// 点击页面其他区域关闭小工具二级菜单
+function handleDocClick(e) {
+  if (toolDockRef.value && !toolDockRef.value.contains(e.target)) {
+    toolMenuVisible.value = false
+  }
+}
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
@@ -165,6 +213,7 @@ function goToNotifications() {
 
 // 在组件挂载时获取用户信息
 onMounted(async () => {
+  document.addEventListener('click', handleDocClick)
   if (userStore.token) {
     loading.value = true
     try {
@@ -183,6 +232,7 @@ onMounted(async () => {
 
 // 组件卸载时清理
 onUnmounted(() => {
+  document.removeEventListener('click', handleDocClick)
   if (refreshInterval) {
     clearInterval(refreshInterval)
   }
@@ -437,6 +487,7 @@ const activeMenu = computed(() => {
 
 function handleMenuSelect(index) {
   if (index.startsWith('group:')) {
+    drawerWidth.value = 720
     activeGroupKey.value = index.slice(6)
     drawerVisible.value = true
     return
@@ -537,6 +588,74 @@ function handleCommand(command) {
   overflow-y: auto;
 }
 
+/* 小工具：固定在侧栏最左下角，点击向右展开二级菜单 */
+.tool-dock-wrap {
+  position: relative;
+  margin-top: auto;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  padding: 0 20px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  user-select: none;
+}
+
+.tool-dock:hover,
+.tool-dock-wrap.active .tool-dock {
+  background: rgba(255, 255, 255, 0.08);
+  color: #409eff;
+}
+
+.tool-dock-arrow {
+  font-size: 14px;
+  opacity: 0.5;
+  transition: transform 0.2s;
+}
+
+.tool-dock-arrow.open {
+  transform: rotate(90deg);
+}
+
+/* 小工具二级菜单：显示在小工具文字右侧，使用 fixed 定位避免被侧栏裁剪 */
+.tool-submenu {
+  position: fixed;
+  left: 200px;
+  bottom: 0;
+  min-width: 140px;
+  background: #001529;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.25);
+  padding: 6px 0;
+  z-index: 2100;
+}
+
+.tool-submenu-item {
+  padding: 0 18px;
+  height: 40px;
+  line-height: 40px;
+  color: #fff;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.tool-submenu-item:hover {
+  background: rgba(64, 158, 255, 0.15);
+  color: #409eff;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -605,17 +724,13 @@ function handleCommand(command) {
   --el-badge-font-size: 10px;
 }
 
-.exchange-wrapper {
-  padding: 10px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: auto;
-}
-
 .group-arrow {
   margin-left: auto;
   font-size: 12px;
   opacity: 0.45;
 }
+
+/* 小工具计算器浮动窗口：深色衬底样式见 CalcFloatWindow.vue，此处预留扩展 */
 
 /* ===== MDI 多标签栏 ===== */
 .tabs-bar {

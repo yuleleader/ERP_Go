@@ -1,5 +1,8 @@
 <template>
   <div class="dashboard">
+    <!-- 订单流程全景：销售 -> 生产 -> 发货 -->
+    <OrderFlowPanorama />
+
     <el-row :gutter="20">
       <el-col :span="8" v-for="card in cards" :key="card.key">
         <el-card class="stat-card clickable" :class="{ active: activeCard === card.key }" @click="filterCard(card.key)">
@@ -27,6 +30,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { getShippingDashboardStats } from '@/api/statistics'
 import { Box, Clock, CircleCheck } from '@element-plus/icons-vue'
 import UniversalOrderList from '@/modules/Order/components/UniversalOrderList.vue'
+import OrderFlowPanorama from '@/modules/Order/components/OrderFlowPanorama.vue'
 
 const orderListRef = ref(null)
 const activeCard = ref('all')

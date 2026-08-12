@@ -1,51 +1,7 @@
 <template>
   <div class="dashboard">
-    <el-row :gutter="20">
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon sales">
-            <el-icon><ShoppingCart /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.myOrders }}</div>
-            <div class="stat-label">我的订单</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon pending">
-            <el-icon><Clock /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.pendingOrders }}</div>
-            <div class="stat-label">待发货</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon amount">
-            <el-icon><Money /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">¥{{ stats.mySales }}</div>
-            <div class="stat-label">我的销售额</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon commission">
-            <el-icon><Wallet /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">¥{{ stats.myCommission }}</div>
-            <div class="stat-label">我的提成</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <!-- 订单流程全景：替换为原「我的订单」卡片，点击卡片跳订单列表（销售端仅看自己创建的订单） -->
+    <OrderFlowPanorama />
 
     <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="24">
@@ -77,20 +33,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { getOrders } from '@/api/order'
-import { ShoppingCart, Clock, Money, Wallet } from '@element-plus/icons-vue'
 import { formatDateTime } from '@/utils/format'
+import OrderFlowPanorama from '@/modules/Order/components/OrderFlowPanorama.vue'
 
 const userStore = useUserStore()
-
-const stats = reactive({
-  myOrders: 0,
-  pendingOrders: 0,
-  mySales: 0,
-  myCommission: 0
-})
 
 const myOrders = ref([])
 
@@ -120,11 +69,6 @@ onMounted(async () => {
     const username = userStore.userInfo?.username
     
     myOrders.value = orders.filter(o => String(o.created_by) === String(username))
-
-    stats.myOrders = myOrders.value.length
-    stats.pendingOrders = myOrders.value.filter(o => o.shipping_status === 'pending').length
-    stats.mySales = myOrders.value.reduce((sum, o) => sum + (parseFloat(o.sales_amount) || 0), 0)
-    stats.myCommission = myOrders.value.reduce((sum, o) => sum + (parseFloat(o.commission_amount) || 0), 0)
   } catch (error) {
     console.error('获取数据失败:', error)
   }

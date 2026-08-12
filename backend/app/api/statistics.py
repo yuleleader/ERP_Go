@@ -684,17 +684,19 @@ async def get_process_flow_stats(
     current_user = Depends(get_current_active_user)
 ):
     """
-    老板端工作台三段式流程图统计（销售 -> 生产 -> 发货）
-    全部按订单当前状态实时计数：
-    - 销售：总订单数 / 未发货(pending) / 虚拟发货(virtual) / 已退货(refunded)
-    - 生产：未生产(unproduce) / 生产中(producing) / 生产完成(produced)
-    - 发货：未发货(pending) / 已发货(shipped)
+    工作台三段式流程图统计（销售 -> 生产 -> 发货），所有角色可用。
+    销售角色只统计自己创建的订单；老板/工厂/发货统计全公司订单。
     """
-    if current_user.role != "boss":
-        raise HTTPException(status_code=403, detail="权限不足，仅老板端可访问")
+    # 销售端仅查看自己创建的订单；其他角色（老板/工厂/发货）看全公司
+    owner_filter = None
+    if current_user.role == "sales":
+        owner_filter = Order.created_by == current_user.username
 
     async def count(*filter_exprs):
-        result = await db.execute(select(func.count(Order.id)).filter(*filter_exprs))
+        conditions = list(filter_exprs)
+        if owner_filter is not None:
+            conditions.append(owner_filter)
+        result = await db.execute(select(func.count(Order.id)).filter(*conditions))
         return result.scalar() or 0
 
     # 销售段

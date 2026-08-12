@@ -1,39 +1,8 @@
 <template>
   <div class="exchange-wrapper-inner">
-    <div class="exchange-card" :class="{ expanded: isExpanded }">
-      <div class="exchange-header" @click="isExpanded = !isExpanded">
-        <span class="title">汇率计算器</span>
-        <el-icon class="arrow-icon" :class="{ rotated: isExpanded }">
-          <ArrowRight />
-        </el-icon>
-      </div>
-
-      <div class="content-collapsed" v-show="!isExpanded">
-        <div class="exchange-rates">
-          <div class="rate-row">
-            <span class="currency-text">{{ currencyMap[fromCurrency] }}</span>
-            <el-icon class="swap-icon-mini clickable" @click.stop="swapCurrency"><Switch /></el-icon>
-            <span class="currency-text">{{ currencyMap[toCurrency] }}</span>
-          </div>
-          <div class="rate-row">
-            <span v-if="loading" class="rate-value loading">加载中...</span>
-            <span v-else-if="error" class="rate-value error">获取失败</span>
-            <span v-else class="rate-value">1 = {{ currentRate.toFixed(4) }}</span>
-          </div>
-        </div>
-        <el-button
-          type="primary"
-          size="small"
-          class="refresh-btn"
-          :icon="Refresh"
-          :loading="loading"
-          @click.stop="fetchExchangeRate"
-        >
-          刷新
-        </el-button>
-      </div>
-
-      <div class="content-expanded" v-show="isExpanded">
+    <div class="exchange-card">
+      <!-- 汇率计算器主体 -->
+      <div class="exchange-panel">
         <div class="currency-row">
           <el-select v-model="fromCurrency" placeholder="货币" @change="handleCurrencyChange" size="small">
             <el-option v-for="currency in currencies" :key="currency" :label="`${currencyMap[currency]}（${currency}）`" :value="currency" />
@@ -94,15 +63,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Coin,
   Refresh,
-  Switch,
-  Loading,
-  Warning,
-  ArrowRight,
-  Close
+  Switch
 } from '@element-plus/icons-vue'
-import { getExchangeRate, getSpecificRate } from '@/api/exchange'
+import { getSpecificRate } from '@/api/exchange'
 
 // 货币列表
 const currencyMap = {
@@ -118,7 +82,6 @@ const currencyMap = {
 const currencies = Object.keys(currencyMap)
 
 // 状态管理
-const isExpanded = ref(false)
 const loading = ref(false)
 const error = ref('')
 const fromCurrency = ref('CNY')
@@ -140,15 +103,13 @@ const currentRate = computed(() => {
   return 0
 })
 
-// 美元汇率（用于收起状态显示）
+// 美元汇率（保留备用）
 const usdRate = computed(() => {
   if (rates.value && rates.value['USD']) {
     return rates.value['USD']
   }
   return 0.14 // 默认值
 })
-
-// 格式化时间（统一走 @/utils/format，按北京时间显示）
 
 async function fetchExchangeRate() {
   loading.value = true
@@ -218,124 +179,11 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.exchange-card.expanded {
-  padding: 10px 12px;
-}
-
-/* 头部 */
-.exchange-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.exchange-header .title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: #ffffff;
-}
-
-.arrow-icon {
-  color: #4ade80;
-  font-size: 16px;
-  transition: transform 0.3s;
-  padding: 3px;
-  border-radius: 5px;
-}
-
-.arrow-icon:hover {
-  background: rgba(74, 222, 128, 0.1);
-}
-
-.arrow-icon.rotated {
-  transform: rotate(90deg);
-}
-
-/* 收起状态内容 */
-.content-collapsed,
-.content-expanded {
+/* 汇率主体 */
+.exchange-panel {
   transition: opacity 0.3s;
 }
 
-.exchange-rates {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rate-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.currency-text {
-  font-size: 11px;
-  font-weight: 500;
-  color: #e6f7ff;
-}
-
-.swap-icon-mini {
-  color: #4ade80;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.swap-icon-mini.clickable {
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-  transition: all 0.2s;
-}
-
-.swap-icon-mini.clickable:hover {
-  background: rgba(74, 222, 128, 0.15);
-  transform: rotate(180deg);
-}
-
-.rate-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: #4ade80;
-  letter-spacing: 0.1px;
-}
-
-.rate-value.loading {
-  color: #8c8c8c;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.rate-value.error {
-  color: #f87171;
-}
-
-/* 收起状态刷新按钮 */
-.content-collapsed .refresh-btn {
-  margin-top: 12px;
-  width: 100%;
-  --el-button-bg-color: rgba(74, 222, 128, 0.15);
-  --el-button-hover-bg-color: rgba(74, 222, 128, 0.25);
-  --el-button-text-color: #4ade80;
-  --el-button-border-color: rgba(74, 222, 128, 0.3);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  border-radius: 8px;
-  font-weight: 500;
-}
-
-.content-collapsed .refresh-btn:hover {
-  --el-button-border-color: rgba(74, 222, 128, 0.5);
-}
-
-/* 展开状态样式 */
 .currency-row,
 .amount-row {
   display: flex;
@@ -377,6 +225,24 @@ onMounted(() => {
 
 .amount-row :deep(.el-input__inner::placeholder) {
   color: #737373;
+}
+
+.swap-icon-mini {
+  color: #4ade80;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.swap-icon-mini.clickable {
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.swap-icon-mini.clickable:hover {
+  background: rgba(74, 222, 128, 0.15);
+  transform: rotate(180deg);
 }
 
 /* 汇率显示 */
@@ -429,70 +295,25 @@ onMounted(() => {
   --el-button-border-color: rgba(74, 222, 128, 0.5);
 }
 
-/* 下拉菜单深色主题 */
-:deep(.el-select-dropdown) {
-  background: #1f1f1f;
-  border: 1px solid #333333;
-  border-radius: 8px;
-}
-
-:deep(.el-select-dropdown__item) {
-  color: #ffffff;
-}
-
-:deep(.el-select-dropdown__item:hover) {
-  background: #2d2d2d;
-}
-
-:deep(.el-select-dropdown__item.selected) {
-  background: rgba(74, 222, 128, 0.2);
-  color: #4ade80;
-}
-
-:deep(.el-popper__arrow) {
-  display: none;
-}
-
 /* 响应式适配 - 移动端 */
 @media (max-width: 768px) {
-  .exchange-container {
-    left: 10px;
-    bottom: 10px;
-    right: 10px;
-  }
-  
   .exchange-card {
     width: 100%;
     max-width: 280px;
-  }
-  
-  .exchange-card.expanded {
-    width: 100%;
-    max-width: 340px;
   }
 }
 
 /* 响应式适配 - 平板端 */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .exchange-container {
-    left: 15px;
-    bottom: 15px;
-  }
-  
   .exchange-card {
     width: 200px;
-  }
-  
-  .exchange-card.expanded {
-    width: 360px;
   }
 }
 
 /* 大屏幕适配 */
 @media (min-width: 1920px) {
-  .exchange-container {
-    left: 30px;
-    bottom: 30px;
+  .exchange-card {
+    width: 100%;
   }
 }
 </style>

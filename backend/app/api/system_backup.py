@@ -10,6 +10,7 @@
 启动器未运行时返回 {ok:false, message:"启动器未运行或本地备份接口不可用..."}，
 由前端提示用户先启动桌面启动器。
 """
+import asyncio
 import json
 import urllib.request
 import urllib.error
@@ -23,7 +24,8 @@ router = APIRouter(prefix="/api/system-backup", tags=["系统备份"])
 LAUNCHER_BACKUP_API = "http://127.0.0.1:25998"
 
 
-def _proxy(method: str, path: str, body=None):
+def _proxy_blocking(method: str, path: str, body=None):
+    """同步实现：实际发起 HTTP 请求（会阻塞，必须在线程中执行）。"""
     url = f"{LAUNCHER_BACKUP_API}{path}"
     data = json.dumps(body).encode('utf-8') if body is not None else None
     req = urllib.request.Request(url, method=method, data=data,
@@ -41,19 +43,27 @@ def _proxy(method: str, path: str, body=None):
         return {'ok': False, 'message': '启动器未运行或本地备份接口不可用（请先启动桌面启动器）'}, 503
 
 
+async def _proxy(method: str, path: str, body=None):
+    """异步包装：把阻塞的 HTTP 调用丢到线程池，避免冻结 uvicorn 事件循环。"""
+    return await asyncio.to_thread(_proxy_blocking, method, path, body)
+
+
 @router.get("/state")
 async def get_backup_state(_=Depends(require_role("boss"))):
     """读取启动器备份配置与最近备份日志"""
-    return _proxy('GET', '/backup/state')[0]
+    result, _ = await _proxy('GET', '/backup/state')
+    return result
 
 
 @router.post("/run")
 async def run_backup(_=Depends(require_role("boss"))):
     """触发启动器立即备份"""
-    return _proxy('POST', '/backup/run')[0]
+    result, _ = await _proxy('POST', '/backup/run')
+    return result
 
 
 @router.post("/config")
 async def save_backup_config(payload: dict = Body(...), _=Depends(require_role("boss"))):
     """保存自动备份设置（透传 auto_backup 配置）"""
-    return _proxy('POST', '/backup/config', payload)[0]
+    result, _ = await _proxy('POST', '/backup/config', payload)
+    return result
