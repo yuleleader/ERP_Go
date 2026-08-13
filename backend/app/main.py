@@ -25,6 +25,26 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# ── 全局错误落盘（诊断增强）──
+# 原后端异常只经 stdout/stderr 进入启动器图形日志，未落盘，难以事后排查。
+# 此处把 uvicorn 的 500 堆栈与根日志同时写入 backend/data/logs/backend_errors.log，
+# 便于复现"隔一段时间才出现"的间歇性异常时定位根因。不影响任何接口行为。
+import logging
+from logging.handlers import RotatingFileHandler
+
+_log_dir = DATA_DIR / "logs"
+_log_dir.mkdir(parents=True, exist_ok=True)
+_error_file = RotatingFileHandler(
+    str(_log_dir / "backend_errors.log"),
+    maxBytes=5_000_000,
+    backupCount=3,
+    encoding="utf-8",
+)
+_error_file.setLevel(logging.ERROR)
+_error_file.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+logging.getLogger("uvicorn.error").addHandler(_error_file)
+logging.getLogger().addHandler(_error_file)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
