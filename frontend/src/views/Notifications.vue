@@ -32,6 +32,8 @@
               <el-option label="图片上传完成" value="image_uploaded" />
               <el-option label="订单已发货" value="order_shipped" />
               <el-option label="生产状态变更" value="produce_status_changed" />
+              <el-option label="订单已退款" value="order_refunded" />
+              <el-option label="订单已删除" value="order_deleted" />
             </el-select>
           </el-col>
           <el-col :span="4">
@@ -61,6 +63,8 @@
             <el-icon v-if="notification.event_type === 'order_created'"><Document /></el-icon>
             <el-icon v-else-if="notification.event_type === 'image_uploaded'"><Picture /></el-icon>
             <el-icon v-else-if="notification.event_type === 'order_shipped'"><Van /></el-icon>
+            <el-icon v-else-if="notification.event_type === 'order_refunded'"><RefreshLeft /></el-icon>
+            <el-icon v-else-if="notification.event_type === 'order_deleted'"><Delete /></el-icon>
             <el-icon v-else><Bell /></el-icon>
           </div>
           <div class="notification-content">
@@ -121,6 +125,8 @@
           <el-icon v-if="selectedNotification.event_type === 'order_created'" class="detail-icon"><Document /></el-icon>
           <el-icon v-else-if="selectedNotification.event_type === 'image_uploaded'" class="detail-icon"><Picture /></el-icon>
           <el-icon v-else-if="selectedNotification.event_type === 'order_shipped'" class="detail-icon"><Van /></el-icon>
+          <el-icon v-else-if="selectedNotification.event_type === 'order_refunded'" class="detail-icon"><RefreshLeft /></el-icon>
+          <el-icon v-else-if="selectedNotification.event_type === 'order_deleted'" class="detail-icon"><Delete /></el-icon>
           <el-icon v-else class="detail-icon"><Bell /></el-icon>
           <div class="detail-title">{{ selectedNotification.title }}</div>
         </div>
@@ -301,7 +307,7 @@ import { formatDate, formatDateTime } from '@/utils/format'
 import { imageUrlWithToken, saveImageByUrl } from '@/utils/imageUrl'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Picture, Van, Bell, Box, Search, Document } from '@element-plus/icons-vue'
+import { Picture, Van, Bell, Box, Search, Document, Delete, RefreshLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification } from '@/api/notification'
 import { getOrder, updateOrder, markOrderPrinted } from '@/api/order'
@@ -458,7 +464,7 @@ async function handleMarkAllRead() {
     await markAllAsRead()
     notifications.value.forEach(n => n.is_read = true)
     unreadCount.value = 0
-    fetchNotifications()
+    await fetchNotifications()
   } catch (error) {
     console.error('标记全部已读失败:', error)
   }

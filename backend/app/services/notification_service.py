@@ -24,6 +24,8 @@ EVENT_TYPES = {
     'order_shipped': '订单已发货',
     'order_created': '新订单提醒',
     'produce_status_changed': '生产状态变更',
+    'order_refunded': '订单已退款',
+    'order_deleted': '订单已删除',
 }
 
 class NotificationService:
@@ -178,6 +180,127 @@ class NotificationService:
             
         except Exception as e:
             logger.error(f"发送订单发货通知失败: {e}")
+            return False
+
+    @staticmethod
+    async def send_order_refunded_notification(
+        db: AsyncSession,
+        order: Order,
+        operator: str
+    ) -> bool:
+        """
+        订单状态被修改为「已退款」时，发送站内信给：
+        - 订单创建人
+        - 所有老板端(boss)账号
+
+        Args:
+            db: 数据库会话
+            order: 订单对象（需已更新为 refunded 状态）
+            operator: 操作人用户名
+
+        Returns:
+            是否至少成功发送一条
+        """
+        try:
+            event_type = 'order_refunded'
+            title = EVENT_TYPES[event_type]
+
+            operator_info = await db.execute(
+                select(User.real_name).where(User.username == operator)
+            )
+            operator_name = operator_info.scalar() or operator
+
+            content = (
+                f"订单【{order.order_id}】已被 {operator_name} 修改为【已退款】状态。\n"
+                f"商品: {order.product_name or '无'}\n"
+                f"退款备注: {order.refund_note or '无'}\n"
+                f"时间: {beijing_now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+            recipients = []
+            if order.created_by:
+                recipients.append(str(order.created_by))
+            result = await db.execute(select(User.username).where(User.role == "boss"))
+            recipients.extend(result.scalars().all())
+
+            # 去重（创建人本身可能也是老板，避免重复给同一人发两条）
+            seen = set()
+            unique_recipients = [r for r in recipients if not (r in seen or seen.add(r))]
+
+            success_count = 0
+            for recipient in unique_recipients:
+                await NotificationService.send_notification(
+                    db=db,
+                    recipient_username=recipient,
+                    order_id=order.order_id,
+                    event_type=event_type,
+                    title=title,
+                    content=content
+                )
+                success_count += 1
+
+            logger.info(f"订单退款通知已发送，订单: {order.order_id}，接收人数: {success_count}")
+            return success_count > 0
+        except Exception as e:
+            logger.error(f"发送订单退款通知失败: {e}")
+            return False
+
+    @staticmethod
+    async def send_order_deleted_notification(
+        db: AsyncSession,
+        order_id: str,
+        created_by: str,
+        operator_name: str
+    ) -> bool:
+        """
+        订单被删除时，发送站内信给：
+        - 订单创建人
+        - 所有老板端(boss)账号
+
+        Args:
+            db: 数据库会话
+            order_id: 被删除订单的订单号
+            created_by: 被删除订单的创建人用户名（删除前已取出）
+            operator_name: 操作人显示名（真实姓名或用户名）
+
+        Returns:
+            是否至少成功发送一条
+        """
+        try:
+            event_type = 'order_deleted'
+            title = EVENT_TYPES[event_type]
+
+            content = (
+                f"订单【{order_id}】已被 {operator_name} 删除。\n"
+                f"时间: {beijing_now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+            recipients = []
+            if created_by:
+                recipients.append(str(created_by))
+            result = await db.execute(select(User.username).where(User.role == "boss"))
+            recipients.extend(result.scalars().all())
+
+            # 去重（创建人本身可能也是老板）
+            seen = set()
+            unique_recipients = [r for r in recipients if not (r in seen or seen.add(r))]
+
+            success_count = 0
+            for recipient in unique_recipients:
+                await NotificationService.send_notification(
+                    db=db,
+                    recipient_username=recipient,
+                    order_id=order_id,
+                    event_type=event_type,
+                    title=title,
+                    content=content
+                )
+                success_count += 1
+
+            logger.info(f"订单删除通知已发送，订单: {order_id}，接收人数: {success_count}")
+            return success_count > 0
+        except Exception as e:
+            logger.error(f"发送订单删除通知失败: {e}")
             return False
 
     @staticmethod

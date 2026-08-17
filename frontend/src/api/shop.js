@@ -37,3 +37,10 @@ export function deleteShop(shopId) {
     method: 'delete'
   })
 }
+
+export function syncShopOrders(shopId) {
+  return request({
+    url: `/shops/${shopId}/sync`,
+    method: 'post'
+  })
+}

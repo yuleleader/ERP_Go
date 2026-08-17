@@ -44,3 +44,6 @@ export * as commissionSettlementApi from './commission_settlement'
 
 // 网店提现记录接口
 export * as withdrawApi from './withdraw'
+
+// 平台管理接口
+export * as platformApi from './platform'

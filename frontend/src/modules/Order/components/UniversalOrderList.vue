@@ -319,7 +319,7 @@
           <!-- 退款备注：与普通备注为两个独立字段，仅状态为"已退货/退款"时显示且必填 -->
           <el-row :gutter="20" v-if="orderForm.shipping_status === 'refunded'">
             <el-col :span="24">
-              <el-form-item label="退款备注" prop="refund_note" :required="orderForm.shipping_status === 'refunded'">
+              <el-form-item label="退款备注" prop="refund_note" :rules="orderForm.shipping_status === 'refunded' ? [{ required: true, message: '退款备注为必填项', trigger: ['blur', 'change'] }] : []">
                 <el-input v-model="orderForm.refund_note" type="textarea" :rows="2" placeholder="请填写退款原因（已退货/退款订单必填）" class="w-full" />
               </el-form-item>
             </el-col>

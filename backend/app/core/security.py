@@ -76,7 +76,12 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="用户已被禁用")
     return current_user
 
-def require_role(*roles):
+def require_role(role_or_roles):
+    # 兼容 require_role('boss') 与 require_role(['boss']) 两种写法
+    if isinstance(role_or_roles, str):
+        roles = (role_or_roles,)
+    else:
+        roles = tuple(role_or_roles)
     async def role_checker(current_user: User = Depends(get_current_active_user)):
         if current_user.role not in roles:
             raise HTTPException(

@@ -146,6 +146,8 @@ def seed_all(conn: sqlite3.Connection):
     seed_default_admin(conn)
     seed_system_settings(conn)
     seed_default_category_brand(conn)
+    seed_default_platforms(conn)
+    clean_non_default_platforms(conn)
 
 
 def seed_default_category_brand(conn: sqlite3.Connection):
@@ -170,6 +172,148 @@ def seed_default_category_brand(conn: sqlite3.Connection):
     else:
         print("  - 默认品牌 999 已存在，跳过")
     conn.commit()
+
+
+def seed_default_platforms(conn: sqlite3.Connection):
+    """幂等预置 5 个默认电商平台（code 01-05）并补全真实开放平台 API 配置字段。
+
+    与后端 app/main.py 的 create_default_platforms 保持一致：
+    - 新库写入完整记录（含真实网关/版本/限流/TOP·REST/Webhook 字段）；
+    - 已存在仅补 API 配置字段（不动用户改过的名称/状态/备注）；
+    - 用户主动删除某平台后不会自动恢复。
+    限流数值为查证到的参考值，实际随账号等级与应用审核变化，接入时按官方文档微调。
+    """
+    cursor = conn.cursor()
+    defaults = [
+        {
+            "platform_code": "alibaba_icbu", "platform_name": "阿里巴巴国际站",
+            "api_gateway": "https://gw.api.alibaba.com/openapi/",
+            "api_version": "2.0",
+            "api_global_max_qps": 4,
+            "top_sign_type": "hmac-sha1",
+            "top_default_fields": "product_id,title,price,sku,moq,logistics",
+            "rest_auth_header": "",
+            "rest_token_prefix": "",
+            "webhook_encrypt_type": "sha256",
+            "remark": "阿里系 TOP 开放平台(ICBU)，HMAC-SHA1 签名；仅企业开发者可申请；网关路径含 param2/2.0/<method>",
+        },
+        {
+            "platform_code": "made_in_china", "platform_name": "中国制造网",
+            "api_gateway": "https://api.made-in-china.com/",
+            "api_version": "2.0",
+            "api_global_max_qps": 10,
+            "top_sign_type": "",
+            "top_default_fields": "",
+            "rest_auth_header": "Authorization",
+            "rest_token_prefix": "Bearer",
+            "webhook_encrypt_type": "sha256",
+            "remark": "MIC 开放平台，RESTful + OAuth2.0 + MD5 签名(APIKey+SecretKey+时间戳+随机数)；商品详情 /v2/product/detail",
+        },
+        {
+            "platform_code": "globalsources", "platform_name": "环球资源",
+            "api_gateway": "",
+            "api_version": "",
+            "api_global_max_qps": 10,
+            "top_sign_type": "",
+            "top_default_fields": "",
+            "rest_auth_header": "",
+            "rest_token_prefix": "",
+            "webhook_encrypt_type": "",
+            "remark": "暂无公开标准开放平台API，接入需线下向环球资源申请开发者权限",
+        },
+        {
+            "platform_code": "dhgate", "platform_name": "敦煌网",
+            "api_gateway": "http://api.dhgate.com/dop/router",
+            "api_version": "1.0",
+            "api_global_max_qps": 10,
+            "top_sign_type": "",
+            "top_default_fields": "",
+            "rest_auth_header": "Authorization",
+            "rest_token_prefix": "Bearer",
+            "webhook_encrypt_type": "sha256",
+            "remark": "DOP REST 风格，OAuth2.0 系统参数(method/v/access_token/timestamp)；每分钟≤600次；沙箱 sandbox.api.dhgate.com",
+        },
+        {
+            "platform_code": "aliexpress", "platform_name": "速卖通",
+            "api_gateway": "https://openapi.aliexpress.com/router/rest",
+            "api_version": "2.0",
+            "api_global_max_qps": 5,
+            "top_sign_type": "hmac-sha1",
+            "top_default_fields": "product_id,title,price,sku,logistics,currency",
+            "rest_auth_header": "",
+            "rest_token_prefix": "",
+            "webhook_encrypt_type": "sha256",
+            "remark": "AliExpress Open Platform(阿里系 TOP)，HMAC-SHA1 签名；分区域网关(sg/cn/us)；QPS≤5",
+        },
+    ]
+    # 已存在分支仅补的 API 配置字段（不动名称/状态/备注，尊重用户自定义）
+    api_fields = [
+        "api_gateway", "api_version", "api_global_max_qps",
+        "top_sign_type", "top_default_fields", "rest_auth_header", "rest_token_prefix",
+        "webhook_encrypt_type",
+    ]
+    for d in defaults:
+        name = d["platform_name"]
+        # 按 platform_name 判重（名称唯一约束）：已存在则仅补 API 配置字段，
+        # 不改动用户改过的 platform_name / remark / status；避免与历史数字编码(01-05)撞名崩溃
+        row = cursor.execute("SELECT id FROM platforms WHERE platform_name=?", (name,)).fetchone()
+        if row is None:
+            cols = ["platform_code", "platform_name", "remark", "status"] + api_fields
+            vals = [d["platform_code"], d["platform_name"], d["remark"], 1] + [d[k] for k in api_fields]
+            placeholders = ",".join(["?"] * len(cols))
+            cursor.execute(
+                f"INSERT INTO platforms ({','.join(cols)}) VALUES ({placeholders})", vals
+            )
+            print(f"  + 已预置平台: {d['platform_code']}-{name}")
+        else:
+            sets = ", ".join(f"{k}=?" for k in api_fields)
+            cursor.execute(
+                f"UPDATE platforms SET {sets} WHERE platform_name=?",
+                [d[k] for k in api_fields] + [name],
+            )
+    conn.commit()
+    print("  ✓ 默认平台预置/补全完成（共 5 个，含真实开放平台 API 字段）")
+
+
+# 系统默认平台标识（语义编码 + 中文名，两种编码方案都保护）：
+# 真实库历史为数字编码 01-05，新库/设计文档为语义编码；两者均视为系统默认项
+SYSTEM_DEFAULT_PLATFORM_CODES = {
+    "alibaba_icbu", "made_in_china", "globalsources", "dhgate", "aliexpress",
+}
+SYSTEM_DEFAULT_PLATFORM_NAMES = {
+    "阿里巴巴国际站", "中国制造网", "环球资源", "敦煌网", "速卖通",
+}
+
+
+def clean_non_default_platforms(conn: sqlite3.Connection):
+    """清理非系统默认平台：仅保留 5 个系统默认项，删除其余平台。
+
+    - 被网店引用的平台不会被删除（避免破坏业务数据），仅打印警告；
+    - 系统默认项由 SYSTEM_DEFAULT_PLATFORM_CODES / _NAMES 定义（按编码或名称任一命中即保留）。
+    配合 init_database 使用时，clean_user_data 已先清空 shops，故可安全删除全部非默认项。
+    """
+    cursor = conn.cursor()
+    rows = cursor.execute("SELECT id, platform_code, platform_name FROM platforms").fetchall()
+    deleted = 0
+    skipped = 0
+    for pid, code, name in rows:
+        is_default = (code in SYSTEM_DEFAULT_PLATFORM_CODES) or (name in SYSTEM_DEFAULT_PLATFORM_NAMES)
+        if is_default:
+            continue
+        ref = cursor.execute("SELECT COUNT(*) FROM shops WHERE platform_id=?", (pid,)).fetchone()[0]
+        if ref > 0:
+            print(f"  ! 跳过平台(被 {ref} 个网店引用，不删除): {code}-{name}")
+            skipped += 1
+            continue
+        cursor.execute("DELETE FROM platforms WHERE id=?", (pid,))
+        print(f"  - 已清理非默认平台: {code}-{name}")
+        deleted += 1
+    conn.commit()
+    if deleted == 0 and skipped == 0:
+        print("  无需清理：当前平台均为系统默认项")
+    else:
+        print(f"✓ 共清理 {deleted} 个非默认平台（保留 {len(rows) - deleted - skipped} 个系统默认项"
+              + (f"，跳过 {skipped} 个被引用平台" if skipped else "") + "）")
 
 
 # ==================== 兼容性检查 ====================
@@ -210,6 +354,26 @@ def ensure_columns(conn: sqlite3.Connection):
             ("remark1", "VARCHAR(500)"),
             ("remark2", "VARCHAR(500)"),
             ("remark3", "VARCHAR(500)"),
+        ],
+        "shops": [
+            ("platform_code", "VARCHAR(20)"),
+            ("platform_id", "INTEGER"),
+            ("api_app_key", "VARCHAR(255)"),
+            ("api_app_secret", "TEXT"),
+            ("api_access_token", "TEXT"),
+            ("api_refresh_token", "TEXT"),
+            ("api_token_expire", "DATETIME"),
+            ("api_auth_scope", "TEXT"),
+            ("api_self_qps", "INTEGER"),
+            ("sync_auto_enable", "INTEGER"),
+            ("sync_order_interval", "INTEGER"),
+            ("sync_time_window", "INTEGER"),
+            ("last_sync_success_time", "DATETIME"),
+            ("api_retry_count", "INTEGER"),
+            ("api_retry_base_ms", "INTEGER"),
+            ("webhook_callback", "VARCHAR(500)"),
+            ("webhook_verify_key", "VARCHAR(255)"),
+            ("api_ext_json", "TEXT"),
         ],
     }
 
@@ -441,6 +605,19 @@ def _db_status() -> dict:
             settings = c.fetchone()[0]
         except Exception:
             pass
+        # 平台统计：区分系统默认项与自定义项（用于直观确认清理是否生效）
+        plat_total = plat_default = plat_custom = None
+        try:
+            c.execute("SELECT platform_code, platform_name FROM platforms")
+            rows = c.fetchall()
+            plat_total = len(rows)
+            plat_default = sum(
+                1 for code, name in rows
+                if code in SYSTEM_DEFAULT_PLATFORM_CODES or name in SYSTEM_DEFAULT_PLATFORM_NAMES
+            )
+            plat_custom = plat_total - plat_default
+        except Exception:
+            pass
         conn.close()
         return {
             "exists": True,
@@ -448,6 +625,11 @@ def _db_status() -> dict:
             "counts": counts,
             "admin": admin,
             "settings": settings,
+            "platforms_detail": {
+                "total": plat_total,
+                "default": plat_default,
+                "custom": plat_custom,
+            },
             "size_kb": DB_PATH.stat().st_size / 1024 if DB_PATH.exists() else 0,
         }
     except Exception as e:
@@ -592,6 +774,13 @@ def run_gui():
             admin = st["admin"]
             self._set_grid("管理员", f"{admin[0]} ({admin[1]})" if admin else "未创建")
             self._set_grid("系统参数", f"{st['settings']} 条" if st["settings"] is not None else "—")
+            # 平台统计（总数 + 系统默认/自定义拆分，直观确认清理是否生效）
+            pd = st.get("platforms_detail")
+            if pd and pd["total"] is not None:
+                self._set_grid(
+                    "平台",
+                    f"{pd['total']} 个（系统默认 {pd['default']} / 自定义 {pd['custom']}）",
+                )
             # 关键表数据量
             table_labels = [
                 ("users", "用户"),

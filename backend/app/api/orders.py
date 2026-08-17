@@ -717,6 +717,19 @@ async def update_order(
             logger = logging.getLogger(__name__)
             logger.error(f"发送站内信失败，但不影响订单更新: {e}")
 
+    # 订单状态被修改为「已退款」：给创建人 + 老板端发站内信
+    if "shipping_status" in update_data and old_shipping_status != "refunded" and update_data["shipping_status"] == "refunded":
+        try:
+            await NotificationService.send_order_refunded_notification(
+                db=db,
+                order=order,
+                operator=current_user.username
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"发送退款站内信失败，但不影响订单更新: {e}")
+
     if changes:
         log = OperationLog(
             username=current_user.username,
@@ -813,6 +826,10 @@ async def delete_order(
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
+    # 删除前取出创建人/订单号，供下方发送站内信使用（订单删除后将无法再查）
+    _deleted_order_created_by = str(order.created_by) if order.created_by else None
+    _deleted_order_id = order.order_id
+
     # 检查权限：仅允许订单创建人删除订单，其他用户（包括管理员）均不允许删除他人订单
     if str(order.created_by) != str(current_user.username):
         # 记录未授权的删除尝试
@@ -868,6 +885,19 @@ async def delete_order(
     # 删除订单
     await db.delete(order)
     await db.commit()
+
+    # 删除订单后发送站内信通知（创建人 + 老板端）
+    try:
+        await NotificationService.send_order_deleted_notification(
+            db=db,
+            order_id=_deleted_order_id,
+            created_by=_deleted_order_created_by,
+            operator_name=current_user.real_name or current_user.username
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"发送订单删除站内信失败，但不影响订单删除: {e}")
 
     # 记录成功的删除操作
     log = OperationLog(

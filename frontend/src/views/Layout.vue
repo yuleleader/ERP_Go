@@ -375,6 +375,7 @@ const menuGroups = computed(() => {
           title: '店铺物流',
           items: pick([
             { label: '网店信息', path: '/shops', desc: '管理店铺账号与归属', show: (isBoss || isSales) && perm('/shops') },
+            { label: '平台管理', path: '/platform-management', desc: '维护电商平台与 API 对接配置（仅老板）', show: isBoss },
             { label: '物流管理', path: '/logistics', desc: '维护物流商与运费信息', show: isBoss && perm('/logistics') }
           ])
         }

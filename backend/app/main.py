@@ -5,15 +5,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 import os
+from sqlalchemy import select
 from .core.database import init_db
 from .core.config import BASE_DIR, DATA_DIR
-from .api import auth, users, shops, orders, images, logs, logistics, statistics, notifications, products, dashboard, commission_settlement, withdraw, categories, brands, settings, product_images, order_imports, warnings, non_trade, system_backup
+from .api import auth, users, shops, orders, images, logs, logistics, statistics, notifications, products, dashboard, commission_settlement, withdraw, categories, brands, settings, product_images, order_imports, warnings, non_trade, platforms, system_backup
 from .services.scheduler import setup_scheduler, shutdown_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await create_default_admin()
+    await create_default_platforms()
     setup_scheduler(app)
     yield
     shutdown_scheduler()
@@ -78,6 +80,7 @@ app.include_router(product_images.router)
 app.include_router(order_imports.router)
 app.include_router(warnings.router)
 app.include_router(non_trade.router)
+app.include_router(platforms.router)
 app.include_router(system_backup.router)
 
 os.makedirs(DATA_DIR / "images", exist_ok=True)
@@ -121,4 +124,111 @@ async def create_default_admin():
                 is_active=True
             )
             session.add(admin)
+            await session.commit()
+
+
+async def create_default_platforms():
+    """幂等预置 5 个默认电商平台（语义化 code：alibaba_icbu/made_in_china/globalsources/dhgate/aliexpress）并补全真实开放平台 API 配置字段。
+
+    启动即保证存在；新库直接写入完整记录（含真实网关/版本/限流/TOP·REST 字段），
+    已存在的库仅补 API 配置字段（不动用户可能改过的名称/状态/备注）；
+    用户主动删除某平台后不会自动恢复。
+    限流数值为查证到的参考值，实际随账号等级与应用审核变化，接入时按官方文档微调。
+    """
+    from .core.database import AsyncSessionLocal
+    from .models.models import Platform
+
+    defaults = [
+        {
+            "platform_code": "alibaba_icbu", "platform_name": "阿里巴巴国际站",
+            "api_gateway": "https://gw.api.alibaba.com/openapi/",
+            "api_version": "2.0",
+            "api_global_max_qps": 4,
+            "top_sign_type": "hmac-sha1",
+            "top_default_fields": "product_id,title,price,sku,moq,logistics",
+            "rest_auth_header": "",
+            "rest_token_prefix": "",
+            "webhook_encrypt_type": "sha256",
+            "remark": "阿里系 TOP 开放平台(ICBU)，HMAC-SHA1 签名；仅企业开发者可申请；网关路径含 param2/2.0/<method>",
+        },
+        {
+            "platform_code": "made_in_china", "platform_name": "中国制造网",
+            "api_gateway": "https://api.made-in-china.com/",
+            "api_version": "2.0",
+            "api_global_max_qps": 10,
+            "top_sign_type": "",
+            "top_default_fields": "",
+            "rest_auth_header": "Authorization",
+            "rest_token_prefix": "Bearer",
+            "webhook_encrypt_type": "sha256",
+            "remark": "MIC 开放平台，RESTful + OAuth2.0 + MD5 签名(APIKey+SecretKey+时间戳+随机数)；商品详情 /v2/product/detail",
+        },
+        {
+            "platform_code": "globalsources", "platform_name": "环球资源",
+            "api_gateway": "",
+            "api_version": "",
+            "api_global_max_qps": 10,
+            "top_sign_type": "",
+            "top_default_fields": "",
+            "rest_auth_header": "",
+            "rest_token_prefix": "",
+            "webhook_encrypt_type": "",
+            "remark": "暂无公开标准开放平台API，接入需线下向环球资源申请开发者权限",
+        },
+        {
+            "platform_code": "dhgate", "platform_name": "敦煌网",
+            "api_gateway": "http://api.dhgate.com/dop/router",
+            "api_version": "1.0",
+            "api_global_max_qps": 10,
+            "top_sign_type": "",
+            "top_default_fields": "",
+            "rest_auth_header": "Authorization",
+            "rest_token_prefix": "Bearer",
+            "webhook_encrypt_type": "sha256",
+            "remark": "DOP REST 风格，OAuth2.0 系统参数(method/v/access_token/timestamp)；每分钟≤600次；沙箱 sandbox.api.dhgate.com",
+        },
+        {
+            "platform_code": "aliexpress", "platform_name": "速卖通",
+            "api_gateway": "https://openapi.aliexpress.com/router/rest",
+            "api_version": "2.0",
+            "api_global_max_qps": 5,
+            "top_sign_type": "hmac-sha1",
+            "top_default_fields": "product_id,title,price,sku,logistics,currency",
+            "rest_auth_header": "",
+            "rest_token_prefix": "",
+            "webhook_encrypt_type": "sha256",
+            "remark": "AliExpress Open Platform(阿里系 TOP)，HMAC-SHA1 签名；分区域网关(sg/cn/us)；QPS≤5",
+        },
+    ]
+
+    # 仅补全的 API 配置字段（存在分支不动名称/状态/备注，尊重用户自定义）
+    api_fields = [
+        "api_gateway", "api_version", "api_global_max_qps",
+        "top_sign_type", "top_default_fields", "rest_auth_header", "rest_token_prefix",
+        "webhook_encrypt_type",
+    ]
+
+    async with AsyncSessionLocal() as session:
+        for d in defaults:
+            code = d["platform_code"]
+            res = await session.execute(select(Platform).where(Platform.platform_code == code))
+            plat = res.scalar_one_or_none()
+            if plat is not None:
+                # 已存在（按语义编码）：仅补全 API 配置字段，不动名称/状态/备注，尊重用户数据
+                for k in api_fields:
+                    setattr(plat, k, d[k])
+                await session.commit()
+                continue
+            # 平台名称唯一约束：若已有同名平台（如历史数字编码 01-05 的中文名），
+            # 跳过插入，避免 UNIQUE 冲突导致启动失败；现有数据保持不变。
+            res2 = await session.execute(select(Platform).where(Platform.platform_name == d["platform_name"]))
+            if res2.scalar_one_or_none() is not None:
+                continue
+            session.add(Platform(
+                platform_code=code,
+                platform_name=d["platform_name"],
+                remark=d["remark"],
+                status=1,
+                **{k: d[k] for k in api_fields},
+            ))
             await session.commit()

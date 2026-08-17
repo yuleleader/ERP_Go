@@ -38,6 +38,7 @@ backend/data/db/*.bak_*
 backend/data/logs/*.log
 backend/data/launcher_config.json
 backend/data/.secret_key
+backend/data/.platform_key
 
 # ── 临时文件 / 备份 ──
 data/
@@ -47,3 +48,7 @@ generated-images/
 
 # vite 构建临时文件
 frontend/vite.config.js.timestamp-*.mjs
+
+# ── 运行锁 / 临时构建验证 ──
+launcher.pid
+frontend/dist_verify/

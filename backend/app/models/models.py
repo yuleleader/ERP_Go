@@ -41,8 +41,58 @@ class Shop(Base):
     shop_account = Column(String(100), nullable=False)   # 通常为邮箱；不再全局唯一
     status = Column(String(20), default="normal")
     creator = Column(String(50), nullable=False)
+    platform_code = Column(String(10), nullable=True, index=True)  # 历史遗留列（原关联平台编码）；新设计改用 platform_id，本列保留兼容、不再写入读取
+    platform_id = Column(Integer, nullable=True, index=True)  # 关联 platforms.id；NULL=手工录入网店（API 逻辑全部不生效）
+
+    # ===== 店铺级 API 配置（platform_id 不为 null 时生效；密钥类字段数据库加密存储） =====
+    api_app_key = Column(String(255), nullable=True)            # 店铺私有 AppKey
+    api_app_secret = Column(Text, nullable=True)               # 店铺私有密钥（加密存储）
+    api_access_token = Column(Text, nullable=True)             # OAuth 访问令牌（加密存储）
+    api_refresh_token = Column(Text, nullable=True)            # OAuth 刷新令牌（加密存储）
+    api_token_expire = Column(DateTime, nullable=True)         # Token 过期时间（后端自动更新，只读）
+    api_auth_scope = Column(Text, nullable=True)               # 授权权限范围（接口返回回填，只读）
+    api_self_qps = Column(Integer, default=8, nullable=True)   # 单店最大请求 QPS，默认 8；不能超过平台全局 QPS
+    sync_auto_enable = Column(Integer, default=1, nullable=True)    # 自动同步开关 0关闭/1开启，默认 1
+    sync_order_interval = Column(Integer, default=5, nullable=True)  # 自动同步间隔（分钟），默认 5
+    sync_time_window = Column(Integer, default=1, nullable=True)     # 单次拉取订单时间窗口（小时），默认 1
+    last_sync_success_time = Column(DateTime, nullable=True)   # 上次成功同步订单时间（增量拉单核心，后端自动更新，只读）
+    api_retry_count = Column(Integer, default=3, nullable=True)      # 接口失败最大重试次数，默认 3
+    api_retry_base_ms = Column(Integer, default=1000, nullable=True) # 重试基础间隔毫秒，默认 1000
+    webhook_callback = Column(String(500), nullable=True)      # 店铺独立 webhook 回调地址
+    webhook_verify_key = Column(String(255), nullable=True)    # webhook 验签密钥（加密存储）
+    api_ext_json = Column(Text, nullable=True)                 # JSON 扩展字段（店铺特殊参数）
+
     create_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
     update_time = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+
+
+class Platform(Base):
+    """电商平台（基础信息-平台管理）。存储平台公开公共 API 配置，**不存放任何 AppKey/Token 等密钥**。
+    platform_code：平台唯一编码（语义化，如 aliexpress / alibaba_icbu），用户可填，唯一；
+    platform_name：平台中文名，唯一；
+    status：0 禁用 / 1 启用。
+    仅老板端可查看/新增/编辑（其他角色看不到该菜单）。
+    网店(Shop)通过 platform_id 关联本表；platform_id 为 NULL 表示手工录入网店。"""
+    __tablename__ = "platforms"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    platform_code = Column(String(50), unique=True, index=True, nullable=False)  # 平台唯一编码（语义化），用户填写，不可重复
+    platform_name = Column(String(100), unique=True, nullable=False)             # 平台中文名称（唯一）
+    remark = Column(String(255), nullable=True)                                  # 备注
+    status = Column(Integer, default=1, nullable=False)                          # 0 禁用 / 1 启用
+
+    # ===== API 对接公共配置字段（来自开放平台文档；密钥不在此表） =====
+    api_gateway = Column(String(255), nullable=True)            # API 网关地址
+    api_version = Column(String(50), nullable=True)            # 接口版本 v3 / top2.0
+    api_global_max_qps = Column(Integer, default=10, nullable=True)        # 平台官方全局 QPS 上限
+    top_sign_type = Column(String(50), nullable=True)          # TOP 阿里专属：签名算法 hmac-sha1（非阿里平台留空）
+    top_default_fields = Column(String(500), nullable=True)    # TOP 阿里专属：订单默认查询字段
+    rest_auth_header = Column(String(100), nullable=True)      # REST 通用：鉴权 Header 名
+    rest_token_prefix = Column(String(50), nullable=True)      # REST 通用：Token 前缀 Bearer
+    webhook_encrypt_type = Column(String(50), nullable=True)  # Webhook：加密方式 sha256
+
+    created_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
+    updated_at = Column(DateTime, server_default=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'), onupdate=func.strftime('%Y-%m-%d %H:%M:%S', 'now', '+08:00'))
 
 class Order(Base):
     __tablename__ = "orders"
@@ -331,6 +381,7 @@ class NonTradeTransaction(Base):
 @event.listens_for(OrderImport, 'before_insert')
 @event.listens_for(AccountingCode, 'before_insert')
 @event.listens_for(NonTradeTransaction, 'before_insert')
+@event.listens_for(Platform, 'before_insert')
 def set_create_time_before_insert(mapper, connection, target):
     for col in ['created_at', 'create_time', 'login_time', 'start_time', 'updated_at', 'update_time']:
         if hasattr(target, col) and getattr(target, col) is None:
@@ -350,6 +401,7 @@ def set_create_time_before_insert(mapper, connection, target):
 @event.listens_for(OrderImport, 'before_update')
 @event.listens_for(AccountingCode, 'before_update')
 @event.listens_for(NonTradeTransaction, 'before_update')
+@event.listens_for(Platform, 'before_update')
 def set_update_time_before_update(mapper, connection, target):
     for col in ['updated_at', 'update_time']:
         if hasattr(target, col):

@@ -41,6 +41,12 @@ const routes = [
         meta: { title: '网店管理', roles: ['boss', 'sales'] }
       },
       {
+        path: 'platform-management',
+        name: 'PlatformManagement',
+        component: () => import('@/views/PlatformManagement.vue'),
+        meta: { title: '平台管理', roles: ['boss'] }
+      },
+      {
         path: 'users',
         name: 'Users',
         component: () => import('@/views/Users.vue'),

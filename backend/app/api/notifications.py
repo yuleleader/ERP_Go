@@ -95,7 +95,7 @@ async def mark_as_read(
     else:
         return {'message': '标记失败，通知不存在或不属于当前用户'}
 
-@router.put("/all/read")
+@router.put("/read-all")
 async def mark_all_as_read(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)

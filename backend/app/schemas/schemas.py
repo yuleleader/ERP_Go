@@ -51,16 +51,64 @@ class ShopBase(BaseModel):
     status: str = "normal"
 
 class ShopCreate(ShopBase):
-    pass
+    platform_id: Optional[int] = None  # 关联平台 id；NULL=手工录入网店（API 逻辑不生效）
+    # 店铺级 API 配置（platform_id 不为 null 时由 boss 填写；密钥明文传入，后端加密存储）
+    api_app_key: Optional[str] = None
+    api_app_secret: Optional[str] = None
+    api_access_token: Optional[str] = None
+    api_refresh_token: Optional[str] = None
+    api_self_qps: Optional[int] = None
+    sync_auto_enable: Optional[int] = None
+    sync_order_interval: Optional[int] = None
+    sync_time_window: Optional[int] = None
+    api_retry_count: Optional[int] = None
+    api_retry_base_ms: Optional[int] = None
+    webhook_callback: Optional[str] = None
+    webhook_verify_key: Optional[str] = None
+    api_ext_json: Optional[str] = None
 
 class ShopUpdate(BaseModel):
     shop_name: Optional[str] = None
     shop_account: Optional[str] = None
     status: Optional[str] = None
+    platform_id: Optional[int] = None
+    api_app_key: Optional[str] = None
+    api_app_secret: Optional[str] = None
+    api_access_token: Optional[str] = None
+    api_refresh_token: Optional[str] = None
+    api_self_qps: Optional[int] = None
+    sync_auto_enable: Optional[int] = None
+    sync_order_interval: Optional[int] = None
+    sync_time_window: Optional[int] = None
+    api_retry_count: Optional[int] = None
+    api_retry_base_ms: Optional[int] = None
+    webhook_callback: Optional[str] = None
+    webhook_verify_key: Optional[str] = None
+    api_ext_json: Optional[str] = None
 
 class ShopResponse(ShopBase):
     id: int
     shop_id: str
+    platform_id: Optional[int] = None
+    platform_code: Optional[str] = None   # 关联平台编码（展示用，取自 platforms 表）
+    platform_name: Optional[str] = None   # 关联平台中文名（展示用）
+    # 店铺级 API 配置（密钥类字段仅 boss 可见，非 boss 返回 None）
+    api_app_key: Optional[str] = None
+    api_app_secret: Optional[str] = None
+    api_access_token: Optional[str] = None
+    api_refresh_token: Optional[str] = None
+    api_token_expire: Optional[datetime] = None
+    api_auth_scope: Optional[str] = None
+    api_self_qps: Optional[int] = None
+    sync_auto_enable: Optional[int] = None
+    sync_order_interval: Optional[int] = None
+    sync_time_window: Optional[int] = None
+    last_sync_success_time: Optional[datetime] = None
+    api_retry_count: Optional[int] = None
+    api_retry_base_ms: Optional[int] = None
+    webhook_callback: Optional[str] = None
+    webhook_verify_key: Optional[str] = None
+    api_ext_json: Optional[str] = None
     creator: Optional[str] = None
     create_time: Optional[datetime] = None
     update_time: Optional[datetime] = None
@@ -309,6 +357,53 @@ class BrandResponse(BrandBase):
     id: int
     brand_code: int             # 三位数字，自增（=id）
     created_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== 平台管理相关 Schema ====================
+
+class PlatformBase(BaseModel):
+    """平台基础模型（公共字段，不含编码；平台表不存放密钥）"""
+    platform_name: str = Field(..., min_length=1, max_length=100, description="平台中文名称，唯一")
+    remark: Optional[str] = Field(None, max_length=255, description="备注")
+    status: Optional[int] = Field(1, description="0 禁用 / 1 启用")
+    # ===== API 对接公共配置字段（来自开放平台文档） =====
+    api_gateway: Optional[str] = Field(None, max_length=255, description="API 网关地址")
+    api_version: Optional[str] = Field(None, max_length=50, description="接口版本 v3 / top2.0")
+    api_global_max_qps: Optional[int] = Field(10, description="平台官方全局 QPS 上限")
+    top_sign_type: Optional[str] = Field(None, max_length=50, description="TOP 阿里专属：签名算法 hmac-sha1")
+    top_default_fields: Optional[str] = Field(None, max_length=500, description="TOP 阿里专属：订单默认查询字段")
+    rest_auth_header: Optional[str] = Field(None, max_length=100, description="REST 通用：鉴权 Header 名")
+    rest_token_prefix: Optional[str] = Field(None, max_length=50, description="REST 通用：Token 前缀 Bearer")
+    webhook_encrypt_type: Optional[str] = Field(None, max_length=50, description="Webhook：加密方式 sha256")
+
+class PlatformCreate(PlatformBase):
+    """平台创建模型（platform_code 由用户填写语义编码，唯一不可重复）"""
+    platform_code: str = Field(..., min_length=1, max_length=50, description="平台唯一编码，如 aliexpress / alibaba_icbu，不可重复")
+
+class PlatformUpdate(BaseModel):
+    """平台更新模型（所有字段可选；platform_code 可改但不可重复）"""
+    platform_code: Optional[str] = Field(None, min_length=1, max_length=50, description="平台唯一编码")
+    platform_name: Optional[str] = Field(None, min_length=1, max_length=100, description="平台中文名称")
+    remark: Optional[str] = Field(None, max_length=255, description="备注")
+    status: Optional[int] = Field(None, description="0 禁用 / 1 启用")
+    api_gateway: Optional[str] = Field(None, max_length=255, description="API 网关地址")
+    api_version: Optional[str] = Field(None, max_length=50, description="接口版本 v3 / top2.0")
+    api_global_max_qps: Optional[int] = Field(None, description="平台官方全局 QPS 上限")
+    top_sign_type: Optional[str] = Field(None, max_length=50, description="TOP 阿里专属：签名算法")
+    top_default_fields: Optional[str] = Field(None, max_length=500, description="TOP 阿里专属：订单默认查询字段")
+    rest_auth_header: Optional[str] = Field(None, max_length=100, description="REST 通用：鉴权 Header 名")
+    rest_token_prefix: Optional[str] = Field(None, max_length=50, description="REST 通用：Token 前缀")
+    webhook_encrypt_type: Optional[str] = Field(None, max_length=50, description="Webhook：加密方式")
+
+class PlatformResponse(PlatformBase):
+    """平台响应模型"""
+    id: int
+    platform_code: str          # 平台唯一编码（语义化）
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

@@ -36,6 +36,149 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+
+# ── 自动纠正 Python 版本 ─────────────────────────────────────────────
+# 若以 Python 3.14+ 运行（PySide6/部分后端库尚无现成 wheel，pip 会卡在源码编译），
+# 则尝试切换到本机已装的 Python 3.13 重新运行本脚本，避免双击时踩坑。
+# 切换方式：优先用 py -3.13 启动器；若未安装 py，则扫描常见安装路径找 3.13 的 python.exe。
+# 通过环境变量标记防止无限重启：3.13 子进程不会再次进入本分支。
+_RESTART_MARK = "ERPGO_AUTO_RESTART"
+
+
+def _find_python313():
+    """在本机查找已安装的 Python 3.13 解释器路径，找不到返回 None。"""
+    import glob
+    # 1) 优先用 py launcher（Windows 随 Python 安装的启动器）
+    try:
+        _p = subprocess.run(["py", "-3.13", "--version"],
+                            capture_output=True, text=True, timeout=15)
+        if _p.returncode == 0:
+            _pp = subprocess.run(["py", "-3.13", "-c", "import sys; print(sys.executable)"],
+                                 capture_output=True, text=True, timeout=15)
+            if _pp.returncode == 0 and _pp.stdout.strip():
+                return _pp.stdout.strip()
+    except Exception:
+        pass
+    # 2) 扫描常见安装目录
+    candidates = []
+    local_appdata = os.environ.get("LOCALAPPDATA", "")
+    if local_appdata:
+        candidates.append(os.path.join(local_appdata, "Programs", "Python", "Python313", "python.exe"))
+        candidates.append(os.path.join(local_appdata, "Programs", "Python", "Python313-32", "python.exe"))
+    for base in (os.environ.get("ProgramFiles", r"C:\Program Files"),
+                 os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")):
+        if base:
+            candidates.append(os.path.join(base, "Python313", "python.exe"))
+            candidates.append(os.path.join(base, "Python313-32", "python.exe"))
+    candidates.append(r"C:\Python313\python.exe")
+    candidates.append(r"C:\Python313-32\python.exe")
+    # 3) 通配扫描 Users 下的 Python31x 目录
+    if local_appdata:
+        candidates.extend(
+            glob.glob(os.path.join(local_appdata, "Programs", "Python", "Python31*", "python.exe")))
+    # 4) 逐个验证版本号
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                _v = subprocess.run([c, "--version"],
+                                    capture_output=True, text=True, timeout=15)
+                if _v.returncode == 0 and "3.13" in (_v.stdout + _v.stderr):
+                    return c
+            except Exception:
+                pass
+    return None
+
+
+if sys.version_info >= (3, 14) and not os.environ.get(_RESTART_MARK):
+    _py313 = _find_python313()
+    if _py313:
+        os.environ[_RESTART_MARK] = "1"
+        _script = os.path.abspath(__file__)
+        _child = subprocess.run([_py313, _script] + sys.argv[1:])
+        _rc = _child.returncode if _child.returncode is not None else 0
+        sys.exit(_rc)
+    # 没找到 3.13：继续用当前 3.14 运行，后续 check_python_version 会弹提示
+
+
+# ----------------------------------------------------------------------------
+# PySide6 依赖自检（修复「换电脑直接闪退」）
+# 启动器自身是 PySide6 窗口程序，若新电脑的 Python 没装 PySide6，顶层的 import
+# 会直接抛 ImportError 使进程退出、窗口都来不及出现 → 表现为"闪退"。
+# 这里统一兜底：缺失时先尝试自动安装；若仍失败，则用系统原生弹窗给出清晰的操作
+# 指引并写崩溃日志，而不是静默退出。
+# ----------------------------------------------------------------------------
+def _show_fatal_box(title, text):
+    """无法使用 Qt 时，用系统原生消息框兜底报错（不依赖 PySide6）。"""
+    try:
+        from ctypes import windll
+        windll.user32.MessageBoxW(0, text, title, 0x10)  # 0x10 = 错误图标
+    except Exception:
+        pass
+
+def _write_crash_log(text):
+    try:
+        _lp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'launcher_crash.log')
+        with open(_lp, 'a', encoding='utf-8') as _f:
+            _f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {text}\n")
+    except Exception:
+        pass
+
+def _ensure_pyside6_installed():
+    """若未安装 PySide6，尝试用 pip 自动安装一次（使用运行启动器的同一个 Python）。"""
+    try:
+        from PySide6 import __version__  # 轻量探测，避免拉起整个 GUI 模块
+        return True
+    except ImportError:
+        pass
+    _write_crash_log("未检测到 PySide6，尝试自动 pip 安装…")
+    try:
+        # --only-binary :all: 强制只使用现成 wheel。Python 版本太新（如 3.14）没有 wheel 时
+        # 会立即失败，而不是卡在从源码编译 Qt 十几二十分钟。
+        _r = subprocess.run(
+            [sys.executable, '-m', 'pip', 'install', 'PySide6',
+             '--only-binary', ':all:',
+             '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple'],
+            capture_output=True, text=True, timeout=900)
+        _write_crash_log(f"自动安装 PySide6 返回码={_r.returncode}")
+        if _r.returncode != 0:
+            _write_crash_log(_r.stderr[-800:])
+        return _r.returncode == 0
+    except KeyboardInterrupt:
+        _write_crash_log("自动安装 PySide6 被用户中断（可能等太久）。")
+        return False
+    except Exception as _ex:
+        _write_crash_log(f"自动安装 PySide6 异常: {_ex}")
+        return False
+
+if not _ensure_pyside6_installed():
+    _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if sys.version_info >= (3, 14):
+        # Python 太新时，PySide6 通常还没有对应 wheel，pip 会尝试源码编译导致长时间卡死。
+        _hint = (
+            f"当前 Python 版本是 {_py_ver}，太新了，PySide6 还没有预编译的安装包。\n\n"
+            "请按以下步骤修复（只需做一次）：\n"
+            "1. 卸载或忽略当前 Python 3.14\n"
+            "2. 到 python.org 下载并安装 Python 3.13.x（稳定版）\n"
+            "3. 安装时务必勾选「Add Python to PATH」\n"
+            "4. 重新运行：python 启动器.py\n\n"
+            "本项目建议 Python 版本：3.10 ~ 3.13。"
+        )
+        _title = f"Python {_py_ver} 暂不支持 PySide6"
+    else:
+        _hint = (
+            "启动器需要 PySide6 图形库，但当前电脑的 Python 没有安装，导致无法运行。\n\n"
+            "请按以下步骤修复（只需做一次）：\n"
+            "1. 打开「命令提示符」(CMD)\n"
+            "2. 运行：pip install PySide6\n"
+            "3. 安装完成后，重新双击启动器即可。\n\n"
+            "若提示 pip 不是内部命令，请先到 python.org 安装 Python，并务必勾选"
+            "「Add Python to PATH」。\n"
+            "完整错误见启动器所在目录下的 launcher_crash.log。"
+        )
+        _title = "启动器缺少 PySide6"
+    _show_fatal_box(_title, _hint)
+    sys.exit(1)
+
 from PySide6.QtCore import (
     Qt, QObject, Signal, QTimer, QSize, QByteArray, QUrl, QPoint, QEvent,
     QPointF, QRectF,
@@ -56,8 +199,8 @@ from PySide6.QtSvg import QSvgRenderer
 try:
     from ctypes import windll
     windll.shcore.SetProcessDpiAwareness(1)
-except Exception:
-    pass
+except Exception as e:
+    print(f"[启动器] 设置进程 DPI 感知失败（不影响运行）: {e}")
 
 if sys.platform == 'win32':
     CREATE_NO_WINDOW = 0x08000000
@@ -200,28 +343,74 @@ def kill_process_on_port(port):
                    f'":{port}.*LISTENING"\') do @taskkill /F /T /PID %a >nul 2>&1')
             subprocess.run(cmd, shell=True, capture_output=True)
             return True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[启动器] 按端口结束进程失败 (port={port}): {e}")
     else:
         try:
             cmd = f"lsof -ti:{port} | xargs kill -9 2>/dev/null"
             subprocess.run(cmd, shell=True, capture_output=True)
             return True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[启动器] 按端口结束进程失败 (port={port}): {e}")
     return False
 
 
-def acquire_single_instance_lock(port=25999):
-    """绑定专用本地端口作为单实例进程锁；返回 socket 或 None(已有实例)。"""
+def is_pid_alive(pid):
+    """判断给定 pid 的进程是否仍然存在（跨平台）。"""
+    if not pid:
+        return False
+    if sys.platform == 'win32':
+        try:
+            out = subprocess.run(
+                f'tasklist /FI "PID eq {pid}" /NH', shell=True,
+                capture_output=True, text=True)
+            return str(pid) in out.stdout
+        except Exception:
+            return False
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(('127.0.0.1', port))
-        sock.listen(1)
-        return sock
+        os.kill(pid, 0)
+        return True
     except Exception:
-        return None
+        return False
+
+
+PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'launcher.pid')
+
+
+def acquire_single_instance_lock(port=25999):
+    """单实例锁：以 pid 文件为主（原子创建），专用端口占用校验为辅。
+    返回 True 表示取得锁（可启动），False 表示已有实例在运行。
+
+    采用 pid 文件而非常期占用端口，可避免进程被强杀后端口进入 TIME_WAIT
+    导致的「需等待十几秒才能重新打开」问题：陈旧 pid 文件在检测到进程已死时会被清理。
+    """
+    # 1) 陈旧 pid 文件校验：进程已死则清理，允许立即重启
+    if os.path.exists(PID_FILE):
+        old_pid = None
+        try:
+            with open(PID_FILE, 'r', encoding='utf-8') as f:
+                old_pid = int((f.read() or '0').strip() or 0)
+        except Exception:
+            old_pid = None
+        if old_pid and is_pid_alive(old_pid):
+            return False
+        try:
+            os.remove(PID_FILE)
+        except Exception as e:
+            print(f"[启动器] 清理陈旧 pid 文件失败: {e}")
+    # 2) 端口补充校验：专用端口 25999 仍被监听，说明可能仍有实例
+    if is_port_open(port):
+        return False
+    # 3) 原子写入 pid 文件（O_EXCL 保证并发安全）
+    try:
+        fd = os.open(PID_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(str(os.getpid()))
+    except FileExistsError:
+        return False
+    except Exception as e:
+        print(f"[启动器] 写入 pid 文件失败: {e}")
+    return True
 
 
 # ─────────────────────────────────────────
@@ -1421,8 +1610,8 @@ class LauncherApp(QWidget):
                     s.settimeout(1)
                     if s.connect_ex(('localhost', port)) == 0:
                         return True
-            except Exception:
-                pass
+            except Exception as e:
+                self.add_log(f"探测端口 {port} 异常: {e}", "warning")
             elapsed = time.time() - start
             prog = min(180, int(elapsed / timeout * 180))
             if port == 8000:
@@ -1437,7 +1626,8 @@ class LauncherApp(QWidget):
             return False
         try:
             return proc.poll() is None
-        except Exception:
+        except Exception as e:
+            self.add_log(f"检测进程存活异常: {e}", "warning")
             return False
 
     def kill_own_process(self, proc):
@@ -1450,14 +1640,14 @@ class LauncherApp(QWidget):
             else:
                 try:
                     os.kill(pid, signal.SIGTERM)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    self.add_log(f"终止进程 {pid} 失败: {e}", "warning")
+        except Exception as e:
+            self.add_log(f"结束进程 {pid} 异常: {e}", "warning")
         try:
             proc.wait(timeout=3)
-        except Exception:
-            pass
+        except Exception as e:
+            self.add_log(f"等待进程 {pid} 退出超时: {e}", "warning")
 
     def _start_backend(self):
         backend_dir = os.path.join(os.path.dirname(__file__), 'backend')
@@ -1470,44 +1660,63 @@ class LauncherApp(QWidget):
 
     def _health_watchdog(self):
         import time as _time
-        fail_count = 0
+        restart_count = 0          # 后端连续自愈重启次数
+        MAX_RESTART = 5            # 最大自愈次数，超过后停止自动重启（防雪崩）
+        fail_count = 0             # 后端死锁（连续 /health 超时）计数
         DEADLOCK_THRESHOLD = 12
         self._last_watchdog_restart = 0.0
         while True:
             _time.sleep(15)
             if getattr(self, '_stop_requested', False):
-                fail_count = 0
+                restart_count = 0
                 continue
             if getattr(self, '_starting', False):
-                fail_count = 0
+                restart_count = 0
                 continue
             try:
                 if not is_port_open(8000):
                     now = _time.time()
+                    # 冷却时间：短时间内不重复触发重启
                     if now - getattr(self, '_last_watchdog_restart', 0.0) < 30:
                         continue
+                    # 已达自愈上限：停止自动重启，打印严重告警，等待人工排查
+                    if restart_count >= MAX_RESTART:
+                        self.bridge.log.emit(
+                            f"看门狗：后端连续自愈重启已达上限（{MAX_RESTART} 次），停止自动重启，请人工排查后端！",
+                            'backend_err', None)
+                        continue
                     self._last_watchdog_restart = now
-                    self.bridge.log.emit("看门狗：8000 端口未监听，正在自动重启后端", 'backend')
+                    restart_count += 1
+                    self.bridge.log.emit(
+                        f"看门狗：8000 端口未监听，正在自动重启后端（第 {restart_count}/{MAX_RESTART} 次）",
+                        'backend', None)
                     self.backend_process = self._start_backend()
-                    fail_count = 0
                     continue
+                # 端口正常，再判定服务健康
                 if is_service_healthy('http://localhost:8000/health', timeout=8):
+                    # 服务正常，重置连续失败计数（自动恢复自愈能力）
+                    restart_count = 0
                     fail_count = 0
                 else:
                     fail_count += 1
                     self.bridge.log.emit(
-                        f"看门狗：/health 超时（后端繁忙？{fail_count}/{DEADLOCK_THRESHOLD}），仅观察不重启", 'backend')
+                        f"看门狗：/health 超时（后端繁忙？{fail_count}/{DEADLOCK_THRESHOLD}），仅观察不重启", 'backend', None)
                     if fail_count >= DEADLOCK_THRESHOLD:
                         if self._is_alive(self.backend_process):
-                            self.bridge.log.emit("看门狗：后端疑似死锁（连续超时约 3 分钟），正在重启", 'backend_err')
+                            self.bridge.log.emit("看门狗：后端疑似死锁（连续超时约 3 分钟），正在重启", 'backend_err', None)
                             self.kill_own_process(self.backend_process)
                             _time.sleep(2)
                             self.backend_process = self._start_backend()
+                            restart_count += 1
+                            if restart_count >= MAX_RESTART:
+                                self.bridge.log.emit(
+                                    f"看门狗：后端连续自愈重启已达上限（{MAX_RESTART} 次），停止自动重启，请人工排查后端！",
+                                    'backend_err', None)
                         else:
-                            self.bridge.log.emit("看门狗：8000 端口进程非本启动器管理，跳过自动重启", 'backend_err')
+                            self.bridge.log.emit("看门狗：8000 端口进程非本启动器管理，跳过自动重启", 'backend_err', None)
                         fail_count = 0
             except Exception as e:
-                self.bridge.log.emit(f"看门狗异常: {e}", 'backend_err')
+                self.bridge.log.emit(f"看门狗异常: {e}", 'backend_err', None)
 
     def start_services(self):
         self._set_button_state(start='disabled')
@@ -1662,14 +1871,17 @@ class LauncherApp(QWidget):
         tag = source if pipe == 'stdout' else source + '_err'
         try:
             while True:
+                # 子进程已结束则立即退出，避免 readline 在 Windows 下阻塞导致线程泄漏
+                if process.poll() is not None:
+                    break
                 line = stream.readline()
                 if not line:
                     break
                 decoded = line.decode('utf-8', errors='ignore').strip()
                 if decoded:
-                    self.bridge.log.emit(decoded, tag)
-        except Exception:
-            pass
+                    self.bridge.log.emit(decoded, tag, None)
+        except Exception as e:
+            self.add_log(f"读取进程输出异常: {e}", "error")
 
     # ── 系统备份本地接口（供后台「系统备份」页面联动）──
     def _start_backup_http_service(self):
@@ -1696,10 +1908,10 @@ class LauncherApp(QWidget):
                 if len(lines) > 500:
                     with open(BACKUP_LOG_FILE, 'w', encoding='utf-8') as f:
                         f.writelines(lines[-500:])
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as e:
+                self.add_log(f"备份日志截断失败: {e}", "warning")
+        except Exception as e:
+            self.add_log(f"写入备份日志失败: {e}", "warning")
 
     def _load_backup_logs(self, limit=200):
         try:
@@ -1709,8 +1921,8 @@ class LauncherApp(QWidget):
             for ln in lines[-limit:]:
                 try:
                     out.append(json.loads(ln))
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.add_log(f"解析备份日志行失败（已跳过）: {e}", "warning")
             return out
         except Exception:
             return []
@@ -1758,8 +1970,8 @@ class LauncherApp(QWidget):
                 self.day_combo.setCurrentText(str(day))
                 self.interval_edit.setText(str(interval))
                 self._update_settings_ui()
-            except Exception:
-                pass
+            except Exception as e:
+                self.add_log(f"同步备份设置界面失败: {e}", "warning")
 
     # ── 备份 / 还原配置 ──
     def _load_backup_config(self):
@@ -1779,8 +1991,8 @@ class LauncherApp(QWidget):
                     if k not in cfg.get('auto_backup', {}):
                         cfg['auto_backup'][k] = v
                 return cfg
-            except Exception:
-                pass
+            except Exception as e:
+                self.add_log(f"读取备份配置失败，使用默认配置: {e}", "warning")
         return default
 
     def _save_backup_config(self):
@@ -1962,6 +2174,15 @@ class LauncherApp(QWidget):
         self.settings_auto_enabled.setStyleSheet(f"font:11px {FONT}; color:{TEXT};")
         b2.addWidget(self.settings_auto_enabled)
         b2.addSpacing(4)
+        warn = QLabel(
+            "⚠ 重要提示：自动备份仅在「启动器保持打开」时才会执行。关闭启动器后，定时备份线程随之销毁，"
+            "备份将不再运行。\n如需无人值守定时备份，请改用 Windows 任务计划程序 或 Linux cron。")
+        warn.setStyleSheet(
+            f"font:10px 'Segoe UI'; color:#c0392b; background:{CARD}; "
+            f"border:1px solid #c0392b; border-radius:8px; padding:6px 8px;")
+        warn.setWordWrap(True)
+        b2.addWidget(warn)
+        b2.addSpacing(6)
 
         lbl_style = f"font:11px {FONT}; color:{TEXT2};"
         grid = QGridLayout()
@@ -2427,8 +2648,8 @@ class LauncherApp(QWidget):
         if ti:
             try:
                 ti.hide()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[启动器] 隐藏托盘图标失败: {e}")
             self._tray_icon = None
 
 
@@ -2437,11 +2658,20 @@ class LauncherApp(QWidget):
 # ═══════════════════════════════════════
 def main():
     # 单实例保护
-    lock_sock = acquire_single_instance_lock()
-    if lock_sock is None:
+    if not acquire_single_instance_lock():
         app = QApplication.instance() or QApplication([])
         QMessageBox.warning(None, "提示", "启动器已在运行，请勿重复打开。\n若窗口不可见，请在任务栏或系统托盘查找。")
         sys.exit(0)
+
+    # 正常退出时清理 pid 文件（强杀不触发，由下次启动时陈旧检测处理）
+    import atexit
+    def _cleanup_pid():
+        try:
+            if os.path.exists(PID_FILE):
+                os.remove(PID_FILE)
+        except Exception as e:
+            print(f"[启动器] 退出时清理 pid 文件失败: {e}")
+    atexit.register(_cleanup_pid)
 
     app = QApplication([])
     app.setStyle('Fusion')
