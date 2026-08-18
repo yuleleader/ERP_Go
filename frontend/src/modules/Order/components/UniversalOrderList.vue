@@ -435,11 +435,11 @@
             </div>
           </div>
 
-          <!-- 工厂端图片（仅工厂端可见可操作） -->
-          <div class="image-section" v-if="isFactory">
+          <!-- 工厂端图片（工厂/销售/老板可见可操作） -->
+          <div class="image-section" v-if="isFactory || isSalesOrBoss">
             <div class="image-header">
               <span class="image-title">🏭 生产进度图片</span>
-              <span class="image-desc">（工厂端专属上传）</span>
+              <span class="image-desc">（上传生产实拍，订单自动更新为生产中）</span>
             </div>
             <div class="image-upload">
               <el-upload
@@ -461,11 +461,11 @@
             </div>
           </div>
 
-          <!-- 发货端图片（仅发货端可见可操作） -->
-          <div class="image-section" v-if="isShipping">
+          <!-- 发货端图片（发货/销售/老板可见可操作） -->
+          <div class="image-section" v-if="isShipping || isSalesOrBoss">
             <div class="image-header">
               <span class="image-title">📤 发货凭证图片</span>
-              <span class="image-desc">（发货端专属上传）</span>
+              <span class="image-desc">（上传发货凭证）</span>
             </div>
             <div class="image-upload">
               <el-upload

@@ -173,10 +173,10 @@ async def upload_direct(
     await db.commit() 
     await db.refresh(image) 
 
-    if current_user.role == "factory" and layer == "factory":
+    if layer == "factory" and current_user.role in ("factory", "sales", "boss"):
         order_result = await db.execute(select(Order).where(Order.order_id == order_id))
         order = order_result.scalar_one_or_none()
-        if order and order.produce_status != "producing":
+        if order and order.produce_status != "producing" and order.shipping_status not in ("shipped", "virtual"):
             old_status = order.produce_status
             order.produce_status = "producing"
             order.produce_status_update_at = beijing_now()
@@ -185,7 +185,7 @@ async def upload_direct(
             log = OperationLog(
                 username="system-auto",
                 operation_type="update_produce_status",
-                operation_content=f"系统自动更新：工厂上传生产图片，订单生产状态由{old_status}变更为生产中"
+                operation_content=f"系统自动更新：上传生产进度图片，订单生产状态由{old_status}变更为生产中"
             )
             db.add(log)
             
@@ -236,10 +236,10 @@ async def migrate_image(
     # 发送图片上传完成通知给订单创建人
     await NotificationService.send_image_uploaded_notification(db=db, order_id=order_id)
 
-    if current_user.role == "factory" and layer == "factory":
+    if layer == "factory" and current_user.role in ("factory", "sales", "boss"):
         order_result = await db.execute(select(Order).where(Order.order_id == order_id))
         order = order_result.scalar_one_or_none()
-        if order and order.produce_status != "producing":
+        if order and order.produce_status != "producing" and order.shipping_status not in ("shipped", "virtual"):
             old_status = order.produce_status
             order.produce_status = "producing"
             order.produce_status_update_at = beijing_now()
@@ -248,7 +248,7 @@ async def migrate_image(
             log = OperationLog(
                 username="system-auto",
                 operation_type="update_produce_status",
-                operation_content=f"系统自动更新：工厂上传生产图片，订单生产状态由{old_status}变更为生产中"
+                operation_content=f"系统自动更新：上传生产进度图片，订单生产状态由{old_status}变更为生产中"
             )
             db.add(log)
             
