@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统使用说明书（全年龄段友好版）</title>
+<style>
+:root{ --blue:#4a6cf7; --purple:#8b5cf6; --orange:#f59e0b; --green:#10b981; --red:#ef4444; --ink:#2b2f3a; --muted:#7a8194; --bg:#f4f6fc; --card:#ffffff; --line:#e3e6f0; }
+*{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+body{ margin:0; font-family:"Microsoft YaHei","PingFang SC",-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--ink); line-height:1.9; font-size:17px; }
+.wrap{ max-width:920px; margin:0 auto; padding:24px 16px 90px; }
+.hero{ background:linear-gradient(135deg,#4a6cf7 0%,#8b5cf6 100%); color:#fff; border-radius:20px; padding:44px 36px; text-align:center; box-shadow:0 12px 30px rgba(90,100,240,.28); }
+.hero h1{ margin:0 0 8px; font-size:34px; letter-spacing:1px; }
+.hero p{ margin:6px 0; font-size:18px; opacity:.95; }
+.hero .slogan{ font-size:20px; font-weight:600; margin-top:12px; }
+.toc{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 28px; margin:26px 0; }
+.toc h2{ margin:0 0 12px; font-size:20px; }
+.toc a{ display:block; color:var(--blue); text-decoration:none; padding:5px 0; border-bottom:1px dashed #eef0f8; font-size:16.5px; }
+.toc a:hover{ color:var(--purple); }
+.card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px 30px; margin:24px 0; box-shadow:0 3px 12px rgba(70,80,160,.05); }
+.card h2{ margin-top:0; font-size:24px; padding-bottom:10px; border-bottom:2px solid #eef0f8; }
+.card h3{ font-size:19px; margin:22px 0 8px; }
+.rolebar{ display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 4px; }
+.role{ flex:1 1 180px; border-radius:12px; padding:14px 16px; color:#fff; }
+.role b{ font-size:18px; display:block; margin-bottom:2px; }
+.role span{ font-size:14.5px; opacity:.95; }
+.r-boss{ background:linear-gradient(135deg,#8b5cf6,#6d28d9); }
+.r-sales{ background:linear-gradient(135deg,#4a6cf7,#3730a3); }
+.r-factory{ background:linear-gradient(135deg,#f59e0b,#d97706); }
+.r-ship{ background:linear-gradient(135deg,#10b981,#047857); }
+.step{ display:flex; gap:14px; margin:14px 0; }
+.step .num{ flex:0 0 34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--purple)); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:17px; }
+.step .txt{ flex:1; }
+.step .txt b{ font-size:17px; }
+.tip{ background:#f0f4ff; border-left:4px solid var(--blue); border-radius:8px; padding:12px 16px; margin:12px 0; }
+.warn{ background:#fff7ed; border-left:4px solid var(--orange); border-radius:8px; padding:12px 16px; margin:12px 0; }
+.danger{ background:#fef2f2; border-left:4px solid var(--red); border-radius:8px; padding:12px 16px; margin:12px 0; }
+table{ border-collapse:collapse; width:100%; margin:12px 0; font-size:15.5px; }
+th{ background:#4a6cf7; color:#fff; padding:8px 12px; text-align:left; }
+td{ border:1px solid var(--line); padding:8px 12px; }
+tr:nth-child(even) td{ background:#f7f8fd; }
+code{ background:#eef0fa; padding:1px 7px; border-radius:5px; font-size:15px; color:#4a4f8f; font-family:Consolas,Menlo,monospace; }
+.faq{ border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin:12px 0; background:#fff; }
+.faq b{ color:#3730a3; display:block; margin-bottom:4px; font-size:17px; }
+.footer{ text-align:center; color:var(--muted); font-size:14px; margin-top:34px; }
+#topBtn{ position:fixed; right:24px; bottom:24px; width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--purple)); color:#fff; border:none; font-size:22px; cursor:pointer; box-shadow:0 6px 16px rgba(90,100,240,.4); display:none; z-index:99; }
+@media print{ .toc,#topBtn{ display:none; } body{ background:#fff; font-size:12pt; } .card{ box-shadow:none; page-break-inside:avoid; } }
+@media (max-width:640px){ .hero{padding:30px 18px;} .hero h1{font-size:26px;} .card{padding:18px 16px;} body{font-size:16px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <h1>📋 系统使用说明书</h1>
+  <p>玻璃猫 · 电商产销协同管理系统</p>
+  <div class="slogan">管订单 · 盯生产 · 查发货 · 算提成</div>
+  <p style="margin-top:10px;font-size:15.5px;">这本说明书用最通俗的话，教每一位伙伴用好系统。照着步骤做，保准学得会。</p>
+</div>
+
+<div class="toc">
+  <h2>📖 目录</h2>
+  <a href="#c1">一、开始之前：怎么打开、怎么登录</a>
+  <a href="#c2">二、咱们四个人，各干各的活</a>
+  <a href="#c3">三、业务员（销售）怎么录订单</a>
+  <a href="#c4">四、车间（工厂）怎么盯生产</a>
+  <a href="#c5">五、仓库（发货）怎么发货</a>
+  <a href="#c6">六、老板怎么看、怎么管</a>
+  <a href="#c7">七、人人都该知道的小常识</a>
+  <a href="#c8">八、常见问题（遇到事先看这里）</a>
+  <a href="#c9">九、安全提醒（最后必读）</a>
+</div>
+
+<div class="card" id="c1">
+  <h2>一、开始之前：怎么打开、怎么登录</h2>
+  <div class="step"><div class="num">1</div><div class="txt"><b>打开系统</b><br>桌面上有一个叫 <b>启动器</b> 的程序，双击打开它。看到里面写着「前端运行中」「后端运行中」就说明系统好了。</div></div>
+  <div class="step"><div class="num">2</div><div class="txt"><b>进入页面</b><br>启动器里点一下「打开系统」（或在浏览器里打开它提示的网址），就会出现登录页面。</div></div>
+  <div class="step"><div class="num">3</div><div class="txt"><b>登录</b><br>输入你的<b>账号</b>（一般是姓名拼音或邮箱）和<b>密码</b>，点「登录」。账号密码由老板分配。</div></div>
+  <div class="step"><div class="num">4</div><div class="txt"><b>退出</b><br>右上角点自己的名字 → 退出登录。离开工位时记得退出，保护数据。</div></div>
+  <div class="tip">💡 记不住密码？找老板在「用户管理」里帮你重置，不用自己折腾。</div>
+</div>
+
+<div class="card" id="c2">
+  <h2>二、咱们四个人，各干各的活</h2>
+  <p>系统按分工给每个人开了不同的「门」：你能看到的、能操作的，都和你的工作有关。</p>
+  <div class="rolebar">
+    <div class="role r-boss"><b>👑 老板</b><span>看全部数据、管所有设置、算提成发工资</span></div>
+    <div class="role r-sales"><b>👔 业务员（销售）</b><span>录订单、传商品图、看自己卖的货</span></div>
+    <div class="role r-factory"><b>🏭 车间（工厂）</b><span>看订单、打印二维码、传生产照片</span></div>
+    <div class="role r-ship"><b>🚚 仓库（发货）</b><span>填物流单号、点发货、传发货凭证</span></div>
+  </div>
+  <div class="tip">💡 业务员只能看到<b>自己</b>的订单；老板能看到<b>所有人</b>的。这是规矩，不是出错了。</div>
+</div>
+
+<div class="card" id="c3">
+  <h2>三、业务员（销售）怎么录订单</h2>
+  <h3>3.1 新建一笔订单</h3>
+  <div class="step"><div class="num">1</div><div class="txt"><b>找到入口</b><br>左侧菜单点「订单管理」→ 右上角点「<b>新建订单</b>」。</div></div>
+  <div class="step"><div class="num">2</div><div class="txt"><b>填必填项</b><br>选<b>网店</b>（哪个店铺卖的）、填<b>平台订单号</b>（平台上的单号）、选<b>商品名称</b>、填<b>销售金额</b>。</div></div>
+  <div class="step"><div class="num">3</div><div class="txt"><b>填地址和备注</b><br>收货地址按平台原样填；有要交代的话写进备注。</div></div>
+  <div class="step"><div class="num">4</div><div class="txt"><b>保存</b><br>点「保存」。系统会自动生成一个<b>追溯码</b>（订单编号），以后靠它找订单、打二维码。</div></div>
+  <h3>3.2 上传商品图片</h3>
+  <div class="step"><div class="num">1</div><div class="txt">打开订单 → 找到「商品图片」区域 → 点上传，选好图片确认即可。</div></div>
+  <h3>3.3 找自己的订单</h3>
+  <div class="step"><div class="num">1</div><div class="txt">订单列表页上方有筛选栏，可按<b>状态</b>（未发货/已发货等）、<b>生产状态</b>筛选；用<b>搜索框</b>输追溯码或商品名，一点就找到。</div></div>
+  <div class="step"><div class="num">2</div><div class="txt">想留底？点「<b>导出Excel</b>」，订单表就下载到电脑里了。</div></div>
+  <div class="warn">⚠️ 录单时务必核对平台订单号、金额、地址，录错了后面改起来麻烦，还容易耽误发货。</div>
+</div>
+
+<div class="card" id="c4">
+  <h2>四、车间（工厂）怎么盯生产</h2>
+  <div class="step"><div class="num">1</div><div class="txt"><b>看活</b><br>进「订单管理」，订单默认把<b>没发货的排前面</b>，方便你按顺序安排生产。</div></div>
+  <div class="step"><div class="num">2</div><div class="txt"><b>打印二维码</b><br>找到要生产的订单 → 点「打印」，把二维码贴在货上，方便后面扫码核对。</div></div>
+  <div class="step"><div class="num">3</div><div class="txt"><b>传生产照片</b><br>生产开始后，在订单里「生产进度图片」区域上传<b>生产实拍图</b>。传上去系统自动把状态变成「<b>生产中</b>」，并通知业务员和老板。</div></div>
+  <div class="step"><div class="num">4</div><div class="txt"><b>随时更新进度</b><br>状态也可以手动改（未生产→生产中→生产完成）。但<b>订单一旦发货，生产状态就永远锁死为「生产完成」</b>，改不回去了。</div></div>
+  <div class="tip">💡 同一个订单传多张生产照片，系统不会重复通知，放心传。</div>
+</div>
+
+<div class="card" id="c5">
+  <h2>五、仓库（发货）怎么发货</h2>
+  <div class="step"><div class="num">1</div><div class="txt"><b>找待发货订单</b><br>筛选「未发货」，按顺序处理。</div></div>
+  <div class="step"><div class="num">2</div><div class="txt"><b>填物流信息</b><br>在「物流信息」区填：<b>发货平台</b>（哪家物流）、<b>运单号1</b>（快递单号）、运费，运单号2可留空。</div></div>
+  <div class="step"><div class="num">3</div><div class="txt"><b>上传发货凭证</b><br>在「发货凭证图片」区上传快递面单照片。</div></div>
+  <div class="step"><div class="num">4</div><div class="txt"><b>点发货</b><br>把状态改成「<b>已发货</b>」（没货但想先占位催单时选「虚拟发货」）。保存后系统自动通知业务员，并把生产状态锁成「生产完成」。</div></div>
+  <div class="danger">⚠️ 重要：<b>已发货的订单就不能再改了</b>——物流单号、金额都锁住，只能改「退货/退款」并填退款备注。所以<b>发货前一定把运单号、运费填完整</b>！</div>
+</div>
+
+<div class="card" id="c6">
+  <h2>六、老板怎么看、怎么管</h2>
+  <h3>6.1 一屏看全局</h3>
+  <p>「<b>智慧大屏</b>」是老板专属，销售额、商品排行、月度销量、店铺排行、超期订单、国家分布，一个页面全看到。</p>
+  <h3>6.2 盯住异常</h3>
+  <p>「<b>预警中心</b>」自动揪出<b>超期</b>的订单（默认超过 35 天还没生产/没发货），点进去就能追责或催办。</p>
+  <h3>6.3 算钱</h3>
+  <p>「<b>提成</b>」自动按订单算好业务员提成；「<b>退款率分析</b>」看哪些店铺退款多；「<b>财务</b>」里还能记非交易收支（买水、广告费等）。</p>
+  <h3>6.4 管店铺和平台</h3>
+  <p>「<b>店铺</b>」里维护网店、配置平台 API（密钥只有老板能看）；「<b>立即同步</b>」可拉取平台订单，拉进来先存「待审核」。</p>
+  <h3>6.5 批量导入订单</h3>
+  <p>订单多？用「<b>数据导入</b>」：下载 Excel 模板 → 填好上传 → 系统逐行检查 → 有问题的改一改 → 勾选审核 → 合并进正式订单，一次进一大批。</p>
+  <h3>6.6 备份数据（很重要）</h3>
+  <p>「<b>系统备份</b>」可立即备份数据库。设了自动备份的话，<b>记住：只有启动器开着才自动备份</b>，关了就停了。</p>
+  <h3>6.7 管人和权限</h3>
+  <p>「<b>用户管理</b>」开账号、重置密码、设置角色和权限；「<b>系统日志</b>」看谁什么时候干了什么，出了事查得到。</p>
+</div>
+
+<div class="card" id="c7">
+  <h2>七、人人都该知道的小常识</h2>
+  <table>
+    <tr><th>东西</th><th>一句话解释</th></tr>
+    <tr><td>未发货（待发货）</td><td>单子录进来了，还没发出去</td></tr>
+    <tr><td>已发货</td><td>货已发出，物流单号已填</td></tr>
+    <tr><td>虚拟发货</td><td>货还没好，先用占位单号催着，之后补发实体</td></tr>
+    <tr><td>已退货/退款</td><td>这笔单退款了，要填退款备注</td></tr>
+    <tr><td>追溯码</td><td>系统生成的订单编号，找单、扫码、追溯全靠它</td></tr>
+    <tr><td>生产状态</td><td>未生产 → 生产中 → 生产完成（发货后锁死）</td></tr>
+    <tr><td>站内信</td><td>页面里的「信封」图标，订单有新进展会提醒你</td></tr>
+    <tr><td>下单时长</td><td>这单下了多少天，超期会变红，提醒催办</td></tr>
+  </table>
+  <div class="step"><div class="num">!</div><div class="txt"><b>删订单要输密码</b><br>订单删掉<b>找不回来</b>，所以系统要求输入密码二次确认。删之前想清楚。</div></div>
+</div>
+
+<div class="card" id="c8">
+  <h2>八、常见问题（遇到事先看这里）</h2>
+  <div class="faq"><b>Q1. 页面打不开 / 白屏怎么办？</b><br>先看启动器：服务状态是否「运行中」。不是的话等几秒，或点启动；还不行就重启启动器（它会自动拉起前后端）。</div>
+  <div class="faq"><b>Q2. 忘记密码了？</b><br>找老板，在「用户管理」里帮你重置，不用自己折腾。</div>
+  <div class="faq"><b>Q3. 已发货了，运单号填错了怎么办？</b><br>抱歉，已发货的订单物流信息锁定了，改不了。只能把订单改「退货/退款」重新处理。所以发货前一定核对清楚。</div>
+  <div class="faq"><b>Q4. 图片传错了能换吗？</b><br>可以。在订单图片区把错的删掉，重新上传即可。</div>
+  <div class="faq"><b>Q5. 为什么看不到别人（别人看不到我）的订单？</b><br>系统按职责分权限：业务员只看自己录的单，老板看全部。这是防出错、防泄密的设计。</div>
+  <div class="faq"><b>Q6. 设了自动备份，为什么没动静？</b><br>自动备份只有在<b>启动器保持打开</b>时才执行。关机、退出启动器后备份就停了。重要数据建议每天看眼备份记录。</div>
+  <div class="faq"><b>Q7. 「虚拟发货」是啥意思？</b><br>工厂还没生产出来，又不想让订单一直晾着，就先填个占位单号点虚拟发货催进度，货好后再补发实体。</div>
+  <div class="faq"><b>Q8. 那个「超期订单」红色提醒是什么？</b><br>超过 35 天还没生产完/没发货的订单，系统自动标红提醒，提醒相关人抓紧处理。</div>
+</div>
+
+<div class="card" id="c9">
+  <h2>九、安全提醒（最后必读）</h2>
+  <div class="danger">🔒 <b>密码就是你的签名。</b> 不要告诉任何人你的密码，离开工位记得退出登录。</div>
+  <div class="danger">🔒 <b>订单删了不能恢复。</b> 删除要输密码，输之前多看一眼订单号对不对。</div>
+  <div class="danger">🔒 <b>别手动改数据库。</b> 系统出问题找老板或维护人员，不要自己动电脑里的数据库文件，改坏了一整年账都找不回来。</div>
+  <div class="warn">🛡️ <b>重要数据要备份。</b> 老板记得定期用「系统备份」保存数据库，或保证启动器常开让自动备份生效。</div>
+</div>
+
+<div class="footer">玻璃猫 · 电商产销协同管理系统 · 使用说明书（全年龄段友好版）<br>生成日期 2026-08-18 · 内容与当前系统版本一致</div>
+</div>
+
+<button id="topBtn" title="回到顶部">↑</button>
+<script>
+(function(){
+  var btn = document.getElementById('topBtn');
+  window.addEventListener('scroll', function(){
+    btn.style.display = window.scrollY > 400 ? 'block' : 'none';
+  });
+  btn.addEventListener('click', function(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+</script>
+</body>
+</html>

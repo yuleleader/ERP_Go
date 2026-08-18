@@ -1,0 +1,4877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商产销协同管理系统 开发文档说明</title>
+<style>
+:root { --accent:#5b6ef5; --accent2:#9b5bf5; --border:#e3e6f0; --text:#2b2f3a; --muted:#7a8194; --bg:#f5f6fb; --card:#ffffff; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:"Microsoft YaHei","PingFang SC",-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.75; font-size:15px; }
+.wrap { max-width:1000px; margin:0 auto; padding:32px 20px 80px; }
+article { background:var(--card); border-radius:14px; padding:40px 48px; box-shadow:0 6px 24px rgba(60,70,140,.08); border:1px solid var(--border); }
+h1 { font-size:26px; border-bottom:2px solid var(--accent); padding-bottom:10px; margin-top:34px; color:#232741; }
+h1:first-child { margin-top:0; font-size:30px; text-align:center; border-bottom:none; padding-bottom:0; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+h2 { font-size:21px; margin-top:38px; padding:10px 14px; background:linear-gradient(90deg,rgba(91,110,245,.10),rgba(155,91,245,.06)); border-left:4px solid var(--accent); border-radius:6px; color:#232741; }
+h3 { font-size:17px; margin-top:26px; color:#3a3f5c; }
+h4 { font-size:15px; margin-top:20px; color:#4a5070; }
+p { margin:10px 0; }
+ul,ol { padding-left:26px; }
+li { margin:4px 0; }
+blockquote { margin:14px 0; padding:10px 16px; background:#f3f5ff; border-left:4px solid var(--accent); border-radius:6px; color:#4a5070; }
+code { font-family:Consolas,Menlo,monospace; background:#eef0fa; padding:2px 6px; border-radius:4px; font-size:13px; color:#4a4f8f; }
+pre { background:#282c3a; color:#e6e8f2; padding:14px 18px; border-radius:10px; overflow-x:auto; }
+pre code { background:transparent; color:inherit; padding:0; font-size:13px; line-height:1.6; }
+table { border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px; }
+th { background:#5b6ef5; color:#fff; font-weight:600; padding:8px 12px; text-align:left; }
+td { border:1px solid var(--border); padding:7px 12px; vertical-align:top; }
+tr:nth-child(even) td { background:#f7f8fd; }
+.mermaid { margin:20px auto; text-align:center; overflow-x:auto; background:#fff; border:1px dashed var(--border); border-radius:10px; padding:14px; }
+.mermaid svg { max-width:100%; height:auto; }
+hr { border:none; border-top:1px solid var(--border); margin:26px 0; }
+#topBtn { position:fixed; right:26px; bottom:26px; width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none; font-size:20px; cursor:pointer; box-shadow:0 4px 14px rgba(91,110,245,.4); display:none; }
+footer { text-align:center; color:var(--muted); font-size:12.5px; margin-top:28px; }
+@media (max-width:720px){ article{padding:22px 16px;} .wrap{padding:12px 8px 70px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<article>
+<h1>电商产销协同管理系统 开发文档说明</h1>
+<h1>最后更新时间 2026-08-18 10:30:00</h1>
+<h2>1 项目概述</h2>
+<h3>1.1 项目背景</h3>
+<p>搭建轻量化内网电商产销协同管理平台，打通销售端、工厂端、发货端、管理端（老板端）业务链路，替代线下表格管理，实现网店自主管理、订单统一录入、唯一追溯码+二维码溯源、工厂统一打印、发货全流程维护、图片凭证存档、操作全程留痕、销售提成可视化，提升订单流转与发货管控效率，确保数据安全可控。</p>
+<h3>1.2 业务目标</h3>
+<ol>
+<li>销售端：自主维护所属网店，标准化录入订单信息，上传产品图片，追踪个人订单状态，维护订单发货状态，查看个人订单提成金额及计算逻辑。</li>
+<li>工厂端：查看所有状态下的订单（隐藏销售金额），拥有唯一二维码打印权限，配合订单流转，可上传图片告知生产任务，确保生产环节能全面对接所有订单需求。</li>
+<li>发货端：查看自己关联操作的订单（隐藏销售金额），全权维护自己关联订单的发货状态、物流单号、物流公司信息、发货凭证，确保发货流程可追溯。</li>
+<li>老板端：全数据管控，负责账号权限管理、数据备份、日志审计、销售端提成比例配置，掌握全局业务数据，可操作软件内所有功能。</li>
+<li>财务模块：包含工资结算（提成结算）和账户提现功能，支持按发货时间统计提成、提现记录管理。</li>
+</ol>
+<h3>1.3 技术架构</h3>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>技术选型</th>
+<th>版本要求</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端</td>
+<td>Vue3 + Element Plus</td>
+<td>Vue 3.3+、Element Plus 2.3+</td>
+<td>适配电脑端浏览器，支持响应式布局</td>
+</tr>
+<tr>
+<td>后端</td>
+<td>Python FastAPI + Uvicorn</td>
+<td>Python 3.10+、FastAPI 0.100+</td>
+<td>轻量高效，支持RESTful API</td>
+</tr>
+<tr>
+<td>数据库</td>
+<td>SQLite 3</td>
+<td>3.35+</td>
+<td>单文件存储，免安装服务，适配内网轻量化部署</td>
+</tr>
+<tr>
+<td>图片存储</td>
+<td>本地文件目录归档</td>
+<td>-</td>
+<td>按固定路径存储，分临时目录、正式目录</td>
+</tr>
+<tr>
+<td>认证方式</td>
+<td>Token令牌登录鉴权</td>
+<td>-</td>
+<td>Token有效期可配置</td>
+</tr>
+</tbody>
+</table>
+<h3>1.4 系统架构图</h3>
+<blockquote>
+<p>系统整体为「浏览器 / 启动器 → Vue3 前端 → FastAPI 后端 → SQLite / 本地图片」的单机内网架构，后端通过平台 API 与外部电商平台对接。Mermaid 源码可被 Typora / 语雀 / GitHub 直接渲染。</p>
+</blockquote>
+<p><div class="mermaid">flowchart TB
+    subgraph CLIENT[&quot;客户端层&quot;]
+        Browser[&quot;浏览器&lt;br/&gt;（日常访问前端页面）&quot;]
+        Launcher[&quot;启动器（PySide6 桌面程序）&lt;br/&gt;负责前后端进程启停 + 看门狗自愈&quot;]
+    end
+
+    subgraph FRONTEND[&quot;前端层 Vue3 + Element Plus（端口 5173）&quot;]
+        Auth[&quot;路由守卫 + 登录鉴权&quot;]
+        M_Order[&quot;订单模块&lt;br/&gt;列表 / 新建 / 编辑 / 批量导入&quot;]
+        M_Prod[&quot;生产模块&lt;br/&gt;生产进度 / 生产图片&quot;]
+        M_Ship[&quot;发货模块&lt;br/&gt;物流信息 / 发货凭证&quot;]
+        M_Stat[&quot;统计模块&lt;br/&gt;智慧大屏 / 退款率 / 预警中心&quot;]
+        M_Shop[&quot;店铺模块&lt;br/&gt;网店 / 平台 / API 配置&quot;]
+        M_Fin[&quot;财务模块&lt;br/&gt;提成 / 工资结算 / 非交易收支&quot;]
+        M_Sys[&quot;系统模块&lt;br/&gt;用户 / 日志 / 备份 / 设置&quot;]
+    end
+
+    subgraph BACKEND[&quot;后端层 FastAPI + Uvicorn（端口 8000）&quot;]
+        A_Auth[&quot;auth.py 认证接口&quot;]
+        A_Order[&quot;orders.py 订单接口&quot;]
+        A_Import[&quot;order_imports.py 批量导入&quot;]
+        A_Product[&quot;products.py 商品接口&quot;]
+        A_Shop[&quot;shops.py / platforms.py 店铺平台&quot;]
+        A_Stat[&quot;statistics.py / dashboard.py 统计&quot;]
+        A_Fin[&quot;commission_settlement.py / non_trade.py 财务&quot;]
+        A_Sys[&quot;users.py / logs.py / system_backup.py 系统&quot;]
+        Watchdog[&quot;看门狗线程&lt;br/&gt;15 秒健康检查 / 防雪崩自愈&quot;]
+    end
+
+    subgraph DATA[&quot;数据层&quot;]
+        DB[(&quot;SQLite 数据库&lt;br/&gt;backend/data/db/order_system.db&lt;br/&gt;19 张表&quot;)]
+        IMG[&quot;本地图片存储&lt;br/&gt;backend/data/images&quot;]
+    end
+
+    subgraph EXT[&quot;外部系统&quot;]
+        Platform[&quot;电商平台 API&lt;br/&gt;敦煌网 / AliExpress / Shopee / Amazon&quot;]
+    end
+
+    Browser --&gt;|&quot;HTTP 访问&quot;| FRONTEND
+    Launcher --&gt;|&quot;进程管理 + 看门狗监控&quot;| BACKEND
+    FRONTEND --&gt;|&quot;REST API + JWT Bearer&quot;| BACKEND
+    BACKEND --&gt; DB
+    BACKEND --&gt; IMG
+    BACKEND --&gt;|&quot;HTTPS 拉单 / 同步&quot;| Platform</div></p>
+<p><strong>架构说明</strong>：
+- <strong>客户端层</strong>：浏览器是日常操作入口；启动器是桌面管理端，负责拉起/停止前后端进程，其看门狗线程每 15 秒探测后端健康（端口 8000 + <code>/health</code>），后端崩溃自动重启（连续失败 5 次停止自愈）。
+- <strong>前端层</strong>：单页应用按业务模块拆分为 13 个模块目录，路由守卫统一做登录态与角色/数据权限校验；<code>vite dev server</code> 运行在 5173 端口。
+- <strong>后端层</strong>：FastAPI 按业务拆分为 21 个 API 路由文件，统一 JWT 鉴权 + <code>require_role</code> 角色校验 + 账号级数据权限拦截。
+- <strong>数据层</strong>：SQLite 单文件（免安装）；图片按订单/商品归档到本地目录，图片访问走鉴权路由。
+- <strong>外部系统</strong>：店铺级 API 配置（密钥 Fernet 加密存储）用于拉取平台订单写入临时表待审核。</p>
+<h2>2 项目目录树图</h2>
+<pre><code>d:\demo\完整版订单管理系统\
+├── backend\                           # Python FastAPI 后端项目
+│   ├── app\                          # 应用主目录
+│   │   ├── api\                     # API路由模块
+│   │   │   ├── __init__.py
+│   │   │   ├── auth.py              # 认证接口（登录、注册、修改密码）
+│   │   │   ├── users.py            # 用户管理接口
+│   │   │   ├── shops.py            # 网店管理接口
+│   │   │   ├── logistics.py        # 物流公司管理接口
+│   │   │   ├── orders.py           # 订单管理接口
+│   │   │   ├── images.py           # 图片管理接口
+│   │   │   ├── statistics.py       # 数据统计接口
+│   │   │   ├── logs.py             # 日志管理接口
+│   │   │   ├── products.py         # 商品管理接口
+│   │   │   ├── dashboard.py        # 智慧大屏接口
+│   │   │   ├── notifications.py    # 通知管理接口
+│   │   │   ├── commission_settlement.py  # 提成结算接口
+│   │   │   └── withdraw.py               # 账户提现接口
+│   │   ├── core\                   # 核心配置模块
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py          # 系统配置（路径、数据库、JWT等）
+│   │   │   ├── database.py        # 数据库连接配置（含连接池）
+│   │   │   └── security.py        # 安全工具（密码哈希、JWT）
+│   │   ├── models\                # 数据库模型
+│   │   │   ├── __init__.py
+│   │   │   └── models.py          # SQLAlchemy模型定义（12张表）
+│   │   ├── schemas\               # Pydantic schemas
+│   │   │   ├── __init__.py
+│   │   │   ├── logistics.py      # 物流公司schema
+│   │   │   └── schemas.py        # 请求/响应模型
+│   │   ├── services\             # 业务服务层
+│   │   │   ├── __init__.py
+│   │   │   ├── log_cleanup.py    # 日志清理服务
+│   │   │   ├── notification_service.py  # 通知服务
+│   │   │   └── scheduler.py      # 定时任务调度器
+│   │   ├── utils\                 # 工具函数
+│   │   │   ├── __init__.py
+│   │   │   └── order_id_generator.py  # 订单号生成器
+│   │   └── main.py               # FastAPI应用入口
+│   ├── data\                     # 数据存储目录
+│   │   ├── db\                  # SQLite数据库文件
+│   │   ├── images\              # 图片存储目录
+│   │   │   ├── temp\           # 临时图片目录
+│   │   │   └── official\        # 正式图片目录（按订单号分层）
+│   │   ├── backup\             # 数据库备份文件目录（启动器备份/还原生成）
+│   │   └── launcher_config.json # 启动器本地配置（自动备份计划等，已 gitignore）
+│   ├── migrations\              # 数据库迁移脚本
+│   ├── mobile\                 # 手机端轻量作业页（纯静态，同源托管于 /m/）
+│   │   ├── index.html          # 手机端单页：登录/扫码/订单详情/按角色改单/图片上传
+│   │   ├── jsQR.js             # 浏览器端二维码解码库（本地内置，无需外网）
+│   │   └── demo_qr.png         # 测试用系统订单二维码（编码订单号）
+│   ├── requirements.txt         # Python依赖
+│   ├── run_server.py            # 服务启动脚本
+│   ├── start_backend.bat        # 批处理启动
+│   ├── start_backend.ps1        # PowerShell启动
+│   ├── test_login.py            # 登录测试
+│   ├── test_pagination.py       # 分页测试
+│   ├── test_logs_pagination.py  # 日志分页测试
+│   ├── test_password.py         # 密码测试
+│   ├── check_db.py              # 数据库检查
+│   └── check_logs_count.py      # 日志数量检查
+├── frontend\                      # Vue 3 前端项目
+│   ├── dist\                    # 构建产物目录
+│   ├── src\                     # 源代码目录
+│   │   ├── api\                # API请求模块
+│   │   │   ├── baseUrl.js      # 环境域名配置
+│   │   │   ├── request.js      # Axios实例封装
+│   │   │   ├── index.js        # API统一导出入口
+│   │   │   ├── auth.js         # 认证相关API
+│   │   │   ├── user.js         # 用户管理API
+│   │   │   ├── shop.js         # 网店管理API
+│   │   │   ├── logistics.js    # 物流公司API
+│   │   │   ├── order.js        # 订单管理API
+│   │   │   ├── statistics.js   # 数据统计API
+│   │   │   ├── image.js        # 图片管理API
+│   │   │   ├── product.js      # 商品管理API
+│   │   │   ├── logs.js         # 日志管理API
+│   │   │   ├── notification.js # 通知管理API
+│   │   │   ├── exchange.js     # 汇率API
+│   │   │   ├── dashboard.js    # 智慧大屏API
+│   │   │   ├── commission_settlement.js  # 提成结算API
+│   │   │   └── withdraw.js               # 账户提现API
+│   │   ├── modules\            # 业务模块目录
+│   │   │   ├── Common\         # 公共模块
+│   │   │   │   └── components\
+│   │   │   │       ├── ExchangeCalculator.vue   # 汇率计算器
+│   │   │   │       ├── OrderOverview.vue       # 订单概览
+│   │   │   │       ├── SalesPerformance.vue    # 销售业绩
+│   │   │   │       ├── FinanceStatistics.vue   # 财务统计
+│   │   │   │       ├── SalesRanking.vue        # 销售排行
+│   │   │   │       ├── ProductRanking.vue      # 商品排行
+│   │   │   │       ├── SystemControls.vue      # 系统控制
+│   │   │   │       └── world.json             # 世界地图数据
+│   │   │   ├── Order\          # 订单管理模块
+│   │   │   │   ├── views\
+│   │   │   │   │   └── Orders.vue
+│   │   │   │   ├── components\
+│   │   │   │   │   └── UniversalOrderList.vue  # 通用订单列表组件
+│   │   │   │   └── services\
+│   │   │   │       └── orderService.js
+│   │   │   ├── Product\        # 商品管理模块
+│   │   │   │   └── services\
+│   │   │   │       └── productService.js
+│   │   │   ├── Shop\           # 网店管理模块
+│   │   │   │   └── services\
+│   │   │   │       └── shopService.js
+│   │   │   ├── Logistics\      # 物流管理模块
+│   │   │   │   └── services\
+│   │   │   │       └── logisticsService.js
+│   │   │   ├── Image\          # 图片管理模块
+│   │   │   │   └── services\
+│   │   │   │       └── imageService.js
+│   │   │   ├── Log\            # 日志管理模块
+│   │   │   │   └── services\
+│   │   │   │       └── logService.js
+│   │   │   ├── Statistics\     # 数据统计模块
+│   │   │   │   └── services\
+│   │   │   │       └── statisticsService.js
+│   │   │   ├── Settings\       # 系统设置模块
+│   │   │   │   └── services\
+│   │   │   │       └── settingsService.js
+│   │   │   ├── User\           # 用户管理模块
+│   │   │   │   └── services\
+│   │   │   │       └── userService.js
+│   │   │   └── Finance\        # 财务模块
+│   │   │       └── views\
+│   │   │           ├── CommissionSettlement.vue  # 工资结算
+│   │   │           └── AccountWithdrawal.vue     # 账户提现
+│   │   ├── router\             # 路由配置
+│   │   │   └── index.js        # Vue Router配置（含权限守卫）
+│   │   ├── store\              # Pinia状态管理
+│   │   │   ├── user.js         # 用户状态管理
+│   │   │   └── users.js        # 用户列表状态管理
+│   │   ├── utils\              # 工具函数
+│   │   │   ├── request.js      # Axios封装
+│   │   │   ├── format.js       # 格式化函数
+│   │   │   ├── countryData.js  # 国家数据（地图定位）
+│   │   │   ├── addressParser.js # 地址解析器
+│   │   │   └── exchangeRequest.js # 汇率请求工具
+│   │   ├── styles\             # 样式目录
+│   │   │   └── dark-theme.scss # 深色主题样式
+│   │   ├── views\              # 页面组件（根页面）
+│   │   │   ├── Login.vue       # 登录页面
+│   │   │   ├── Layout.vue      # 主布局（侧边栏+汇率计算器）
+│   │   │   ├── Dashboard.vue   # 工作台（角色路由）
+│   │   │   ├── BossDashboard.vue # 老板端工作台
+│   │   │   ├── SalesDashboard.vue # 销售端工作台
+│   │   │   ├── FactoryDashboard.vue # 工厂端工作台
+│   │   │   ├── ShippingDashboard.vue # 发货端工作台
+│   │   │   ├── Users.vue       # 用户管理
+│   │   │   ├── Shops.vue       # 网店管理
+│   │   │   ├── Orders.vue      # 订单管理（模块入口）
+│   │   │   ├── Products.vue    # 商品管理
+│   │   │   ├── Images.vue      # 图片管理
+│   │   │   ├── Logistics.vue   # 物流公司管理
+│   │   │   ├── Statistics.vue  # 数据统计
+│   │   │   ├── Logs.vue        # 日志管理
+│   │   │   ├── Settings.vue    # 系统设置
+│   │   │   ├── Notifications.vue # 站内装他信
+│   │   │   └── SmartDashboard.vue # 智慧大屏
+│   │   ├── App.vue             # 根组件
+│   │   ├── main.js             # 应用入口
+│   │   └── style.css           # 全局样式
+│   ├── index.html              # HTML入口
+│   ├── package.json            # npm依赖配置
+│   └── vite.config.js          # Vite配置
+├── 启动器.py                       # 可视化启动器（推荐使用）
+├── 一键启动.bat                    # 批处理启动脚本
+├── 数据库初始化.py                  # 数据库初始化脚本
+└── 开发文档说明.md              # 本文档
+</code></pre>
+<h2>3 数据库设计</h2>
+<h3>3.1 数据库ER关系图</h3>
+<blockquote>
+<p>系统共 19 张表，以下为实体关系总览（关键字段）；各表完整字段见 3.2 数据表结构。Mermaid 源码可被 Typora / 语雀 / GitHub 直接渲染。</p>
+</blockquote>
+<p><div class="mermaid">erDiagram
+    users ||--o{ orders : &quot;创建订单(created_by)&quot;
+    users ||--o{ operation_logs : &quot;操作日志(user_id)&quot;
+    users ||--o{ login_logs : &quot;登录记录(username)&quot;
+    users ||--o{ notifications : &quot;接收站内信(recipient_username)&quot;
+    users ||--o{ shop_withdraw_record : &quot;创建提现记录&quot;
+    shops ||--o{ orders : &quot;订单归属(shop_id)&quot;
+    shops ||--o{ shop_withdraw_record : &quot;提现记录(shop_id)&quot;
+    platforms ||--o{ shops : &quot;平台下网店(platform_id)&quot;
+    orders ||--o{ images : &quot;订单图片(order_id)&quot;
+    orders ||--o{ notifications : &quot;订单通知(order_id)&quot;
+    products ||--o{ product_images : &quot;商品图片(product_code)&quot;
+    categories ||--o{ products : &quot;商品类别(category_id)&quot;
+    brands ||--o{ products : &quot;商品品牌(brand_id)&quot;
+    accounting_codes ||--o{ non_trade_transactions : &quot;账务代码(code_id)&quot;
+    categories ||--o{ categories : &quot;二级分类(parent_id)&quot;
+    order_imports }o--|| orders : &quot;合并生成(merged_order_id)&quot;
+
+    users {
+        int id PK
+        string username UK &quot;登录名&quot;
+        string role &quot;角色&quot;
+        int commission_rate &quot;提成率&quot;
+        string data_permissions &quot;数据权限JSON&quot;
+    }
+    shops {
+        int id PK
+        string shop_id UK &quot;网店编码&quot;
+        string shop_name &quot;网店名称&quot;
+        int platform_id FK &quot;关联平台&quot;
+        string status
+    }
+    platforms {
+        int id PK
+        string platform_code UK &quot;平台编码&quot;
+        string platform_name &quot;平台名称&quot;
+        string api_gateway &quot;API网关&quot;
+    }
+    orders {
+        int id PK
+        string order_id UK &quot;追溯码&quot;
+        string platform_order_no UK &quot;平台单号&quot;
+        string shop_id FK &quot;网店&quot;
+        string product_name &quot;商品名称&quot;
+        string shipping_status &quot;发货状态&quot;
+        string produce_status &quot;生产状态&quot;
+        string created_by &quot;创建人&quot;
+    }
+    images {
+        int id PK
+        string order_id FK &quot;所属订单&quot;
+        string image_type &quot;图片类型&quot;
+        string layer &quot;层级 sales/factory/shipping&quot;
+    }
+    operation_logs {
+        int id PK
+        int user_id FK &quot;操作人&quot;
+        string operation_type &quot;操作类型&quot;
+        string operation_content
+    }
+    login_logs {
+        int id PK
+        string username &quot;账号&quot;
+        string status &quot;success/fail&quot;
+    }
+    system_settings {
+        int id PK
+        string key UK &quot;参数键&quot;
+        string value &quot;参数值&quot;
+    }
+    logistics_companies {
+        int id PK
+        string company_code UK
+        string company_name UK &quot;公司名&quot;
+    }
+    log_cleanup_records {
+        int id PK
+        string cleanup_type &quot;清理类型&quot;
+        int deleted_count &quot;删除条数&quot;
+    }
+    notifications {
+        int id PK
+        string recipient_username FK &quot;接收人&quot;
+        string order_id FK &quot;关联订单&quot;
+        string event_type &quot;事件类型&quot;
+        boolean is_read &quot;是否已读&quot;
+    }
+    products {
+        int id PK
+        string product_code UK &quot;商品编码&quot;
+        string product_name
+        int category_id FK &quot;类别&quot;
+        int brand_id FK &quot;品牌&quot;
+        float cost_price &quot;成本价&quot;
+    }
+    shop_withdraw_record {
+        int id PK
+        string shop_id FK &quot;网店&quot;
+        string withdraw_amount &quot;提现金额&quot;
+    }
+    categories {
+        int id PK
+        string category_code UK &quot;类别编码&quot;
+        string category_name
+        int parent_id FK &quot;上级类别&quot;
+    }
+    brands {
+        int id PK
+        int brand_code UK &quot;品牌编码&quot;
+        string brand_name
+    }
+    product_images {
+        int id PK
+        string product_code FK &quot;商品编码&quot;
+        string image_url &quot;图片地址&quot;
+    }
+    order_imports {
+        int id PK
+        string batch_no &quot;导入批次&quot;
+        string platform_order_no &quot;平台单号&quot;
+        string status &quot;pending/merged&quot;
+        string merged_order_id FK &quot;合并后追溯码&quot;
+    }
+    accounting_codes {
+        int id PK
+        string code UK &quot;账务代码&quot;
+        string code_type &quot;income/expense&quot;
+    }
+    non_trade_transactions {
+        int id PK
+        int code_id FK &quot;账务代码&quot;
+        string trans_type &quot;收入/支出&quot;
+        float amount &quot;金额&quot;
+    }</div></p>
+<p><strong>关系说明</strong>：
+- <strong>用户表</strong> 与 <strong>订单表</strong>：1:N（一个用户可创建多个订单，通过 created_by 关联）
+- <strong>用户表</strong> 与 <strong>操作日志表</strong>：1:N（一个用户可产生多条操作日志）
+- <strong>用户表</strong> 与 <strong>登录日志表</strong>：1:N（一个用户可产生多条登录记录）
+- <strong>用户表</strong> 与 <strong>通知表</strong>：1:N（一个用户可接收多条站内信）
+- <strong>用户表</strong> 与 <strong>提现记录表</strong>：1:N（一个用户可创建多条提现记录）
+- <strong>平台表</strong> 与 <strong>网店表</strong>：1:N（一个平台下可有多家网店，platform_id 为空表示手工录入网店）
+- <strong>网店表</strong> 与 <strong>订单表</strong>：1:N（一个网店可关联多个订单）
+- <strong>网店表</strong> 与 <strong>提现记录表</strong>：1:N（一个网店可关联多条提现记录）
+- <strong>订单表</strong> 与 <strong>图片表</strong>：1:N（一个订单可关联多张图片）
+- <strong>订单表</strong> 与 <strong>通知表</strong>：1:N（一个订单可关联多条通知）
+- <strong>商品表</strong> 与 <strong>订单表</strong>：1:N（通过 product_name 文本弱关联；商品表为选填主数据）
+- <strong>类别表</strong> 与 <strong>商品表</strong>：1:N（一个类别下多个商品）；<strong>品牌表</strong> 与 <strong>商品表</strong>：1:N
+- <strong>类别表</strong> 自关联：1:N（二级分类挂一级分类）
+- <strong>商品表</strong> 与 <strong>商品图片表</strong>：1:N（同一商品编码最多 5 张图）
+- <strong>账务代码表</strong> 与 <strong>非交易收支表</strong>：1:N（一个代码对应多条收支流水）
+- <strong>临时导入表</strong> 与 <strong>订单表</strong>：N:1（多条临时记录合并生成正式订单，合并后临时记录删除仅审计兜底）
+- <strong>物流公司表 / 系统设置表 / 日志清理记录表</strong>：独立主数据表，无外键关联</p>
+<h3>3.2 数据表结构</h3>
+<h4>3.2.1 用户表（users）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>username</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>登录账号，全局唯一</td>
+</tr>
+<tr>
+<td>password_hash</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>密码哈希存储</td>
+</tr>
+<tr>
+<td>real_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>真实姓名</td>
+</tr>
+<tr>
+<td>role</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>角色类型：boss/sales/factory/shipping</td>
+</tr>
+<tr>
+<td>commission_rate</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>提成比例（仅sales角色，1-100）</td>
+</tr>
+<tr>
+<td>is_active</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>账号状态：1启用/0禁用，默认1</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.2 网店表（shops）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>shop_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>网店唯一标识（店铺名称明文），全局唯一</td>
+</tr>
+<tr>
+<td>shop_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>店铺名称，不可重复</td>
+</tr>
+<tr>
+<td>shop_account</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>店铺账号</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>网店状态：normal/closed，默认normal</td>
+</tr>
+<tr>
+<td>creator</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>创建人用户名，关联users表username</td>
+</tr>
+<tr>
+<td>create_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+<tr>
+<td>update_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.3 物流公司表（logistics_companies）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>company_code</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>物流公司代码，唯一</td>
+</tr>
+<tr>
+<td>company_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>物流公司名称，唯一</td>
+</tr>
+<tr>
+<td>contact_person</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>联系人</td>
+</tr>
+<tr>
+<td>contact_phone</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>联系电话</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>状态：active/inactive，默认active</td>
+</tr>
+<tr>
+<td>created_by</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>创建人用户名，关联user表username</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.4 订单表（orders）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>order_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>追溯码，全局唯一，按固定规则生成</td>
+</tr>
+<tr>
+<td>shop_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>关联网店表shop_id</td>
+</tr>
+<tr>
+<td>product_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>商品名称</td>
+</tr>
+<tr>
+<td>platform_order_no</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>平台原始订单号，唯一</td>
+</tr>
+<tr>
+<td>sales_amount</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>销售金额，保留2位小数</td>
+</tr>
+<tr>
+<td>shipping_status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>发货状态：pending/shipped/virtual/refunded，默认pending（refunded=已退货/退款）</td>
+</tr>
+<tr>
+<td>logistics_company</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>物流公司名称</td>
+</tr>
+<tr>
+<td>logistics_no</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>物流单号</td>
+</tr>
+<tr>
+<td>shipping_operator</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>发货操作人</td>
+</tr>
+<tr>
+<td>shipping_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>否</td>
+<td>发货操作时间，状态变更为已发货时自动填充，支持手动编辑</td>
+</tr>
+<tr>
+<td>receiver_address</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>收货地址</td>
+</tr>
+<tr>
+<td>remark</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>订单备注</td>
+</tr>
+<tr>
+<td>commission_rate</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>提成比例</td>
+</tr>
+<tr>
+<td>commission_amount</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>提成金额，自动计算</td>
+</tr>
+<tr>
+<td>created_by</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>创建人用户名，关联user表username</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，可自定义</td>
+</tr>
+<tr>
+<td>order_days</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>订单滞留时长（单位：天）</td>
+</tr>
+<tr>
+<td>commission_paid</td>
+<td>BOOLEAN</td>
+<td>否</td>
+<td>是</td>
+<td>提成是否已发放，默认false</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+<tr>
+<td>produce_status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>生产状态：unproduce/producing/produced，默认unproduce</td>
+</tr>
+<tr>
+<td>produce_status_update_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>否</td>
+<td>生产状态最后变更时间戳</td>
+</tr>
+<tr>
+<td>produce_status_update_user</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>变更操作人标识：手动修改存储操作人用户名，系统自动变更填写system-auto</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.5 图片表（images）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>temp_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>临时图片ID</td>
+</tr>
+<tr>
+<td>order_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>关联订单号，临时图片时为null</td>
+</tr>
+<tr>
+<td>image_type</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>图片类型：product/shipping/virtual/production（兼容旧字段，归档与分类展示以 layer 为准）</td>
+</tr>
+<tr>
+<td>image_url</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>图片存储路径</td>
+</tr>
+<tr>
+<td>thumbnail_url</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>缩略图路径</td>
+</tr>
+<tr>
+<td>image_hash</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>图片MD5哈希值</td>
+</tr>
+<tr>
+<td>is_main</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>是否主图：1是/0否，默认0</td>
+</tr>
+<tr>
+<td>uploaded_by</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>上传人用户名，关联users表username</td>
+</tr>
+<tr>
+<td>is_locked</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>是否锁定：1是/0否，默认0</td>
+</tr>
+<tr>
+<td>layer</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>图片层级：sales/factory/shipping，默认sales</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.6 操作日志表（operation_logs）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>user_id</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>操作人ID</td>
+</tr>
+<tr>
+<td>username</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>操作人用户名</td>
+</tr>
+<tr>
+<td>operation_type</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>操作类型</td>
+</tr>
+<tr>
+<td>operation_content</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>操作内容</td>
+</tr>
+<tr>
+<td>ip_address</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>IP地址</td>
+</tr>
+<tr>
+<td>user_agent</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>用户代理</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>操作时间，自动生成</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.7 登录日志表（login_logs）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>username</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>登录账号</td>
+</tr>
+<tr>
+<td>login_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>登录时间</td>
+</tr>
+<tr>
+<td>ip_address</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>IP地址</td>
+</tr>
+<tr>
+<td>user_agent</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>用户代理</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>登录状态：success/failed，默认success</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.8 商品表（products）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>product_code</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>商品唯一标识码（UUID v4格式：PRD-XXXXXXXX），全局唯一</td>
+</tr>
+<tr>
+<td>product_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>商品名称，长度限制2-100字符，与订单表product_name字段关联</td>
+</tr>
+<tr>
+<td>product_remark</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>商品备注，支持富文本格式，最大长度500字符</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>商品状态：active(启用)/inactive(停用)，默认active</td>
+</tr>
+<tr>
+<td>created_by</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>创建人用户名，关联user表username</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.9 提现记录表（shop_withdraw_record）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>shop_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>关联网店表shop_id</td>
+</tr>
+<tr>
+<td>withdraw_date</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>提现日期，格式YYYY-MM-DD</td>
+</tr>
+<tr>
+<td>withdraw_amount</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>提现金额，保留2位小数</td>
+</tr>
+<tr>
+<td>remark</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>备注</td>
+</tr>
+<tr>
+<td>create_operator_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>创建人姓名</td>
+</tr>
+<tr>
+<td>create_operator_id</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>创建人ID</td>
+</tr>
+<tr>
+<td>update_operator_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>更新人姓名</td>
+</tr>
+<tr>
+<td>update_operator_id</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>更新人ID</td>
+</tr>
+<tr>
+<td>create_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成（北京时间）</td>
+</tr>
+<tr>
+<td>update_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新（北京时间）</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.10 通知表（notifications）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>recipient_username</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>接收人用户名，关联users表username，索引</td>
+</tr>
+<tr>
+<td>order_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>关联订单号，索引</td>
+</tr>
+<tr>
+<td>event_type</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>事件类型</td>
+</tr>
+<tr>
+<td>title</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>通知标题</td>
+</tr>
+<tr>
+<td>content</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>通知内容</td>
+</tr>
+<tr>
+<td>is_read</td>
+<td>BOOLEAN</td>
+<td>否</td>
+<td>是</td>
+<td>是否已读，默认false</td>
+</tr>
+<tr>
+<td>read_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>否</td>
+<td>读取时间</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.11 日志清理记录表（log_cleanup_records）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>cleanup_type</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>清理类型：operation/login/all</td>
+</tr>
+<tr>
+<td>retention_days</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>保留天数</td>
+</tr>
+<tr>
+<td>deleted_count</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>删除数量，默认0</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>状态：pending/success/failed</td>
+</tr>
+<tr>
+<td>error_message</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>错误信息</td>
+</tr>
+<tr>
+<td>start_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>开始时间</td>
+</tr>
+<tr>
+<td>end_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>否</td>
+<td>结束时间</td>
+</tr>
+<tr>
+<td>triggered_by</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>触发方式：manual/scheduled</td>
+</tr>
+<tr>
+<td>operator_username</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>操作人用户名</td>
+</tr>
+</tbody>
+</table>
+<h4>3.2.12 系统设置表（system_settings）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>key</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>设置键，全局唯一</td>
+</tr>
+<tr>
+<td>value</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>设置值</td>
+</tr>
+<tr>
+<td>description</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>设置描述</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间，自动生成</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间，自动更新</td>
+</tr>
+</tbody>
+</table>
+<h2>4 核心字段定义</h2>
+<h3>4.1 订单追溯码（order_id）生成规则</h3>
+<ul>
+<li><strong>生成格式</strong>：<code>登录账号（username）+ 年月日（YYYYMMDD）+ 网店ID（shop_account）+平台订单号（platform_order_no）+ 6位随机数字</code></li>
+<li><strong>示例</strong>：zhangsan20260424淘宝XX旗舰店P20260424001123456</li>
+<li><strong>并发防重机制</strong>：</li>
+<li>系统启动时预生成1000个6位随机号存入内存队列</li>
+<li>新增订单时从队列取号拼接</li>
+<li>若重复则重试最多3次</li>
+<li>队列剩余≤100个时自动补充</li>
+</ul>
+<h3>4.2 商品唯一标识码（product_code）生成规则</h3>
+<ul>
+<li><strong>生成格式</strong>：<code>PLU-{6位数字}</code>（顺序编号，从1开始递增）</li>
+<li><strong>示例</strong>：PLU-000001、PLU-000002、PLU-000100</li>
+<li><strong>唯一性保证</strong>：基于数据库自增ID生成，保证唯一性</li>
+<li><strong>生成时机</strong>：商品创建时自动生成，不可修改</li>
+</ul>
+<h3>4.3 提成计算公式</h3>
+<ul>
+<li><strong>公式</strong>：<code>提成金额 = 销售金额 × 提成比例 ÷ 100</code></li>
+<li><strong>取值范围</strong>：提成比例1-100（仅销售端账号）</li>
+<li><strong>计算时机</strong>：订单创建时、编辑销售金额时自动计算</li>
+</ul>
+<h3>4.4 图片存储方案（方案A）</h3>
+<ul>
+<li><strong>临时目录</strong>：<code>data/images/temp/</code></li>
+<li><strong>正式目录</strong>：<code>data/images/official/{order_id}/{layer}/</code>（按追溯码+层级分目录）</li>
+<li><strong>层级分类</strong>：</li>
+<li><code>sales</code>（销售端）：商品图片</li>
+<li><code>factory</code>（工厂端）：生产进度图片</li>
+<li><code>shipping</code>（发货端）：发货凭证图片</li>
+<li><strong>清理机制</strong>：临时图片保留24小时</li>
+<li><strong>完整性验证</strong>：使用MD5哈希值校验</li>
+</ul>
+<h3>4.5 生产状态定义</h3>
+<h4>4.5.1 生产状态枚举</h4>
+<table>
+<thead>
+<tr>
+<th>存储值</th>
+<th>展示名称</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>unproduce</td>
+<td>未生产</td>
+<td>新建订单默认状态，未开展任何生产作业</td>
+</tr>
+<tr>
+<td>producing</td>
+<td>生产中</td>
+<td>工厂上传生产图片自动切换，代表车间正在生产</td>
+</tr>
+<tr>
+<td>produced</td>
+<td>生产完成</td>
+<td>订单发货后自动锁定，生产流程永久结束，不存在返工、回退场景</td>
+</tr>
+</tbody>
+</table>
+<h4>4.5.2 手动修改权限&amp;锁定规则</h4>
+<ul>
+<li><strong>手动修改权限</strong>：全部角色（boss、sales、factory、shipping）均可手动修改订单生产状态</li>
+<li><strong>永久锁定机制</strong>：只要订单 <code>shipping_status = shipped / virtual</code>（已发货/虚拟发货），系统永久锁定生产状态为「生产完成」；任何人手动修改为「未生产/生产中」直接拦截，弹窗提示：订单已完成发货，生产流程结束，生产状态不可调整</li>
+<li><strong>撤销发货锁定</strong>：即使后续手动撤销发货、将 <code>shipping_status</code> 改回 <code>pending</code>，生产状态依旧保持 <code>produced</code>，不允许人工下调，不支持返工</li>
+</ul>
+<h4>4.5.3 系统自动变更触发逻辑</h4>
+<p><strong>触发1：工厂端上传factory层级生产图片</strong>
+- <strong>触发条件</strong>：上传用户角色为factory；图片层级 layer = factory（生产实拍图）；订单当前生产状态 ≠ producing
+- <strong>执行动作</strong>：自动更新 <code>produce_status = producing</code>；同步更新 <code>produce_status_update_at</code>、<code>produce_status_update_user = system-auto</code>；写入操作日志，标记类型：系统自动-工厂上传生产图片；推送站内通知至订单创建销售、工厂、全部老板账号
+- <strong>防抖规则</strong>：订单已是「生产中」时，重复上传多张生产图片，不重复更新状态、不新增日志、不推送通知</p>
+<p><strong>触发2：发货端更新订单为已发货/虚拟发货</strong>
+- <strong>触发条件</strong>：接口更新订单 <code>shipping_status</code> 从 <code>pending</code> 变为 <code>shipped / virtual</code>
+- <strong>执行动作</strong>：强制固定 <code>produce_status = produced</code>，不受前端传入参数影响；同步更新 <code>produce_status_update_at</code>、<code>produce_status_update_user = system-auto</code>；写入操作日志，标记类型：系统自动-订单完成发货，生产流程结束；推送站内通知至订单创建销售、工厂、全部老板账号；永久锁定，后续无论是否撤销发货，生产状态固定不变</p>
+<h4>4.5.4 操作日志留存规范</h4>
+<p>所有生产状态变更（手动修改、系统自动变更）强制写入 <code>operation_logs</code>，操作类型统一为 <code>update_produce_status</code>：</p>
+<table>
+<thead>
+<tr>
+<th>变更类型</th>
+<th>日志文案格式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>手动修改</td>
+<td>用户{操作人姓名}手动调整订单生产状态：{旧状态} → {新状态}</td>
+</tr>
+<tr>
+<td>工厂传图自动变更</td>
+<td>系统自动更新：工厂上传生产图片，订单生产状态由{旧状态}变更为生产中</td>
+</tr>
+<tr>
+<td>发货自动变更</td>
+<td>系统自动锁定：订单完成发货，生产状态强制更新为生产完成，生产流程结束</td>
+</tr>
+</tbody>
+</table>
+<h4>4.5.5 站内通知推送规则</h4>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>接收人</th>
+<th>标题</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工厂上传图片→自动变为生产中</td>
+<td>订单创建销售、当前工厂账号、所有老板账号</td>
+<td>订单生产进度更新</td>
+<td>订单【{order_id}】已上传生产实拍，当前生产状态更新为：生产中</td>
+</tr>
+<tr>
+<td>订单完成发货→自动锁定为生产完成</td>
+<td>订单创建销售、工厂账号、所有老板账号</td>
+<td>订单生产全部完成</td>
+<td>订单【{order_id}】已完成发货，生产流程结束，生产状态固定为生产完成</td>
+</tr>
+<tr>
+<td>任意角色手动修改生产状态</td>
+<td>订单创建销售、所有老板账号</td>
+<td>订单生产状态人工调整</td>
+<td>用户{操作人姓名}手动将订单【{order_id}】生产状态由{旧状态}修改为{新状态}</td>
+</tr>
+</tbody>
+</table>
+<h4>4.5.6 站内信模板样式详表</h4>
+<blockquote>
+<p>完整模板统计见 <code>站内信模板样式统计.md</code>，此处为摘要。系统共 6 类站内信事件，时间统一北京时间 <code>YYYY-MM-DD HH:MM:SS</code>；同订单+同事件自动去重（含已读/未读）。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>事件类型</th>
+<th>触发场景</th>
+<th>接收者</th>
+<th>标题</th>
+<th>内容模板</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_created</code></td>
+<td>销售/老板创建新订单</td>
+<td>全部工厂端</td>
+<td>新订单提醒</td>
+<td>{creator_name}创建了新订单【{order_id}】，【{product_name}】【{created_at}】订单号【{order_id}】</td>
+</tr>
+<tr>
+<td><code>image_uploaded</code></td>
+<td>工厂上传生产实拍图片</td>
+<td>订单创建者</td>
+<td>图片上传完成</td>
+<td>订单 {order_id} 的图片已上传完成。时间: {当前时间}</td>
+</tr>
+<tr>
+<td><code>order_shipped</code></td>
+<td>发货端更新为已发货/虚拟发货</td>
+<td>订单创建者</td>
+<td>订单已发货</td>
+<td>订单 {order_id} 已发货。{物流公司: xxx}{物流单号: xxx}时间: {当前时间}（物流字段可选，有则显示）</td>
+</tr>
+<tr>
+<td><code>produce_status_changed_manual</code></td>
+<td>手动修改生产状态</td>
+<td>订单创建者、所有老板端</td>
+<td>订单生产状态人工调整</td>
+<td>用户{操作人姓名}手动将订单【{order_id}】生产状态由{原状态}修改为{新状态}</td>
+</tr>
+<tr>
+<td><code>produce_status_changed_factory_image</code></td>
+<td>工厂上传生产图片自动变为生产中</td>
+<td>订单创建者、所有工厂端、所有老板端</td>
+<td>订单生产进度更新</td>
+<td>订单【{order_id}】已上传生产实拍，当前生产状态更新为：{新状态}</td>
+</tr>
+<tr>
+<td><code>produce_status_changed_shipping</code></td>
+<td>发货后自动锁定生产完成</td>
+<td>订单创建者、所有工厂端、所有老板端</td>
+<td>订单生产全部完成</td>
+<td>订单【{order_id}】已完成发货，生产流程结束，生产状态固定为{新状态}</td>
+</tr>
+</tbody>
+</table>
+<p><strong>生产状态显示映射</strong>：<code>unproduce</code>→未生产、<code>producing</code>→生产中、<code>produced</code>→生产完成。</p>
+<p><strong>前端展示样式</strong>：通知列表图标 48x48 圆形渐变背景（紫）、标题加粗黑色（font-weight:600, #333）、时间/订单号灰色小字（12px, #999/#666）、内容 14px 灰、状态标签（已读绿/未读黄）、未读项背景 <code>#fff3e6</code>；图标映射 <code>image_uploaded</code>→Picture、<code>order_shipped</code>→Van、其他→Bell。</p>
+<p><strong>数据模型</strong>：<code>notifications</code> 表（id, recipient_username, order_id, event_type, title, content, is_read, read_at, created_at）。</p>
+<h4>4.5.7 全场景边界规则</h4>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>处理逻辑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新建订单</td>
+<td>默认 <code>unproduce</code>（未生产），无通知推送</td>
+</tr>
+<tr>
+<td>工厂多次上传生产图片</td>
+<td>订单当前已是生产中，再次上传factory层级图片，不触发状态变更、不新增日志、不推送通知</td>
+</tr>
+<tr>
+<td>订单已发货，人工下调状态</td>
+<td>系统直接拦截，弹窗提示：该订单已完成发货，生产流程已结束，生产状态锁定为【生产完成】，无法修改</td>
+</tr>
+<tr>
+<td>撤销发货（shipping_status改回pending）</td>
+<td>生产状态维持 <code>produced</code> 不变，所有角色均无法手动改回「生产中/未生产」，无返工流程</td>
+</tr>
+<tr>
+<td>虚拟发货订单</td>
+<td>虚拟发货完成后，和实体发货逻辑完全一致，自动锁定生产状态为生产完成，不可回退</td>
+</tr>
+<tr>
+<td>批量新建订单</td>
+<td>批量创建的所有订单，生产状态统一默认「未生产」，无自动状态变更</td>
+</tr>
+<tr>
+<td>删除订单</td>
+<td>删除订单时，操作日志同步记录删除瞬间对应的生产状态，完整留存追溯信息</td>
+</tr>
+<tr>
+<td>多账号同时操作冲突</td>
+<td>前端提交修改前实时校验数据库最新状态，若状态已被其他账号/系统自动变更，弹窗刷新最新状态后再操作</td>
+</tr>
+</tbody>
+</table>
+<h4>4.5.8 订单详情生产进度展示与编辑</h4>
+<p>订单详情弹窗（共享组件 <code>OrderDetailDialog.vue</code>，同时被「订单列表-查看」「智慧大屏-超期订单点击订单ID」「站内信-点击订单」复用；站内信 <code>Notifications.vue</code> 内联详情弹窗逻辑一致）在右侧栏「二维码 + 发货状态」下方新增<strong>生产进度卡片</strong>：</p>
+<ul>
+<li><strong>当前状态</strong>：以标签展示 <code>produce_status</code>——未生产（灰）/ 生产中（橙）/ 生产完成（绿）</li>
+<li><strong>更新信息</strong>：展示 <code>produce_status_update_at</code>（更新时间）与 <code>produce_status_update_user</code>（更新人）</li>
+<li><strong>手动修改</strong>：下拉选择新状态后自动调用 <code>PUT /api/orders/{order_id}</code> 更新；权限与第 5.1 节一致（boss/sales/factory/shipping 均可修改，发货后锁定为生产完成不可逆）</li>
+</ul>
+<blockquote>
+<p>后端无需新增接口：Order 模型已含 <code>produce_status</code> / <code>produce_status_update_at</code> / <code>produce_status_update_user</code> 三字段，<code>get_order</code> 已返回，更新复用既有订单更新接口。</p>
+</blockquote>
+<h2>5 角色权限说明</h2>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>数据查看范围</th>
+<th>核心操作权限</th>
+<th>权限禁止项</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>老板端(boss)</td>
+<td>全部数据</td>
+<td>所有功能、批量修改生产状态</td>
+<td>无</td>
+</tr>
+<tr>
+<td>销售端(sales)</td>
+<td>自己创建的网店、订单</td>
+<td>订单录入、编辑、图片上传、修改生产状态</td>
+<td>不可查看他人订单、不可打印二维码</td>
+</tr>
+<tr>
+<td>工厂端(factory)</td>
+<td>所有订单（隐藏金额）</td>
+<td>查看所有订单、二维码打印、上传生产图片（自动触发生产中状态）、修改生产状态</td>
+<td>不可编辑订单、不可查看金额</td>
+</tr>
+<tr>
+<td>发货端(shipping)</td>
+<td>自己关联的订单（隐藏金额）</td>
+<td>发货状态、物流信息维护、修改生产状态、发货自动锁定生产完成</td>
+<td>不可新增/编辑订单、不可查看金额</td>
+</tr>
+</tbody>
+</table>
+<h3>5.1 生产状态修改权限说明</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>手动修改生产状态</th>
+<th>批量修改生产状态</th>
+<th>自动触发生产状态变更</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>老板端(boss)</td>
+<td>是</td>
+<td>是</td>
+<td>无</td>
+</tr>
+<tr>
+<td>销售端(sales)</td>
+<td>是</td>
+<td>否</td>
+<td>无</td>
+</tr>
+<tr>
+<td>工厂端(factory)</td>
+<td>是</td>
+<td>否</td>
+<td>上传生产图片自动变为生产中</td>
+</tr>
+<tr>
+<td>发货端(shipping)</td>
+<td>是</td>
+<td>否</td>
+<td>更新发货状态自动锁定为生产完成</td>
+</tr>
+</tbody>
+</table>
+<p><strong>生产状态锁定规则</strong>：订单发货后（shipping_status = shipped / virtual），生产状态永久锁定为「生产完成」，所有角色均无法手动下调为「未生产/生产中」，不支持返工流程。</p>
+<h3>5.2 通用订单列表组件（多角色动态权限版）</h3>
+<blockquote>
+<p>详细需求与规则见 <code>通用订单列表组件（多角色动态权限版）开发需求文档.md</code>，此处为摘要。</p>
+</blockquote>
+<p><strong>方案</strong>：单套通用订单列表组件（<code>frontend/src/modules/Order/components/UniversalOrderList.vue</code>）+ 基于系统已有角色动态权限控制，一处开发、多处复用（订单管理页 <code>Orders.vue</code> 等）。组件自动识别当前登录角色，动态适配数据权限、展示字段、操作按钮、编辑权限与专属上传功能。</p>
+<p><strong>权限校验原则</strong>：前端控制 UI 展示（字段显隐、按钮禁用、字段只读置灰），后端做所有数据/操作/权限的最终校验（防止抓包越权）。</p>
+<p><strong>各角色对照</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>数据范围</th>
+<th>展示字段</th>
+<th>编辑权限</th>
+<th>删除</th>
+<th>专属功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>销售端</td>
+<td>仅本人创建订单</td>
+<td>全字段</td>
+<td>可编辑全部字段</td>
+<td>✅（需账号+密码二次校验，仅创建人）</td>
+<td>无</td>
+</tr>
+<tr>
+<td>老板端</td>
+<td>全部订单</td>
+<td>全字段</td>
+<td>可编辑全部字段</td>
+<td>❌</td>
+<td>无</td>
+</tr>
+<tr>
+<td>发货端</td>
+<td>全部订单</td>
+<td>精简字段（隐藏金额/提成/状态/创建人等）</td>
+<td>仅发货状态+物流信息</td>
+<td>❌</td>
+<td>上传发货凭证图</td>
+</tr>
+<tr>
+<td>工厂端</td>
+<td>全部订单</td>
+<td>精简字段</td>
+<td>订单信息全程只读</td>
+<td>❌</td>
+<td>上传/删除/替换自己提交的生产进度图（后端单独鉴权）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>列表基础展示</strong>（全角色固定前置）：序号 → 订单二维码 → 商品图片（首图）→ 平台订单号 → 网店商品名称 → 下单时间 → 已下单时长。</p>
+<p><strong>关键词搜索</strong>：追溯码（=order_id）/ 商品名称模糊（后端 <code>keyword</code> 同时匹配 order_id / product_name / platform_order_no / sales_amount）。</p>
+<p><strong>路由联动</strong>：监听 <code>route.query</code> 变化（如工作台卡片跳转 <code>/orders?shipping_status=xxx</code>）自动重置筛选并刷新，解决 keep-alive 缓存下重复跳转不刷新的问题。</p>
+<p><strong>已下单时长（order_days）字段规则</strong>：
+- 数据库物理整数字段（单位：天，默认 0），非前端实时计算——保障排序精准、稳定、可持久化。
+- 计算：取自然日（仅年月日、忽略时分秒），<code>order_days = 服务器当前自然日 - 订单下单自然日</code>，纯整数无小数。
+- 更新：订单新增时按当日初始化；每次查询订单列表时后端以最新自然日自动刷新。
+- 展示：前端原样展示整数天数（如 1天、2天、5天）；支持全局正/倒序排序，默认倒序（滞留最久置顶）；全角色默认展示、不可隐藏。</p>
+<p><strong>实现文件</strong>：后端 <code>orders.py</code>（数据权限过滤、order_days 计算）、<code>models.py</code>（order_days 字段）；前端 <code>UniversalOrderList.vue</code>（通用组件）、<code>Orders.vue</code>（订单管理页）、<code>orderService.js</code>（业务逻辑层）。</p>
+<h3>5.3 账号级数据权限（全模块版，2026-08-12）</h3>
+<p><strong>存储格式</strong>：用户表 <code>data_permissions</code> 为 JSON，键=页面路由路径，值=操作码数组：</p>
+<pre><code class="language-json">{&quot;/orders&quot;:[&quot;query&quot;,&quot;export&quot;], &quot;/products&quot;:[&quot;query&quot;,&quot;add&quot;,&quot;edit&quot;,&quot;delete&quot;]}
+</code></pre>
+<p>操作码：<code>query</code> 查询 / <code>add</code> 新增 / <code>edit</code> 修改 / <code>delete</code> 删除 / <code>export</code> 导出。</p>
+<p><strong>规则约束</strong>：
+- <code>query</code> 是页面可见性开关——某页面未勾「查询」，该二级菜单隐藏，其增删改导出权限同步失效；
+- 老板端（boss）恒有全部权限，不参与勾选判断；
+- 兼容旧格式 <code>{"category":["add"],...}</code>：旧键自动映射为路径键（category→/categories、brand→/brands、product→/products），且旧数据只要有任一操作，视为拥有该页查询权限（页面保持可见）。</p>
+<p><strong>权限树</strong>（一级模块 → 分组 → 页面，共 28 个页面）：</p>
+<table>
+<thead>
+<tr>
+<th>一级模块</th>
+<th>分组</th>
+<th>页面（操作集按页面性质定制）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>订单管理</td>
+<td>—</td>
+<td>订单管理（查询/导出）</td>
+</tr>
+<tr>
+<td>基础信息</td>
+<td>商品资料</td>
+<td>商品管理、类别管理、品牌管理（查询/增/改/删）</td>
+</tr>
+<tr>
+<td>基础信息</td>
+<td>店铺物流</td>
+<td>网店信息、物流管理（查询/增/改/删）</td>
+</tr>
+<tr>
+<td>数据统计</td>
+<td>数据概览</td>
+<td>数据总览（查询）</td>
+</tr>
+<tr>
+<td>数据统计</td>
+<td>销售分析</td>
+<td>销售统计、毛利分析、网店销售统计、退款订单、退款率分析（查询/导出）</td>
+</tr>
+<tr>
+<td>数据统计</td>
+<td>预警管理</td>
+<td>预警中心（查询）</td>
+</tr>
+<tr>
+<td>数据统计</td>
+<td>提成核算</td>
+<td>销售提成统计（查询）</td>
+</tr>
+<tr>
+<td>财务模块</td>
+<td>财务结算</td>
+<td>工资结算（查询/改）、账户提现（查询/增/改）</td>
+</tr>
+<tr>
+<td>财务模块</td>
+<td>费用统计</td>
+<td>运费统计（查询/导出）</td>
+</tr>
+<tr>
+<td>财务模块</td>
+<td>非交易收支</td>
+<td>账务代码、收支录入（查询/增/改/删）、收支统计（查询/导出）</td>
+</tr>
+<tr>
+<td>系统设置</td>
+<td>账号权限</td>
+<td>用户管理（查询/增/改/删）</td>
+</tr>
+<tr>
+<td>系统设置</td>
+<td>消息通讯</td>
+<td>站内信管理（查询/删）、日志管理（查询）、系统备份（查询/改）</td>
+</tr>
+<tr>
+<td>系统设置</td>
+<td>系统运维</td>
+<td>系统参数、日志清理（查询/改）、数据导入（查询/增/改/删）</td>
+</tr>
+<tr>
+<td>系统设置</td>
+<td>关于本系统</td>
+<td>系统信息（查询）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>实现</strong>：
+- 前端统一配置 <code>frontend/src/utils/permTree.js</code>（PERM_TREE 权限树 + LEGACY_KEYS 旧键映射 + normalizePerms / hasPerm / canQuery）；<code>utils/dataPerm.js</code> 的 <code>checkDataPerm</code> 委托到 permTree，既有类别/品牌/商品调用不受影响。
+- 编辑用户弹窗「数据权限」页签（<code>Users.vue</code>）：树形分层展示，提供「一键展开 / 一键收缩 / 全选（全页面）/ 清空」，每个一级模块与分组行均有独立全选；未勾「查询」时该页增删改导出勾选框禁用且自动清空；弹窗 600px 尺寸不变，树形区域超出滚动。
+- 侧边栏菜单（<code>Layout.vue</code>）：每个二级菜单项可见性 = 原角色权限 ∩ <code>canQuery(该页)</code>；工作台 / 智慧大屏 / 小工具始终可见。
+- 后端 <code>core/security.py</code>：<code>DATA_PERMISSION_MODULES</code> 扩展为 28 个路径键，<code>DATA_PERMISSION_ACTIONS</code> 增加 query/export，<code>LEGACY_DATA_PERM_KEYS</code> 做旧键映射；既有「类别/品牌/商品」接口的 <code>ensure_data_permission</code> 鉴权继续生效。
+- <strong>生效范围（已全部生效）</strong>：权限设置页 + 菜单隐藏 + 各页面按钮按权限隐藏/禁用 + 后端增删改接口按权限拦截（403）。查询（GET）接口不单独拦截，避免影响跨模块下拉等依赖（如录订单时选网店）。订单管理仅提供「查询/导出」两个权限项，其增删改保持角色制（销售录自己订单、老板全权、工厂/发货只读）。</p>
+<h2>6 接口规范</h2>
+<h3>6.1 通用规范</h3>
+<ul>
+<li>请求方式：RESTful API（GET/POST/PUT/DELETE）</li>
+<li>认证方式：Token令牌（Authorization: Bearer Token）</li>
+<li>返回格式：统一JSON格式 <code>{code, message, data}</code></li>
+<li>状态码：200成功、400参数错误、401未登录、403权限不足、404不存在、500服务器错误</li>
+</ul>
+<h3>6.2 核心接口列表</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>接口路径</th>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>认证</td>
+<td>/api/auth/login</td>
+<td>POST</td>
+<td>登录</td>
+</tr>
+<tr>
+<td>认证</td>
+<td>/api/auth/register</td>
+<td>POST</td>
+<td>注册</td>
+</tr>
+<tr>
+<td>认证</td>
+<td>/api/auth/me</td>
+<td>GET</td>
+<td>获取当前用户</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>/api/users/</td>
+<td>GET</td>
+<td>用户列表</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>/api/users/</td>
+<td>POST</td>
+<td>创建用户</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>/api/users/{id}</td>
+<td>PUT</td>
+<td>更新用户</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>/api/users/{id}</td>
+<td>DELETE</td>
+<td>删除用户</td>
+</tr>
+<tr>
+<td>网店</td>
+<td>/api/shops/</td>
+<td>GET</td>
+<td>网店列表</td>
+</tr>
+<tr>
+<td>网店</td>
+<td>/api/shops/</td>
+<td>POST</td>
+<td>创建网店</td>
+</tr>
+<tr>
+<td>物流公司</td>
+<td>/api/logistics/companies</td>
+<td>GET</td>
+<td>物流公司列表</td>
+</tr>
+<tr>
+<td>物流公司</td>
+<td>/api/logistics/companies</td>
+<td>POST</td>
+<td>创建物流公司</td>
+</tr>
+<tr>
+<td>物流公司</td>
+<td>/api/logistics/companies/{id}</td>
+<td>PUT</td>
+<td>更新物流公司</td>
+</tr>
+<tr>
+<td>物流公司</td>
+<td>/api/logistics/companies/{id}</td>
+<td>DELETE</td>
+<td>删除物流公司</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/</td>
+<td>GET</td>
+<td>商品列表（支持关键词搜索、状态筛选）</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/</td>
+<td>POST</td>
+<td>创建商品（仅boss、sales）</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/{product_code}</td>
+<td>GET</td>
+<td>商品详情</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/{product_code}</td>
+<td>PUT</td>
+<td>更新商品（仅boss、sales）</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/{product_code}</td>
+<td>DELETE</td>
+<td>删除商品（仅boss，已被订单引用的商品不允许删除）</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/batch-delete</td>
+<td>POST</td>
+<td>批量删除商品（仅boss）</td>
+</tr>
+<tr>
+<td>商品</td>
+<td>/api/products/count/total</td>
+<td>GET</td>
+<td>商品统计（总数、启用数、停用数）</td>
+</tr>
+<tr>
+<td>订单</td>
+<td>/api/orders/</td>
+<td>GET</td>
+<td>订单列表（支持平台订单号/商品名称/销售金额搜索）</td>
+</tr>
+<tr>
+<td>订单</td>
+<td>/api/orders/</td>
+<td>POST</td>
+<td>创建订单</td>
+</tr>
+<tr>
+<td>订单</td>
+<td>/api/orders/{order_id}</td>
+<td>GET</td>
+<td>订单详情</td>
+</tr>
+<tr>
+<td>订单</td>
+<td>/api/orders/{order_id}</td>
+<td>PUT</td>
+<td>更新订单</td>
+</tr>
+<tr>
+<td>订单</td>
+<td>/api/orders/{order_id}</td>
+<td>DELETE</td>
+<td>删除订单（需密码验证）</td>
+</tr>
+<tr>
+<td>订单</td>
+<td>/api/orders/{order_id}/qr-code</td>
+<td>GET</td>
+<td>获取二维码</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/upload-temp</td>
+<td>POST</td>
+<td>上传临时图片（创建订单前）</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/upload-direct/{order_id}</td>
+<td>POST</td>
+<td>直接上传图片（已有订单）</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/migrate/{temp_id}/{order_id}</td>
+<td>POST</td>
+<td>迁移临时图片到正式目录</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/list/{order_id}</td>
+<td>GET</td>
+<td>获取订单图片列表</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/delete/{img_id}</td>
+<td>DELETE</td>
+<td>删除单张图片</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/set-main/{img_id}</td>
+<td>POST</td>
+<td>设置为主图</td>
+</tr>
+<tr>
+<td>图片</td>
+<td>/api/images/clean-temp</td>
+<td>POST</td>
+<td>清理48小时过期临时图片</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/operations</td>
+<td>GET</td>
+<td>操作日志</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/overview</td>
+<td>GET</td>
+<td>综合统计概览（默认近365天）</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/sales/total</td>
+<td>GET</td>
+<td>销售总金额统计（默认近365天）</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/commission/theoretical</td>
+<td>GET</td>
+<td>理论应得提成（按销售时间，默认近365天）</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/commission/actual</td>
+<td>GET</td>
+<td>实际应得提成（按发货时间，默认近365天）</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/commission/by-user</td>
+<td>GET</td>
+<td>按用户统计提成（老板端，默认近365天）</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/factory-dashboard</td>
+<td>GET</td>
+<td>工厂端工作台聚合（已发货/未生产/生产中/生产完成，仅boss、factory）</td>
+</tr>
+<tr>
+<td>统计</td>
+<td>/api/statistics/avg-shipping-time</td>
+<td>GET</td>
+<td>平均发货时长统计（默认近365天）</td>
+</tr>
+<tr>
+<td>提成结算</td>
+<td>/api/commission-settlement/unpaid</td>
+<td>GET</td>
+<td>获取未结算提成数据</td>
+</tr>
+<tr>
+<td>提成结算</td>
+<td>/api/commission-settlement/unpaid/orders</td>
+<td>GET</td>
+<td>获取未结算提成订单列表</td>
+</tr>
+<tr>
+<td>提成结算</td>
+<td>/api/commission-settlement/pay</td>
+<td>POST</td>
+<td>执行提成结算</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/api/withdraw/shops</td>
+<td>GET</td>
+<td>获取提现网店列表（按创建者分组）</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/api/withdraw/records</td>
+<td>GET</td>
+<td>获取提现记录列表</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/api/withdraw/records</td>
+<td>POST</td>
+<td>新增提现记录</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/api/withdraw/records/{id}</td>
+<td>PUT</td>
+<td>更新提现记录</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/api/withdraw/records/{id}</td>
+<td>DELETE</td>
+<td>删除提现记录</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/api/withdraw/records/export</td>
+<td>GET</td>
+<td>导出提现记录Excel</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/*</td>
+<td>GET</td>
+<td>见下方「智慧大屏」接口组（旧 /api/statistics/dashboard/<em> 路径已下线，统一迁至 /api/dashboard/</em>）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/operations</td>
+<td>GET</td>
+<td>操作日志（仅boss）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/login</td>
+<td>GET</td>
+<td>登录日志（仅boss）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/cleanup/config</td>
+<td>GET</td>
+<td>获取日志清理配置（仅boss）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/cleanup/config</td>
+<td>PUT</td>
+<td>更新日志清理配置（仅boss）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/cleanup/preview</td>
+<td>POST</td>
+<td>预览日志清理效果（仅boss）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/cleanup/execute</td>
+<td>POST</td>
+<td>执行日志清理（仅boss）</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>/api/logs/cleanup/records</td>
+<td>GET</td>
+<td>获取日志清理记录（仅boss）</td>
+</tr>
+<tr>
+<td>通知</td>
+<td>/api/notifications</td>
+<td>GET</td>
+<td>获取站内信列表</td>
+</tr>
+<tr>
+<td>通知</td>
+<td>/api/notifications/unread-count</td>
+<td>GET</td>
+<td>获取未读消息数量</td>
+</tr>
+<tr>
+<td>通知</td>
+<td>/api/notifications/{id}/read</td>
+<td>PUT</td>
+<td>标记单条消息为已读</td>
+</tr>
+<tr>
+<td>通知</td>
+<td>/api/notifications/read-all</td>
+<td>PUT</td>
+<td>标记所有消息为已读</td>
+</tr>
+<tr>
+<td>通知</td>
+<td>/api/notifications/{id}</td>
+<td>DELETE</td>
+<td>删除单条消息</td>
+</tr>
+<tr>
+<td>数据清理</td>
+<td>/api/logs/cleanup/notification/config</td>
+<td>GET</td>
+<td>获取站内信清理配置（仅boss）</td>
+</tr>
+<tr>
+<td>数据清理</td>
+<td>/api/logs/cleanup/notification/config</td>
+<td>PUT</td>
+<td>更新站内信清理配置（仅boss，最小360天）</td>
+</tr>
+<tr>
+<td>数据清理</td>
+<td>/api/logs/cleanup/notification/preview</td>
+<td>POST</td>
+<td>预览站内信清理效果（仅boss）</td>
+</tr>
+<tr>
+<td>数据清理</td>
+<td>/api/logs/cleanup/notification/execute</td>
+<td>POST</td>
+<td>执行站内信清理（仅boss，需 confirm=true）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/overview</td>
+<td>GET</td>
+<td>总览：总订单数、销售总额、待发货、生产中、已发货（仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/monthly-sales</td>
+<td>GET</td>
+<td>近24个月月度销售趋势（参数 months，仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/shop-ranking</td>
+<td>GET</td>
+<td>网店销售额TOP10（仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/overdue-orders</td>
+<td>GET</td>
+<td>超期订单明细（待发货/虚拟发货 + 下单时长，仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/product-ranking</td>
+<td>GET</td>
+<td>畅销商品TOP10（仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/sales-ranking</td>
+<td>GET</td>
+<td>销售员销售额排行（仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/finance-summary</td>
+<td>GET</td>
+<td>财务汇总（仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/sales-performance</td>
+<td>GET</td>
+<td>销售业绩详情（仅boss）</td>
+</tr>
+<tr>
+<td>智慧大屏</td>
+<td>/api/dashboard/test</td>
+<td>GET</td>
+<td>接口连通性测试</td>
+</tr>
+<tr>
+<td>汇率</td>
+<td>https://api.exchangerate-api.com/v4/latest/CNY</td>
+<td>GET</td>
+<td>获取汇率数据（外部API）</td>
+</tr>
+<tr>
+<td>健康检查</td>
+<td>/health</td>
+<td>GET</td>
+<td>服务健康检查</td>
+</tr>
+</tbody>
+</table>
+<h2>7 数据统计功能说明</h2>
+<h3>7.1 统计数据范围</h3>
+<p>所有统计接口默认查询近365天的数据，可通过<code>start_date</code>和<code>end_date</code>参数自定义时间范围。</p>
+<blockquote>
+<p>例外：智慧大屏（<code>/api/dashboard/*</code>）默认统计近 <strong>24 个月</strong> 数据，用于呈现更长期的销售趋势与全球业务分布；其 <code>overview</code> 接口在原有总订单数/已发货/待发货基础上，新增返回「销售总额（sales_total）」与「生产中订单数（producing_orders）」。</p>
+<p><strong>生产状态统计口径（2026-08-10 起）</strong>：已退货/退款（<code>refunded</code>）订单不计入「未生产 / 生产中 / 生产完成」统计——工作台 <code>process-flow</code>、工厂看板 <code>factory-dashboard</code>、智慧大屏 <code>overview</code> 及订单列表 <code>produce_status</code> 筛选（<code>orders.py</code>）均已排除 <code>shipping_status=refunded</code>，保证"卡片数字 = 点击跳转列表数量"一致。</p>
+</blockquote>
+<h3>7.2 角色差异化统计</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>统计内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>老板端(boss)</td>
+<td>订单总金额、总订单数、已发货订单数、待发货订单数、平均发货时长、销售提成统计表格、订单生产状态分布</td>
+</tr>
+<tr>
+<td>销售端(sales)</td>
+<td>我的销售总金额、我的订单数、理论应得提成、实际应得提成、生产状态简易统计</td>
+</tr>
+<tr>
+<td>工厂端(factory)</td>
+<td>总订单数、待处理订单数、已完成订单数、未生产订单数、生产中订单数、已完成生产订单数</td>
+</tr>
+<tr>
+<td>发货端(shipping)</td>
+<td>总订单数、待处理订单数、已完成订单数、生产状态简易统计</td>
+</tr>
+</tbody>
+</table>
+<h3>7.3 老板端销售提成统计表格</h3>
+<p><strong>功能说明</strong>：按发货时间统计每个销售端用户的提成数据。</p>
+<p><strong>表格字段</strong></p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+<th>格式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>登录账号</td>
+<td>销售用户的登录用户名</td>
+<td>字符串</td>
+</tr>
+<tr>
+<td>真实姓名</td>
+<td>销售用户的真实姓名</td>
+<td>字符串</td>
+</tr>
+<tr>
+<td>提成比例</td>
+<td>该用户的提成比例</td>
+<td>百分比格式（如5%）</td>
+</tr>
+<tr>
+<td>销售金额</td>
+<td>该用户的销售总金额</td>
+<td>¥xxx,xxx.xx</td>
+</tr>
+<tr>
+<td>发货订单数</td>
+<td>已发货的订单数量</td>
+<td>数字</td>
+</tr>
+<tr>
+<td>应得提成</td>
+<td>该用户应得的提成金额</td>
+<td>¥xxx,xxx.xx（高亮显示）</td>
+</tr>
+<tr>
+<td>单笔提成</td>
+<td>平均每单提成金额</td>
+<td>¥xxx.xx</td>
+</tr>
+</tbody>
+</table>
+<p><strong>统计汇总</strong></p>
+<p>表格头部显示汇总信息：
+- 总计提成：所有销售用户的提成总和
+- 总计订单：所有销售用户的发货订单总数
+- 总计销售：所有销售用户的销售总金额</p>
+<p><strong>筛选功能</strong>
+- 日期范围筛选：默认显示当前月份数据（从本月1日到今天）
+- 用户筛选：可选择查看全部用户或单个用户</p>
+<h3>7.4 平均发货时长统计</h3>
+<p><strong>计算公式</strong>：<code>平均发货时长 = 平均（发货时间 - 订单创建时间）</code></p>
+<p><strong>显示格式</strong>：以天为单位，保留2位小数；同时显示小时数（如：2.5天 = 60小时）</p>
+<h2>8 业务流程图</h2>
+<h3>8.1 订单管理业务流程（含生产状态）</h3>
+<p><div class="mermaid">flowchart TD
+    A[&quot;销售/老板创建订单&quot;] --&gt; B[&quot;生成追溯码 + 二维码\nproduce_status = unproduce&quot;]
+    B --&gt; C[&quot;上传产品图片（layer=sales）&quot;]
+    C --&gt; D[&quot;订单列表（待发货）&quot;]
+    D --&gt;|&quot;删除订单（需密码验证）&quot;| E[&quot;删除并记录操作日志&quot;]
+    D --&gt; F[&quot;工厂端查看订单 / 打印二维码&quot;]
+    F --&gt; G[&quot;上传生产图片（layer=factory）&quot;]
+    G --&gt;|&quot;自动触发&quot;| H[&quot;produce_status = producing\n推送站内通知（销售/工厂/老板）&quot;]
+    H --&gt; I[&quot;继续生产...&quot;]
+    D --&gt; J[&quot;发货端填写物流信息 + 上传发货凭证&quot;]
+    J --&gt; K[&quot;修改发货状态：pending → shipped / virtual&quot;]
+    K --&gt;|&quot;自动触发&quot;| L[&quot;produce_status = produced\n永久锁定不可回退\n推送站内通知&quot;]
+    L --&gt; M[&quot;订单完成（生产流程结束）&quot;]</div></p>
+<h3>8.2 生产状态流转图</h3>
+<p><div class="mermaid">stateDiagram-v2
+    [*] --&gt; unproduce: 新建订单默认
+    unproduce --&gt; producing: 工厂上传生产图片（自动）
+    unproduce --&gt; produced: 手动修改 / 直接发货
+    producing --&gt; produced: 手动修改 / 订单发货（自动）
+    unproduce --&gt; unproduce: 手动调整（保持未生产）
+    producing --&gt; producing: 重复传图（防抖，不重复更新/通知）
+    produced --&gt; [*]: 永久锁定
+    note right of produced
+        发货后强制锁定为 produced；
+        撤销发货不回退，无返工流程
+    end note</div></p>
+<h3>8.3 订单批量导入流程</h3>
+<p><div class="mermaid">flowchart LR
+    A[&quot;下载 Excel 模板&quot;] --&gt; B[&quot;填写并上传 Excel&quot;]
+    B --&gt; C[&quot;写入 order_imports 临时表\n（按 batch_no 批次分组）&quot;]
+    C --&gt; D[&quot;逐行业务规则校验\n（10 条异常规则）&quot;]
+    D --&gt;|&quot;存在异常&quot;| E[&quot;列表展示异常原因&quot;]
+    E --&gt; F[&quot;逐行编辑修正&quot;]
+    F --&gt; C
+    D --&gt;|&quot;无异常&quot;| G[&quot;手动勾选审核（支持全选）&quot;]
+    G --&gt; H[&quot;合并进 orders 正式表&quot;]
+    H --&gt; I[&quot;生成追溯码&quot;]
+    I --&gt; J[&quot;删除临时记录（仅审计兜底）&quot;]
+    H --&gt; K[&quot;进入订单列表正常流转&quot;]</div></p>
+<blockquote>
+<p>说明：批量导入与平台「立即同步」共用 order_imports 临时表；销售角色仅见自己导入的数据，老板可见全部。</p>
+</blockquote>
+<h2>9 系统配置参数</h2>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SECRET_KEY</td>
+<td>your-secret-key-change-in-production</td>
+<td>JWT密钥</td>
+</tr>
+<tr>
+<td>ALGORITHM</td>
+<td>HS256</td>
+<td>JWT算法</td>
+</tr>
+<tr>
+<td>ACCESS_TOKEN_EXPIRE_MINUTES</td>
+<td>1440</td>
+<td>Token有效期（24小时）</td>
+</tr>
+<tr>
+<td>TEMP_IMAGE_RETENTION_HOURS</td>
+<td>24</td>
+<td>临时图片保留时间</td>
+</tr>
+<tr>
+<td>QR_CODE_SIZE</td>
+<td>300</td>
+<td>二维码尺寸</td>
+</tr>
+<tr>
+<td>DATABASE_URL</td>
+<td>sqlite+aiosqlite:///</td>
+<td>SQLite数据库URL</td>
+</tr>
+<tr>
+<td>STATISTICS_DEFAULT_DAYS</td>
+<td>365</td>
+<td>统计数据默认查询天数</td>
+</tr>
+</tbody>
+</table>
+<h2>10 图片目录结构</h2>
+<pre><code>data/images/
+├── temp/                          # 临时图片目录
+│   └── {uuid}.{ext}              # 临时图片文件
+└── official/                     # 正式图片目录
+    └── {order_id}/               # 按订单追溯码分组
+        ├── sales/                # 销售端图片（商品图片）
+        │   └── {uuid}.jpg
+        ├── factory/              # 工厂端图片（生产进度）
+        │   └── {uuid}.jpg
+        └── shipping/             # 发货端图片（发货凭证）
+            └── {uuid}.jpg
+</code></pre>
+<h3>10.1 图片层级说明</h3>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>标识</th>
+<th>用途</th>
+<th>上传角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>销售端</td>
+<td>sales</td>
+<td>商品图片、产品展示</td>
+<td>sales</td>
+</tr>
+<tr>
+<td>工厂端</td>
+<td>factory</td>
+<td>生产进度、加工过程</td>
+<td>factory</td>
+</tr>
+<tr>
+<td>发货端</td>
+<td>shipping</td>
+<td>发货凭证、物流单据</td>
+<td>shipping</td>
+</tr>
+</tbody>
+</table>
+<h2>11 日志记录规范</h2>
+<h3>11.1 操作日志记录范围</h3>
+<ul>
+<li>用户登录/登出</li>
+<li>订单新增、编辑、删除、状态变更</li>
+<li>图片上传、删除</li>
+<li>网店新增、编辑、删除、状态变更</li>
+<li>物流公司新增、编辑、删除</li>
+<li>用户管理（新增、编辑、删除、密码重置）</li>
+</ul>
+<h3>11.2 日志字段说明</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>user_id</td>
+<td>操作人ID</td>
+</tr>
+<tr>
+<td>username</td>
+<td>操作人用户名</td>
+</tr>
+<tr>
+<td>operation_type</td>
+<td>操作类型（add/edit/delete/update等）</td>
+</tr>
+<tr>
+<td>operation_content</td>
+<td>操作内容详情，含修改前后值</td>
+</tr>
+<tr>
+<td>ip_address</td>
+<td>操作者IP地址</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>操作时间</td>
+</tr>
+</tbody>
+</table>
+<h2>12 数据清理管理</h2>
+<blockquote>
+<p>由原「日志清理管理」扩展升级而来，现统一纳管<strong>日志清理</strong>与<strong>站内信清理</strong>两类数据，入口整合在「系统设置」页面的标签页面板中。</p>
+</blockquote>
+<h3>12.1 功能概述</h3>
+<p>数据清理模块确保仅保留必要期限的运营数据，同时提供灵活的配置、预览、手动执行与定时自动执行能力。分为两个独立分区：</p>
+<ul>
+<li><strong>日志清理</strong>：清理操作日志与登录日志（基于 <code>created_at</code> 时间戳）</li>
+<li><strong>站内信清理</strong>：清理站内通知消息（基于 <code>created_at</code> 时间戳），默认最少保留 360 天</li>
+</ul>
+<h3>12.2 核心特性</h3>
+<ol>
+<li><strong>基于时间戳的筛选</strong>：自动识别并删除超过保留期限的历史数据</li>
+<li><strong>可配置的保留期限</strong>：</li>
+<li>日志保留天数：默认 730 天（2 年），最小 30 天，最大 3650 天</li>
+<li>站内信保留天数：默认 360 天，最小 360 天（硬性约束，不可低于此值），最大 3650 天</li>
+<li><strong>删除前确认机制</strong>：手动清理前需二次确认，防止误操作</li>
+<li><strong>操作记录</strong>：所有清理操作记录在 <code>log_cleanup_records</code> 表，可追溯（<code>cleanup_type</code> 新增 <code>notification</code> 类型）</li>
+<li><strong>定时自动执行</strong>：</li>
+<li>日志清理：每日凌晨 2:00</li>
+<li>站内信清理：每日凌晨 2:10（与日志清理解耦，避免同一时刻资源争用）</li>
+<li><strong>手动触发接口</strong>：提供手动触发清理的 API 接口</li>
+<li><strong>失败重试机制</strong>：清理失败时自动重试，最多3次</li>
+<li><strong>异常告警</strong>：清理失败时记录错误日志</li>
+</ol>
+<h3>12.3 数据模型</h3>
+<h4>12.3.1 日志清理记录表（log_cleanup_record）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>cleanup_type</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>清理类型：operation/login/all/notification</td>
+</tr>
+<tr>
+<td>retention_days</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>保留天数</td>
+</tr>
+<tr>
+<td>deleted_count</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>删除数量，默认0</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>状态：pending/success/failed</td>
+</tr>
+<tr>
+<td>error_message</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>错误信息</td>
+</tr>
+<tr>
+<td>start_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>开始时间</td>
+</tr>
+<tr>
+<td>end_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>否</td>
+<td>结束时间</td>
+</tr>
+<tr>
+<td>triggered_by</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>触发方式：manual/scheduled</td>
+</tr>
+<tr>
+<td>operator_username</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>操作人用户名</td>
+</tr>
+</tbody>
+</table>
+<h3>12.4 系统配置</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LOG_RETENTION_DAYS</td>
+<td>730</td>
+<td>日志保留天数（2年）</td>
+</tr>
+<tr>
+<td>NOTIFICATION_RETENTION_DAYS</td>
+<td>360</td>
+<td>站内信保留天数（最小 360，不可低于此值）</td>
+</tr>
+<tr>
+<td>SCHEDULED_CLEANUP_TIME</td>
+<td>02:00</td>
+<td>日志定时清理时间（24小时制）</td>
+</tr>
+<tr>
+<td>SCHEDULED_NOTIFICATION_CLEANUP_TIME</td>
+<td>02:10</td>
+<td>站内信定时清理时间（24小时制）</td>
+</tr>
+<tr>
+<td>MAX_RETRY_COUNT</td>
+<td>3</td>
+<td>清理失败最大重试次数</td>
+</tr>
+</tbody>
+</table>
+<h3>12.5 API接口</h3>
+<table>
+<thead>
+<tr>
+<th>接口路径</th>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/api/logs/cleanup/config</td>
+<td>GET</td>
+<td>获取日志清理配置</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/config</td>
+<td>PUT</td>
+<td>更新日志清理配置</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/preview</td>
+<td>POST</td>
+<td>预览日志清理效果</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/execute</td>
+<td>POST</td>
+<td>执行日志清理（需确认）</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/records</td>
+<td>GET</td>
+<td>获取清理记录列表</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/notification/config</td>
+<td>GET</td>
+<td>获取站内信清理配置（retention_days 默认 360、最小 360）</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/notification/config</td>
+<td>PUT</td>
+<td>更新站内信清理配置（受最小 360 天约束）</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/notification/preview</td>
+<td>POST</td>
+<td>预览站内信清理效果（返回待删除数量）</td>
+</tr>
+<tr>
+<td>/api/logs/cleanup/notification/execute</td>
+<td>POST</td>
+<td>执行站内信清理（需 <code>confirm=true</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3>12.6 前端功能</h3>
+<p>数据清理管理功能已整合到「系统设置」页面，采用<strong>标签页（Tabs）</strong>分区，包含「日志清理」与「站内信清理」两个独立分页：</p>
+<p><strong>通用（两分区一致）：</strong>
+1. <strong>保留天数配置</strong>：日志 30–3650 天；站内信 360–3650 天（<code>&lt;el-input-number :min="360"&gt;</code> 硬约束）
+2. <strong>待删除统计</strong>：实时显示当前截止日期与即将删除的数据条数
+3. <strong>预览 / 执行</strong>：先预览再二次确认执行，执行后展示删除数量
+4. <strong>清理记录</strong>：统一的历史记录表，<code>cleanup_type</code> 以不同标签区分 操作/登录/全部/站内信</p>
+<p><strong>站内信清理分区额外说明：</strong>
+- 保留天数默认 360 天，且最小不可低于 360 天（业务要求最少存储 360 天）
+- 执行清理时按 <code>created_at</code> 早于 <code>NOW() - retention_days</code> 删除 <code>notifications</code> 表记录（分批 1000 条/批）</p>
+<h3>12.7 定时任务</h3>
+<ul>
+<li><strong>日志清理</strong></li>
+<li>任务名称：每日日志清理</li>
+<li>执行时间：每日凌晨 2:00</li>
+<li>触发方式：APScheduler CronTrigger（hour=2, minute=0）</li>
+<li><strong>站内信清理</strong></li>
+<li>任务名称：每日站内信清理</li>
+<li>执行时间：每日凌晨 2:10</li>
+<li>触发方式：APScheduler CronTrigger（hour=2, minute=10）</li>
+<li><strong>容错机制（两类一致）</strong>：</li>
+<li>1 小时宽限期（错过触发时间 1 小时内仍可执行）</li>
+<li>最多 1 个并发实例</li>
+<li>替换已存在的任务</li>
+</ul>
+<h2>13 安全机制</h2>
+<ol>
+<li><strong>密码存储</strong>：使用passlib库进行密码哈希，不存储明文</li>
+<li><strong>Token认证</strong>：JWT令牌，有效期24小时</li>
+<li><strong>权限控制</strong>：后端接口层鉴权，前端按钮级权限控制</li>
+<li><strong>数据隔离</strong>：除boss/factory外，严格按创建人隔离数据</li>
+<li><strong>敏感数据过滤</strong>：factory/shipping角色不可查看金额相关信息</li>
+<li><strong>操作留痕</strong>：所有核心操作记录日志，不可删除篡改</li>
+<li><strong>SQL注入防护</strong>：使用SQLAlchemy ORM进行参数化查询，防止SQL注入攻击</li>
+<li><strong>订单删除验证</strong>：删除订单时需要输入当前登录账号的密码，确保操作安全性</li>
+</ol>
+<h2>14 数据获取与性能优化</h2>
+<h3>14.1 数据获取机制</h3>
+<ul>
+<li><strong>实时数据获取</strong>：所有前端页面通过API从数据库实时获取数据，确保显示内容与数据库保持一致</li>
+<li><strong>数据更新机制</strong>：</li>
+<li>页面初始化时自动获取数据</li>
+<li>操作（创建、编辑、删除）后自动刷新数据</li>
+<li>相关数据变化时通过Pinia store自动同步</li>
+</ul>
+<h3>14.2 性能优化措施</h3>
+<ul>
+<li><strong>分页查询</strong>：所有列表接口支持分页参数，减少单次查询数据量</li>
+<li><strong>参数化查询</strong>：使用SQLAlchemy ORM进行参数化查询，提高查询效率并防止SQL注入</li>
+<li><strong>缓存机制</strong>：二维码等静态资源使用文件系统缓存，减少重复生成</li>
+<li><strong>异步查询</strong>：后端使用SQLAlchemy异步查询，提高并发处理能力</li>
+<li><strong>按需加载</strong>：前端根据用户角色和权限按需加载数据，减少不必要的请求</li>
+</ul>
+<h3>14.3 数据更新验证机制</h3>
+<ul>
+<li><strong>前端验证</strong>：使用Element Plus表单验证，确保数据格式正确</li>
+<li><strong>后端验证</strong>：API接口进行业务逻辑验证，确保数据完整性</li>
+<li><strong>事务处理</strong>：数据库操作使用事务，确保数据一致性</li>
+<li><strong>自动刷新</strong>：操作完成后自动刷新数据，确保前端显示与数据库一致</li>
+<li><strong>错误处理</strong>：完善的错误处理机制，确保系统稳定性</li>
+</ul>
+<h2>15 系统架构优化</h2>
+<ul>
+<li><strong>前后端分离</strong>：采用Vue3 + FastAPI前后端分离架构，提高开发效率和系统可维护性</li>
+<li><strong>模块化设计</strong>：后端API按功能模块划分，前端组件化开发</li>
+<li><strong>状态管理</strong>：使用Pinia进行状态管理，实现跨组件数据共享和自动更新</li>
+<li><strong>路由守卫</strong>：前端路由守卫实现基于角色的访问控制</li>
+<li><strong>请求拦截器</strong>：Axios请求拦截器处理认证令牌，确保API请求安全</li>
+</ul>
+<h3>15.1 前端路由配置</h3>
+<h4>15.1.1 路由列表</h4>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>名称</th>
+<th>组件</th>
+<th>标题</th>
+<th>权限</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/login</td>
+<td>Login</td>
+<td>Login.vue</td>
+<td>登录</td>
+<td>无</td>
+</tr>
+<tr>
+<td>/</td>
+<td>-</td>
+<td>Layout.vue</td>
+<td>-</td>
+<td>需要登录</td>
+</tr>
+<tr>
+<td>/dashboard</td>
+<td>Dashboard</td>
+<td>Dashboard.vue</td>
+<td>工作台</td>
+<td>需要登录</td>
+</tr>
+<tr>
+<td>/orders</td>
+<td>Orders</td>
+<td>Orders.vue</td>
+<td>订单管理</td>
+<td>需要登录</td>
+</tr>
+<tr>
+<td>/products</td>
+<td>Products</td>
+<td>Products.vue</td>
+<td>商品管理</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/shops</td>
+<td>Shops</td>
+<td>Shops.vue</td>
+<td>网店管理</td>
+<td>boss, sales</td>
+</tr>
+<tr>
+<td>/users</td>
+<td>Users</td>
+<td>Users.vue</td>
+<td>用户管理</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/logistics</td>
+<td>Logistics</td>
+<td>Logistics.vue</td>
+<td>物流管理</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/settings</td>
+<td>Settings</td>
+<td>Settings.vue</td>
+<td>系统设置</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/logs</td>
+<td>Logs</td>
+<td>Logs.vue</td>
+<td>日志管理</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/images</td>
+<td>Images</td>
+<td>Images.vue</td>
+<td>图片管理</td>
+<td>需要登录</td>
+</tr>
+<tr>
+<td>/statistics</td>
+<td>Statistics</td>
+<td>Statistics.vue</td>
+<td>数据统计</td>
+<td>需要登录</td>
+</tr>
+<tr>
+<td>/notifications</td>
+<td>Notifications</td>
+<td>Notifications.vue</td>
+<td>站内信</td>
+<td>需要登录</td>
+</tr>
+<tr>
+<td>/smart-dashboard</td>
+<td>SmartDashboard</td>
+<td>SmartDashboard.vue</td>
+<td>智慧大屏</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/salary-settlement</td>
+<td>SalarySettlement</td>
+<td>CommissionSettlement.vue</td>
+<td>工资结算</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/account-withdrawal</td>
+<td>AccountWithdrawal</td>
+<td>AccountWithdrawal.vue</td>
+<td>账户提现</td>
+<td>boss, sales</td>
+</tr>
+<tr>
+<td>/refund-orders</td>
+<td>RefundOrders</td>
+<td>RefundOrders.vue</td>
+<td>退款订单（数据统计→销售分析）</td>
+<td>boss, factory</td>
+</tr>
+<tr>
+<td>/freight-statistics</td>
+<td>FreightStatistics</td>
+<td>FreightStatistics.vue</td>
+<td>运费统计（财务模块→费用统计）</td>
+<td>boss</td>
+</tr>
+</tbody>
+</table>
+<h4>15.1.2 路由守卫逻辑</h4>
+<pre><code>1. 访问需要认证的路由且未登录 → 跳转到 /login
+2. 已登录状态访问 /login → 跳转到首页 /
+3. 访问有权限限制的路由且当前角色不在允许列表 → 跳转到 /dashboard
+4. 其他情况 → 正常访问
+</code></pre>
+<h4>15.1.3 工作台动态路由</h4>
+<p><code>/dashboard</code> 路径根据用户角色自动跳转到对应的工作台页面：
+- <strong>boss</strong> → BossDashboard.vue
+- <strong>sales</strong> → SalesDashboard.vue
+- <strong>factory</strong> → FactoryDashboard.vue
+- <strong>shipping</strong> → ShippingDashboard.vue</p>
+<h2>16 界面优化说明</h2>
+<h3>16.1 用户信息显示</h3>
+<ul>
+<li><strong>右上角显示真实姓名</strong>：将用户信息从显示账号（username）改为显示真实姓名（real_name）</li>
+<li><strong>降级处理</strong>：当用户没有设置真实姓名时，显示账号作为降级方案</li>
+</ul>
+<h3>16.2 选择框尺寸优化</h3>
+<ul>
+<li><strong>订单状态选择框</strong>：宽度150px，下拉选项高度40px，确保内容完整显示</li>
+<li><strong>用户选择框</strong>：宽度180px，下拉选项高度40px</li>
+<li><strong>日期选择器</strong>：宽度260px</li>
+<li><strong>优化内容</strong>：</li>
+<li>足够的宽度确保长文本不被截断</li>
+<li>合适的选项高度提升点击体验</li>
+<li>与页面其他元素保持协调的视觉比例</li>
+</ul>
+<h3>16.3 订单列表优化</h3>
+<ul>
+<li><strong>新增发货时间列</strong>：显示订单发货时间，格式为YYYY-MM-DD</li>
+<li><strong>关键词搜索增强</strong>：支持搜索平台订单号、商品名称、销售金额</li>
+<li>销售金额转换为字符串后进行模糊匹配</li>
+<li>可通过输入金额的部分数字进行搜索</li>
+</ul>
+<h3>16.4 订单打印功能</h3>
+<ul>
+<li><strong>打印入口</strong>：订单详情弹窗右上角「打印」按钮</li>
+<li><strong>打印格式</strong>：A4 纵向纸张 (210mm × 297mm)</li>
+<li><strong>打印内容</strong>：</li>
+<li>上部左侧：商品名称、平台、订单号、下单时间、创建人、收货地址、备注</li>
+<li>上部右侧：订单二维码 (45mm方框)</li>
+<li>下部：商品大图 (200mm高区域)，优先显示销售图片层第一张</li>
+<li><strong>打印方式</strong>：打开新窗口展示打印预览，点击页内「点击打印单据」按钮调用浏览器原生打印API，连接系统打印机</li>
+<li><strong>打印CSS</strong>：自动隐藏打印按钮，禁止内容分页拆分</li>
+</ul>
+<h3>16.5 订单创建功能增强</h3>
+<ul>
+<li><strong>新增下单时间选择</strong>：在订单创建表单中添加日期选择器组件</li>
+<li><strong>时间格式</strong>：精确到年月日，格式为YYYY-MM-DD</li>
+<li><strong>默认值</strong>：默认选择当前系统日期</li>
+<li><strong>未来日期禁止</strong>：禁用未来日期的选择，确保数据合理性</li>
+<li><strong>时间持久化</strong>：用户选择的下单时间会保存到数据库的created_at字段</li>
+<li><strong>界面显示</strong>：订单列表和详情页都会正确显示用户选择的下单时间</li>
+</ul>
+<h3>16.6 模块整合</h3>
+<h4>16.6.1 基础信息模块</h4>
+<p>将「商品管理」、「网店信息」、「用户管理」、「物流管理」合并为「基础信息」子菜单：</p>
+<table>
+<thead>
+<tr>
+<th>子菜单</th>
+<th>路由</th>
+<th>权限</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>商品管理</td>
+<td>/products</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>网店信息</td>
+<td>/shops</td>
+<td>boss, sales</td>
+</tr>
+<tr>
+<td>用户管理</td>
+<td>/users</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>物流管理</td>
+<td>/logistics</td>
+<td>boss</td>
+</tr>
+</tbody>
+</table>
+<h4>16.6.2 财务模块</h4>
+<p>将「工资结算」和「账户提现」合并为「财务模块」子菜单：</p>
+<table>
+<thead>
+<tr>
+<th>子菜单</th>
+<th>路由</th>
+<th>权限</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工资结算</td>
+<td>/salary-settlement</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>账户提现</td>
+<td>/account-withdrawal</td>
+<td>boss, sales</td>
+</tr>
+</tbody>
+</table>
+<h4>16.6.3 侧边栏菜单结构</h4>
+<pre><code>智慧大屏          /smart-dashboard    (仅boss)
+工作台            /dashboard
+订单管理          /orders             (非factory)
+基础信息 ▼        (子菜单)
+├── 商品管理      /products           (仅boss)
+├── 网店信息      /shops
+├── 用户管理      /users              (仅boss)
+└── 物流管理      /logistics          (仅boss)
+数据统计          /statistics
+财务模块 ▼        (子菜单)
+├── 工资结算      /salary-settlement  (仅boss)
+└── 账户提现      /account-withdrawal
+系统设置          /settings           (仅boss)
+日志管理          /logs               (仅boss)
+─────────────────
+汇率计算器        (底部固定区域)
+</code></pre>
+<h4>16.6.4 头部功能</h4>
+<ul>
+<li><strong>站内信图标</strong>：右上角显示，带未读消息数量角标</li>
+<li><strong>用户信息</strong>：显示真实姓名+角色标签</li>
+<li><strong>下拉菜单</strong>：修改密码、退出登录</li>
+</ul>
+<h3>16.7 小工具（汇率计算器 / 科学计算器）</h3>
+<p>原侧边栏底部的汇率计算器卡片已重构为统一的「小工具」入口：</p>
+<ul>
+<li><strong>入口位置</strong>：侧边栏最左下角固定「小工具」按钮（带箭头），点击在按钮右侧展开二级菜单（汇率计算器 / 科学计算器），点击页面其他区域自动收起。</li>
+<li><strong>浮动窗口</strong>：选择任一计算器后，在屏幕<strong>右下角</strong>弹出浮动窗口（<code>CalcFloatWindow.vue</code>，<code>z-index:4000</code> 最上层），支持鼠标拖动标题栏改变位置，仅点击关闭按钮可关闭（无遮罩、无 ESC 关闭）。</li>
+<li><strong>汇率计算器（<code>ExchangeCalculator.vue</code>）</strong>：</li>
+<li>支持多种货币选择（CNY、USD、EUR、GBP、JPY、HKD、AUD、CAD）</li>
+<li>货币交换功能，一键切换源/目标货币</li>
+<li>实时汇率获取（ExchangeRate-API），自动计算转换结果，显示汇率更新时间</li>
+<li>默认显示 CNY→USD；顶部红色下拉切换器已移除，组件自包含</li>
+<li><strong>科学计算器（<code>ScientificCalculator.vue</code>，新增）</strong>：</li>
+<li>基础四则运算（＋－×÷）、百分比（%）、正负号（±）、清空（C）、删除（←）</li>
+<li>支持<strong>屏幕点击与键盘输入</strong>双操作（数字键、运算符、Enter=计算、Backspace=删除、Esc/Delete/C=清空；已屏蔽 Ctrl/Alt/Win 组合键避免触发浏览器快捷键）</li>
+<li>底部附键盘操作提示</li>
+</ul>
+<h3>16.8 老板端工作台卡片集成工厂端指标</h3>
+<p>老板端工作台（<code>BossDashboard.vue</code>）在原有「经营概览」基础上，新增「生产/发货概览」分区，直接复用工厂端聚合接口（<code>/api/statistics/factory-dashboard</code>），无需切换账号即可掌握生产进度。</p>
+<p><strong>分区与卡片</strong></p>
+<table>
+<thead>
+<tr>
+<th>分区</th>
+<th>卡片</th>
+<th>点击行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>经营概览</td>
+<td>总订单数</td>
+<td>跳转订单管理（全部）</td>
+</tr>
+<tr>
+<td>经营概览</td>
+<td>待发货</td>
+<td>跳转订单管理（筛选待发货）</td>
+</tr>
+<tr>
+<td>经营概览</td>
+<td>总销售额</td>
+<td>跳转数据统计页</td>
+</tr>
+<tr>
+<td>经营概览</td>
+<td>总提成</td>
+<td>跳转工资结算页</td>
+</tr>
+<tr>
+<td>生产/发货概览</td>
+<td>已发货</td>
+<td>跳转订单管理（筛选已发货）</td>
+</tr>
+<tr>
+<td>生产/发货概览</td>
+<td>未生产</td>
+<td>跳转订单管理（筛选未生产）</td>
+</tr>
+<tr>
+<td>生产/发货概览</td>
+<td>生产中</td>
+<td>跳转订单管理（筛选生产中）</td>
+</tr>
+<tr>
+<td>生产/发货概览</td>
+<td>生产完成</td>
+<td>跳转订单管理（筛选生产完成）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>实现要点</strong>
+- 卡片支持点击联动：点击后携带查询参数（如 <code>?shipping_status=pending</code>、<code>?produce_status=unproduce</code>）跳转到订单管理页，<code>UniversalOrderList.vue</code> 会读取路由参数自动应用筛选条件。
+- 卡片带 hover 上浮 + 蓝色边框的点击反馈；工厂端分区的 4 张卡片采用更紧凑的样式。
+- 原「总销售额」「总提成」卡片此前恒为 ¥0，现已分别取自 <code>/api/statistics/overview</code> 与 <code>/api/statistics/commission/by-user</code> 汇总，正常显示。</p>
+<h3>16.9 订单流程全景（所有角色工作台）</h3>
+<p>「订单流程全景」三段式流程图（销售 → 生产 → 发货）已从老板端独占，移植到<strong>全部四类角色工作台</strong>（<code>BossDashboard</code> / <code>SalesDashboard</code> / <code>FactoryDashboard</code> / <code>ShippingDashboard</code> 均引入 <code>OrderFlowPanorama.vue</code> 组件，自行按角色拉取数据）。</p>
+<ul>
+<li><strong>展示内容</strong>：</li>
+<li>销售段：总订单数 / 未发货 / 虚拟发货 / 已退货</li>
+<li>生产段：未生产 / 生产中 / 生产完成</li>
+<li>发货段：未发货 / 已发货</li>
+<li>每段指标卡片可点击，携带 <code>shipping_status</code> / <code>produce_status</code> 路由参数跳转到订单管理页联动筛选。</li>
+<li><strong>权限差异</strong>：</li>
+<li>后端 <code>/api/statistics/process-flow</code> 移除仅老板可访问的限制；<code>sales</code> 角色仅统计<strong>自己创建</strong>的订单（<code>created_by == 当前用户名</code>），其余角色（老板 / 工厂 / 发货）统计全公司订单。</li>
+<li>销售端以「订单流程全景」替换原「我的订单」四张统计卡片，并保留「我创建的订单」表格；工厂 / 发货端在工作台顶部展示完整三段。</li>
+</ul>
+<h2>17 智慧大屏系统</h2>
+<h3>17.1 系统概述</h3>
+<p>智慧大屏数据可视化系统是面向企业管理层的专业级决策支持平台，采用现代化UI设计风格，实现数据实时展示、多维度分析和交互式操作功能。</p>
+<h3>17.2 核心功能模块（当前实现）</h3>
+<p>智慧大屏采用「顶部标题栏 + 左/中/右三栏」的沉浸式布局，数据全部来自 <code>/api/dashboard/*</code> 接口组，仅统计近 24 个月数据。</p>
+<h4>17.2.1 顶部标题栏</h4>
+<ul>
+<li>主标题「全球业务数据智慧大屏」+ 副标签「此面板仅统计最近 24 个月内数据」</li>
+<li>右侧实时时钟（每秒刷新）+ 手动「刷新」按钮（重新拉取全部接口）</li>
+</ul>
+<h4>17.2.2 左侧面板</h4>
+<table>
+<thead>
+<tr>
+<th>区块</th>
+<th>内容</th>
+<th>数据接口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>指标卡片 ×5</td>
+<td>总订单数、销售总金额、待发货、生产中、已发货</td>
+<td><code>/api/dashboard/overview</code></td>
+</tr>
+<tr>
+<td>月度销售折线图</td>
+<td>近 24 个月销售趋势（金额或订单数）</td>
+<td><code>/api/dashboard/monthly-sales</code></td>
+</tr>
+<tr>
+<td>畅销品 TOP10</td>
+<td>商品销量排行（横向条形）</td>
+<td><code>/api/dashboard/product-ranking</code></td>
+</tr>
+</tbody>
+</table>
+<h4>17.2.3 中央面板（世界地图）</h4>
+<ul>
+<li>ECharts 世界地图，15 个全球城市固定坐标以 <code>effectScatter</code> 涟漪散点展示</li>
+<li>从国内 4 个枢纽城市（北京/上海/广州/深圳）向全球城市绘制动态 <code>lines</code> 飞线</li>
+<li>鼠标悬停显示城市名称与数值，支持缩放/平移</li>
+</ul>
+<h4>17.2.4 右侧面板</h4>
+<table>
+<thead>
+<tr>
+<th>区块</th>
+<th>内容</th>
+<th>数据接口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>超期订单（上）</td>
+<td>待发货/虚拟发货且下单时长超阈值的订单明细，卡片式排行：左侧排名色条+订单ID（可点击弹详情）、右侧<strong>发货状态 + 生产进度上下结构标签</strong>、副行「下单时长」天数红色加粗；标题带「X单」计数</td>
+<td><code>/api/dashboard/overdue-orders</code></td>
+</tr>
+<tr>
+<td>网店销售 TOP30（下）</td>
+<td>各网店销售额<strong>卡片式排行</strong>（无表头）：左侧排名色条+店主名，右侧青色金额，下方灰色「网店ID」副标题</td>
+<td><code>/api/dashboard/shop-ranking</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>2026-08-10 起：右侧面板上下两块已对调（超期订单在上、网店排行在下）；所有列表型模块（统计卡/月度趋势/畅销品/网店排行/超期订单）均改为<strong>固定高度 + 内容超出内部滚动</strong>，保证每块稳定显示不被挤压。</p>
+</blockquote>
+<h3>17.3 设计与技术要求</h3>
+<h4>17.3.1 视觉设计</h4>
+<ul>
+<li><strong>主题</strong>：深色主题为主色调</li>
+<li><strong>色彩方案</strong>：高对比度、专业数据可视化色彩</li>
+<li><strong>响应式</strong>：支持1920×1080到4K及以上分辨率</li>
+<li><strong>动画效果</strong>：平滑过渡，避免界面闪烁</li>
+<li><strong>突出显示</strong>：关键数据指标采用大字号、对比色、光晕效果</li>
+</ul>
+<h4>17.3.2 性能要求</h4>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据刷新频率</td>
+<td>不低于5分钟/次</td>
+</tr>
+<tr>
+<td>预警数据更新</td>
+<td>实时</td>
+</tr>
+<tr>
+<td>界面响应延迟</td>
+<td>≤300ms</td>
+</tr>
+<tr>
+<td>图表渲染</td>
+<td>大数据量流畅交互</td>
+</tr>
+</tbody>
+</table>
+<h4>17.3.3 错误处理</h4>
+<ul>
+<li>网络异常友好提示</li>
+<li>数据加载失败自动重试</li>
+<li>完善的错误日志记录</li>
+</ul>
+<h3>17.4 组件结构</h3>
+<pre><code>frontend/
+├── public/
+│   └── map/
+│       └── world.json              # 世界地图 GeoJSON（ECharts 注册用）
+└── src/
+    ├── views/
+    │   └── SmartDashboard.vue      # 智慧大屏主界面（单文件内联，含三栏布局与全部图表）
+    └── api/
+        └── dashboard.js            # 智慧大屏 API 封装
+</code></pre>
+<h3>17.5 权限控制</h3>
+<ul>
+<li><strong>访问权限</strong>：仅boss角色可访问</li>
+<li><strong>路由配置</strong>：<code>/smart-dashboard</code></li>
+<li><strong>数据隔离</strong>：敏感数据访问受限</li>
+</ul>
+<h3>17.6 界面布局</h3>
+<pre><code>┌──────────────────────────────────────────────────────────────────────────┐
+│ 全球业务数据智慧大屏          此面板仅统计最近24个月内数据    [时间] [刷新] │
+├───────────────────────┬───────────────────────────────┬──────────────────┤
+│ 左侧面板              │ 中央面板（世界地图）          │ 右侧面板        │
+│ ┌─────────────────┐  │                               │ 网店销售 TOP10  │
+│ │ 指标卡×5        │  │   ● 北京  ● 上海  ● 纽约      │ ┌──────────────┐ │
+│ │ 总订单/销售额/  │  │      ╱╲                        │ │ ①店主 ¥金额  │ │
+│ │ 待发货/生产中/  │  │   ╱    ╲  ● 伦敦   ● 东京     │ │  网店ID      │ │
+│ │ 已发货          │  │  ● 广州 ────▶ ● 巴黎          │ │ ②店主 ¥金额  │ │
+│ └─────────────────┘  │  （15城涟漪散点+枢纽飞线）     │ └──────────────┘ │
+│ ┌─────────────────┐  │                               │ 超期订单        │
+│ │ 月度销售折线图  │  │                               │ ┌──────────────┐ │
+│ └─────────────────┘  │                               │ │ 单号(可点击) │ │
+│ ┌─────────────────┐  │                               │ │ 天数         │ │
+│ │ 畅销品 TOP10    │  │                               │ └──────────────┘ │
+│ └─────────────────┘  │                               │                  │
+└───────────────────────┴───────────────────────────────┴──────────────────┘
+</code></pre>
+<h3>17.7 数据模型</h3>
+<h4>/api/dashboard/overview 返回</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>total_orders</td>
+<td>Number</td>
+<td>总订单数</td>
+</tr>
+<tr>
+<td>sales_total</td>
+<td>Number</td>
+<td>销售总额（本期新增）</td>
+</tr>
+<tr>
+<td>pending_orders</td>
+<td>Number</td>
+<td>待发货订单数</td>
+</tr>
+<tr>
+<td>producing_orders</td>
+<td>Number</td>
+<td>生产中订单数（本期新增）</td>
+</tr>
+<tr>
+<td>shipped_orders</td>
+<td>Number</td>
+<td>已发货订单数</td>
+</tr>
+</tbody>
+</table>
+<h4>/api/dashboard/monthly-sales 返回</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>months</td>
+<td>Array<String></td>
+<td>月份标签数组（如 2024-08）</td>
+</tr>
+<tr>
+<td>sales</td>
+<td>Array<Number></td>
+<td>各月销售金额</td>
+</tr>
+<tr>
+<td>orders</td>
+<td>Array<Number></td>
+<td>各月订单数</td>
+</tr>
+</tbody>
+</table>
+<h4>/api/dashboard/shop-ranking 返回</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shop_name</td>
+<td>String</td>
+<td>网店名称</td>
+</tr>
+<tr>
+<td>sales</td>
+<td>Number</td>
+<td>销售额（降序 TOP10）</td>
+</tr>
+</tbody>
+</table>
+<h4>/api/dashboard/overdue-orders 返回</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>order_id</td>
+<td>String</td>
+<td>订单号</td>
+</tr>
+<tr>
+<td>shop_name</td>
+<td>String</td>
+<td>网店名称</td>
+</tr>
+<tr>
+<td>days</td>
+<td>Number</td>
+<td>下单至今天数</td>
+</tr>
+<tr>
+<td>overdue_text</td>
+<td>String</td>
+<td>超期时长（如"187天"）</td>
+</tr>
+<tr>
+<td>shipping_status</td>
+<td>String</td>
+<td>pending / virtual</td>
+</tr>
+<tr>
+<td>shipping_status_text</td>
+<td>String</td>
+<td>待发货 / 虚拟发货</td>
+</tr>
+<tr>
+<td>produce_status</td>
+<td>String</td>
+<td>unproduce / producing / produced</td>
+</tr>
+<tr>
+<td>produce_status_text</td>
+<td>String</td>
+<td>未生产 / 生产中 / 生产完成</td>
+</tr>
+</tbody>
+</table>
+<h4>/api/dashboard/product-ranking 返回</h4>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>product_name</td>
+<td>String</td>
+<td>商品名称</td>
+</tr>
+<tr>
+<td>sales</td>
+<td>Number</td>
+<td>销量（降序 TOP10）</td>
+</tr>
+</tbody>
+</table>
+<h3>17.8 交互说明</h3>
+<h4>刷新与实时性</h4>
+<ul>
+<li>右上角「刷新」按钮重新拉取全部 <code>/api/dashboard/*</code> 接口</li>
+<li>顶部时钟每秒刷新，无需刷新页面即可看到当前时间</li>
+</ul>
+<h4>图表交互</h4>
+<ul>
+<li>地图：鼠标悬停显示城市名称与数值，支持滚轮缩放与拖拽平移</li>
+<li>折线图/条形图：鼠标悬停显示 tooltip 明细</li>
+<li>暂无点击卡片下钻与 Excel/PNG 导出（后续版本规划）</li>
+</ul>
+<h4>全屏</h4>
+<ul>
+<li>大屏进入时自动隐藏系统侧边栏与顶栏，沉浸式铺满视口（见第 17.8 节）</li>
+</ul>
+<h4>订单详情与退出</h4>
+<ul>
+<li><strong>超期订单点详情</strong>：右侧「超期订单」列表中订单ID可点击，点击后弹出订单详情弹窗（复用 <code>OrderDetailDialog.vue</code>），展示订单基础信息、图片、二维码、发货状态与<strong>生产进度</strong>，与「订单列表-查看」完全一致</li>
+<li><strong>退出大屏</strong>：右上角「退出」按钮点击后返回订单管理页面（<code>router.push('/orders')</code>）</li>
+</ul>
+<h3>17.9 技术实现要点</h3>
+<h4>响应式布局</h4>
+<ul>
+<li>使用CSS Grid和Flexbox实现自适应布局</li>
+<li>支持不同屏幕比例切换（16:9/4:3/21:9）</li>
+<li>媒体查询适配移动端设备</li>
+</ul>
+<h4>动画效果</h4>
+<ul>
+<li>CSS动画实现平滑过渡</li>
+<li>SVG图表动画增强视觉效果</li>
+<li>数据更新时数字滚动动画</li>
+</ul>
+<h4>状态管理</h4>
+<ul>
+<li>使用Vue响应式系统管理状态</li>
+<li>组件间通过props传递数据</li>
+<li>支持实时数据更新</li>
+</ul>
+<h3>17.10 启动方式</h3>
+<p>智慧大屏系统作为订单管理系统的一个模块，需先启动主系统：</p>
+<ol>
+<li>运行 <code>启动器.py</code> 或 <code>一键启动.bat</code></li>
+<li>使用boss角色账号登录（如：1001/1001）</li>
+<li>点击侧边栏「智慧大屏」菜单进入</li>
+</ol>
+<h2>18 前端模块化开发规范</h2>
+<h3>18.1 模块化架构概述</h3>
+<p>本项目采用模块化架构设计，按业务域拆分独立模块，实现业务解耦、便于维护的目标。</p>
+<h3>18.2 目录结构</h3>
+<pre><code>frontend/src/
+├── api/                          # API接口统一管理（14个业务接口文件）
+│   ├── baseUrl.js               # 环境域名配置
+│   ├── request.js               # Axios实例封装
+│   ├── index.js                 # API统一导出入口（14个模块）
+│   ├── auth.js                  # 认证接口（登录、注册、获取用户）
+│   ├── user.js                  # 用户管理接口（CRUD）
+│   ├── order.js                 # 订单管理接口（列表、详情、CRUD、二维码）
+│   ├── shop.js                  # 网店管理接口
+│   ├── logistics.js             # 物流公司管理接口
+│   ├── image.js                 # 图片管理接口（上传、迁移、删除）
+│   ├── product.js               # 商品管理接口（CRUD、批量删除）
+│   ├── statistics.js            # 数据统计接口（概览、提成、发货时长）
+│   ├── logs.js                  # 日志管理接口（操作日志、登录日志、清理）
+│   ├── notification.js          # 通知管理接口（站内信）
+│   ├── exchange.js              # 汇率接口（外部API）
+│   ├── dashboard.js             # 智慧大屏接口（5个专用API）
+│   ├── commission_settlement.js # 提成结算接口
+│   └── withdraw.js              # 账户提现接口
+├── modules/                      # 业务模块目录（10个模块）
+│   ├── Common/                  # 公共模块
+│   │   └── components/          # 公共组件（8个）
+│   │       ├── ExchangeCalculator.vue   # 汇率计算器（融入侧边栏）
+│   │       ├── OrderOverview.vue       # 订单概览统计卡片
+│   │       ├── SalesPerformance.vue    # 销售人员业绩分析表格
+│   │       ├── FinanceStatistics.vue   # 财务数据统计图表
+│   │       ├── SalesRanking.vue        # 销售排行榜（TOP10）
+│   │       ├── ProductRanking.vue      # 商品热销排行榜（TOP20）
+│   │       ├── SystemControls.vue      # 系统控制面板（全屏、时间选择）
+│   │       └── world.json             # 世界地图数据（用于地址解析）
+│   ├── Order/                   # 订单管理模块
+│   │   ├── views/
+│   │   │   └── Orders.vue              # 订单管理页面
+│   │   ├── components/
+│   │   │   └── UniversalOrderList.vue  # 通用订单列表组件（多角色动态权限）
+│   │   └── services/
+│   │       └── orderService.js         # 订单业务逻辑（数据转换、计算）
+│   ├── Product/                 # 商品管理模块
+│   │   └── services/
+│   │       └── productService.js       # 商品业务逻辑
+│   ├── Shop/                    # 网店管理模块
+│   │   └── services/
+│   │       └── shopService.js          # 网店业务逻辑
+│   ├── Logistics/               # 物流管理模块
+│   │   └── services/
+│   │       └── logisticsService.js     # 物流业务逻辑
+│   ├── Image/                   # 图片管理模块
+│   │   └── services/
+│   │       └── imageService.js         # 图片业务逻辑
+│   ├── Log/                     # 日志管理模块
+│   │   └── services/
+│   │       └── logService.js           # 日志业务逻辑
+│   ├── Statistics/              # 数据统计模块
+│   │   └── services/
+│   │       └── statisticsService.js    # 统计业务逻辑
+│   ├── Settings/                # 系统设置模块
+│   │   └── services/
+│   │       └── settingsService.js      # 设置业务逻辑
+│   ├── User/                    # 用户管理模块
+│   │   └── services/
+│   │       └── userService.js          # 用户业务逻辑
+│   └── Finance/                 # 财务模块
+│       └── views/
+│           ├── CommissionSettlement.vue  # 工资结算（提成结算）
+│           └── AccountWithdrawal.vue     # 账户提现
+├── utils/                        # 工具函数（5个）
+│   ├── request.js               # Axios封装
+│   ├── format.js                # 格式化函数（日期、金额）
+│   ├── countryData.js           # 国家数据（地图定位）
+│   ├── addressParser.js         # 地址解析器（提取国家）
+│   └── exchangeRequest.js       # 汇率请求工具
+├── styles/                      # 样式目录
+│   └── dark-theme.scss          # 深色主题样式（智慧大屏）
+├── store/                        # Pinia状态管理（2个）
+│   ├── user.js                  # 用户状态管理（登录信息、权限）
+│   └── users.js                 # 用户列表状态管理
+├── router/                       # 路由配置
+│   └── index.js                 # Vue Router配置（含权限守卫）
+└── views/                        # 根页面（16个）
+    ├── Login.vue                # 登录页面
+    ├── Layout.vue               # 主布局（侧边栏+主内容区+汇率计算器）
+    ├── Dashboard.vue            # 工作台（角色路由）
+    ├── BossDashboard.vue        # 老板端工作台
+    ├── SalesDashboard.vue       # 销售端工作台
+    ├── FactoryDashboard.vue     # 工厂端工作台
+    ├── ShippingDashboard.vue    # 发货端工作台
+    ├── Users.vue                # 用户管理
+    ├── Shops.vue                # 网店管理
+    ├── Orders.vue               # 订单管理（模块入口）
+    ├── Products.vue             # 商品管理
+    ├── Images.vue               # 图片管理
+    ├── Logistics.vue            # 物流管理
+    ├── Statistics.vue           # 数据统计
+    ├── Logs.vue                 # 日志管理
+    ├── Settings.vue             # 系统设置
+    ├── Notifications.vue        # 站内信
+    └── SmartDashboard.vue       # 智慧大屏
+</code></pre>
+<h3>18.3 API接口规范</h3>
+<h4>18.3.1 目录约束</h4>
+<ol>
+<li>所有后端请求接口全部归集至<code>src/api/</code>目录</li>
+<li>api目录固定分层：</li>
+<li><code>baseUrl.js</code>：统一管理开发/测试/生产环境域名</li>
+<li><code>request.js</code>：axios实例、请求/响应拦截器</li>
+<li>业务api文件：按业务拆分（auth、user、order等）</li>
+<li><code>index.js</code>：统一导出入口</li>
+</ol>
+<h4>18.3.2 编写规则</h4>
+<ol>
+<li>单一接口文件只对应一类业务</li>
+<li>接口函数仅做网络请求，禁止混入业务逻辑</li>
+<li>所有接口请求统一复用<code>request.js</code>导出的axios实例</li>
+<li>请求地址、请求方式、参数严格封装在接口函数内</li>
+</ol>
+<h4>18.3.3 调用规则</h4>
+<ol>
+<li>页面、组件统一从<code>@/api</code>导入接口</li>
+<li>鉴权Token、请求超时、统一报错提示全部由request拦截器处理</li>
+<li>接口参数传递规范：GET请求使用params传参，POST请求使用data传参</li>
+</ol>
+<h3>18.4 模块拆分规范</h3>
+<h4>18.4.1 模块划分标准</h4>
+<ol>
+<li>按业务域拆分独立模块，禁止按单一功能零散拆分</li>
+<li>每个业务模块独立闭环，内部包含页面、私有组件、模块专属逻辑hooks</li>
+<li>模块分层约束：</li>
+<li>业务模块仅允许依赖<code>api</code>、<code>utils</code>、<code>store</code>公共目录</li>
+<li>业务模块之间禁止直接import组件/方法</li>
+<li>拆分粒度控制：单一业务域代码量低于200行不单独拆模块</li>
+</ol>
+<h4>18.4.2 模块依赖禁止项</h4>
+<ol>
+<li>禁止模块循环引用</li>
+<li>禁止A模块直接import B模块内部页面、私有函数</li>
+<li>禁止在模块组件内硬编码接口地址、环境域名、常量编码</li>
+</ol>
+<h3>18.5 业务逻辑层规范</h3>
+<h4>18.5.1 职责划分</h4>
+<ul>
+<li><strong>API层</strong>（<code>src/api/</code>）：仅负责网络请求，不包含业务逻辑</li>
+<li><strong>Service层</strong>（<code>src/modules/*/services/</code>）：负责业务逻辑、数据处理、计算等</li>
+<li><strong>View层</strong>（<code>src/modules/*/views/</code>）：负责UI展示和用户交互</li>
+</ul>
+<h4>18.5.2 Service层规范</h4>
+<ol>
+<li>所有业务逻辑统一放在模块的service层</li>
+<li>Service层函数负责数据计算、格式化、验证等业务逻辑</li>
+<li>Service层统一从<code>@/api</code>导入接口，禁止直接调用axios</li>
+<li>Service层函数必须包含错误处理和日志记录</li>
+</ol>
+<h3>18.6 维护约束</h3>
+<ol>
+<li>修改接口域名、请求拦截逻辑，仅修改<code>api</code>目录下对应文件</li>
+<li>新增业务功能，优先在对应业务模块内新增代码</li>
+<li>接口新增、修改仅改动对应业务api文件</li>
+<li>删除废弃业务，直接删除完整业务模块文件夹</li>
+<li>全局通用工具统一放<code>utils</code>，模块禁止重复实现</li>
+</ol>
+<h3>18.7 禁止行为清单</h3>
+<ol>
+<li>禁止在vue页面、组件、hooks中直接写axios请求代码</li>
+<li>禁止将所有接口全部堆入同一个api文件</li>
+<li>禁止业务模块之间互相引入内部组件、函数</li>
+<li>禁止硬编码后端地址、Token、错误提示文案</li>
+<li>禁止在API函数内编写业务计算、弹窗交互逻辑</li>
+</ol>
+<h2>19 启动器使用说明</h2>
+<h3>19.1 启动方式</h3>
+<p>系统提供两种启动方式，推荐使用可视化启动器：</p>
+<table>
+<thead>
+<tr>
+<th>启动方式</th>
+<th>文件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>推荐</strong></td>
+<td><code>启动器.py</code></td>
+<td>可视化交互界面，实时日志显示</td>
+</tr>
+<tr>
+<td>备用</td>
+<td><code>一键启动.bat</code></td>
+<td>批处理脚本，自动启动前后端服务</td>
+</tr>
+</tbody>
+</table>
+<h3>19.2 可视化启动器功能</h3>
+<blockquote>
+<p>启动器已由 <strong>Tkinter 重写为 PySide6（Qt6）</strong>（2026-08-08），窗口 880×620 无边框浅色风格，最大化走 Qt 原生 <code>showMaximized</code>，根除旧版合成器双窗口堆叠 bug。</p>
+</blockquote>
+<h4>界面特性（PySide6 浅色风格）</h4>
+<ul>
+<li><strong>左侧 170px 侧边栏</strong>：顶部品牌 logo +「牛蛙产销协同」标题与版本号；中部导航项「状态」（服务概览）、「备份」（数据库备份与还原）、「初始」（恢复出厂，需输入特殊操作密码），点击切换主窗口视图。</li>
+<li><strong>服务概览卡片</strong>：两个服务磁贴（「后端接口服务」绿、「前端网页客户端」蓝），磁贴含图标、SRV 标签、服务名、状态文字；每个磁贴下方一张「服务状态」卡片——波浪进度条（WaveBar）+ 状态标签，动画随状态切换：</li>
+<li>已停止：白色轨道无动画，标签「已停止」</li>
+<li>运行中：渐变绿 + 3 条白色波浪缓慢流动，标签「运行中」</li>
+<li>异常告警：橙红轨道 + 高频闪烁波纹，标签「异常告警」</li>
+<li>后端状态判定：端口检测 + <code>/health</code> HTTP 探测（<code>is_service_healthy()</code>），避免「端口占用但进程崩溃」误报运行中。</li>
+<li><strong>实时日志卡片</strong>：标签页 4 个——综合 / 前端 / 后端 / 备份，彩色显示；顶部含检索框与「搜索」按钮（按关键字过滤当前标签页）。</li>
+<li><strong>底部 4 个功能按钮</strong>：启动系统 / 停止系统 / 打开页面 / 刷新状态（文字统一黑色，启动中高亮、禁用态变暗）。</li>
+<li><strong>单实例保护</strong>：socket 端口锁（25999）防止重复启动产生多窗口；支持最小化到系统托盘。</li>
+<li><strong>看门狗</strong>：启动器进程存活期间，若后端/前端意外退出会自动重启；「停止系统」先停自管子进程，再按端口兜底清理。</li>
+</ul>
+<h4>启动流程</h4>
+<ol>
+<li>双击运行 <code>启动器.py</code></li>
+<li>点击「启动系统」按钮</li>
+<li>等待环境检查和依赖安装（首次运行可能需要几分钟）</li>
+<li>服务启动完成后自动打开浏览器</li>
+</ol>
+<h4>使用注意事项</h4>
+<ul>
+<li>服务运行期间不要关闭启动器窗口</li>
+<li>关闭窗口时会提示确认（防止误关闭）</li>
+<li>服务在后台静默运行，不会弹出命令行窗口</li>
+</ul>
+<h3>19.3 启动器界面预览</h3>
+<pre><code>┌──┬─────────────────────────────────────────────────────────┐
+│✓ │  牛蛙产销协同                                            │
+│  │                                                         │
+│状态│  ┌── 服务概览 ───────┐   ┌── 实时日志 ──────────────┐ │
+│备份│  │ [后端接口服务]     │   │ 综合 │ 前端 │ 后端 │ 备份 │ │
+│初始│  │  运行中           │   │ [检索日志__________] [搜索]│ │
+│  │  │  ┌─服务状态─┐      │   │ [14:40:00][系统] ✅ Python…│ │
+│  │  │  │▮▮▮波浪 运行中│  │   │ [14:40:03][后端] INFO: … │ │
+│  │  │  └──────────┘      │   └───────────────────────────┘ │
+│  │  └────────────────────┘                                 │
+│  │                                                         │
+│  │  [ 启动系统 ]  [ 停止系统 ]  [ 打开页面 ]  [ 刷新状态 ]  │
+└──┴─────────────────────────────────────────────────────────┘
+
+备份视图（点击侧边栏「备份」后切换，不弹窗）：
+  ┌── 数据库备份与还原 ──────────────────────────────┐
+  │ ① 备份设置  ② 自动备份配置  ③ 还原操作  ④ 操作日志 │
+  └──────────────────────────────────────────────────┘
+</code></pre>
+<h3>19.4 数据库备份与还原（主窗口内备份视图）</h3>
+<p>启动器侧边栏「备份」导航项，点击后<strong>在主窗口内切换到「数据库备份与还原」视图</strong>（替换首页内容，不弹出独立窗口）；点击「状态」返回首页。该视图集中管理数据库备份与还原：</p>
+<p><strong>功能分区</strong>：
+- <strong>备份设置</strong>：显示当前备份目录，支持「选择目录」与「立即备份」。备份采用 SQLite <code>VACUUM INTO</code> 在线热备，不中断后端服务；备份文件命名 <code>order_system_backup_YYYYMMDD_HHMMSS.db</code>。
+- <strong>自动备份配置</strong>：启用开关 + 周期模式 + 联动控件，配置持久化至 <code>backend/data/launcher_config.json</code>：
+  - <strong>每日</strong>：显示执行时间选择器（HH:mm），每天固定时刻备份；
+  - <strong>每周</strong>：显示星期下拉 + 执行时间，每周指定星期几备份；
+  - <strong>每月</strong>：显示日期下拉（1–31）+ 执行时间，每月几号备份（日期超过当月最大天数自动取月末）；
+  - <strong>每隔几小时</strong>：显示间隔小时数字输入框（限 1–24 整数，非法输入保存时弹窗拦截），循环间隔备份。
+  - 定时任务在后台线程运行，仅启动器打开期间生效，退出自动停止，不注册系统计划任务；备份成功/失败均写入操作日志，视图显示下次备份时间。
+- <strong>还原操作</strong>：列出已有备份文件（含大小、时间），支持刷新与「还原选中备份」。还原流程：先停止前后端服务 → 对当前库做 emergency 备份 → 用选中备份覆盖数据库 → 自动重启服务。
+- <strong>操作日志</strong>：实时显示备份 / 还原的成功、失败与进度信息（同时分流写入首页「实时日志」的「备份」标签页）。</p>
+<blockquote>
+<p>说明：后台 Web「系统设置」模块仅保留提成比例、临时图片保留时间等配置，<strong>不再包含「数据备份路径」表单项</strong>；数据库备份 / 还原的真实入口即本视图。另侧边栏「初始」导航为恢复出厂（停服务 → 跑 <code>数据库初始化.py --force</code> → 重启），需输入特殊操作密码。</p>
+</blockquote>
+<h2>20 商品管理功能说明</h2>
+<h3>20.1 功能概述</h3>
+<p>商品管理模块用于管理系统中的商品信息，支持商品的增删改查操作，并与订单管理模块关联。</p>
+<h3>20.2 核心功能</h3>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>说明</th>
+<th>权限要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>商品列表</td>
+<td>展示商品列表，支持分页、搜索、筛选</td>
+<td>所有角色</td>
+</tr>
+<tr>
+<td>商品添加</td>
+<td>创建新商品，包含字段验证</td>
+<td>boss、sales</td>
+</tr>
+<tr>
+<td>商品编辑</td>
+<td>修改商品名称和备注</td>
+<td>boss、sales</td>
+</tr>
+<tr>
+<td>商品删除</td>
+<td>删除单个商品（已被订单引用的商品不可删除）</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>批量删除</td>
+<td>批量删除多个商品</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>商品详情</td>
+<td>查看商品完整信息</td>
+<td>所有角色</td>
+</tr>
+</tbody>
+</table>
+<h3>20.3 数据模型</h3>
+<h4>商品表（product）</h4>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>product_code</td>
+<td>TEXT</td>
+<td>是</td>
+<td>商品唯一标识码（PRD-XXXXXXXX格式）</td>
+</tr>
+<tr>
+<td>product_name</td>
+<td>TEXT</td>
+<td>是</td>
+<td>商品名称（2-100字符）</td>
+</tr>
+<tr>
+<td>product_remark</td>
+<td>TEXT</td>
+<td>否</td>
+<td>商品备注（最大500字符）</td>
+</tr>
+<tr>
+<td>status</td>
+<td>TEXT</td>
+<td>是</td>
+<td>商品状态：active/inactive</td>
+</tr>
+<tr>
+<td>created_by</td>
+<td>TEXT</td>
+<td>是</td>
+<td>创建人用户名</td>
+</tr>
+<tr>
+<td>created_at</td>
+<td>TIMESTAMP</td>
+<td>是</td>
+<td>创建时间</td>
+</tr>
+<tr>
+<td>updated_at</td>
+<td>TIMESTAMP</td>
+<td>是</td>
+<td>更新时间</td>
+</tr>
+</tbody>
+</table>
+<h4>商品编码生成规则</h4>
+<ul>
+<li><strong>格式</strong>：<code>PRD-{UUID前8位}</code>（采用UUID v4标准）</li>
+<li><strong>示例</strong>：PRD-A1B2C3D4</li>
+<li><strong>唯一性</strong>：系统自动检查，确保全局唯一</li>
+</ul>
+<h3>20.4 API接口列表</h3>
+<table>
+<thead>
+<tr>
+<th>接口路径</th>
+<th>方法</th>
+<th>说明</th>
+<th>权限</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/api/products/</td>
+<td>GET</td>
+<td>获取商品列表</td>
+<td>所有角色</td>
+</tr>
+<tr>
+<td>/api/products/</td>
+<td>POST</td>
+<td>创建商品</td>
+<td>boss、sales</td>
+</tr>
+<tr>
+<td>/api/products/{product_code}</td>
+<td>GET</td>
+<td>获取商品详情</td>
+<td>所有角色</td>
+</tr>
+<tr>
+<td>/api/products/{product_code}</td>
+<td>PUT</td>
+<td>更新商品</td>
+<td>boss、sales</td>
+</tr>
+<tr>
+<td>/api/products/{product_code}</td>
+<td>DELETE</td>
+<td>删除商品</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/api/products/batch-delete</td>
+<td>POST</td>
+<td>批量删除商品</td>
+<td>boss</td>
+</tr>
+<tr>
+<td>/api/products/count/total</td>
+<td>GET</td>
+<td>获取商品统计</td>
+<td>所有角色</td>
+</tr>
+</tbody>
+</table>
+<h3>20.5 前端页面功能</h3>
+<h4>商品列表页面</h4>
+<ul>
+<li>关键词搜索（商品编码、商品名称）</li>
+<li>状态筛选（启用/停用）</li>
+<li>分页展示</li>
+<li>批量选择和批量删除</li>
+<li>操作按钮：查看、编辑、删除</li>
+</ul>
+<h4>商品创建/编辑表单</h4>
+<ul>
+<li>商品名称（必填，2-100字符）</li>
+<li>商品备注（选填，最大500字符）</li>
+<li>表单验证（前端实时验证 + 后端二次验证）</li>
+</ul>
+<h4>订单关联</h4>
+<ul>
+<li>创建订单时，商品名称通过下拉框选择</li>
+<li>下拉框仅显示已存在的商品，禁止输入不存在的商品名称</li>
+<li>商品名称与订单表的product_name字段关联</li>
+</ul>
+<h3>20.6 权限控制</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>权限</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>boss</td>
+<td>完整权限（查看、创建、编辑、删除、批量删除）</td>
+</tr>
+<tr>
+<td>sales</td>
+<td>查看、创建、编辑（不可删除）</td>
+</tr>
+<tr>
+<td>factory</td>
+<td>仅查看</td>
+</tr>
+<tr>
+<td>shipping</td>
+<td>仅查看</td>
+</tr>
+</tbody>
+</table>
+<h3>20.7 删除限制</h3>
+<ul>
+<li>已被订单引用的商品不允许删除</li>
+<li>删除前系统会检查订单表中是否存在引用</li>
+<li>删除失败时显示具体原因（如：该商品已被订单 XXX 引用）</li>
+</ul>
+<h2>21 部署与维护</h2>
+<ul>
+<li><strong>轻量化部署</strong>：使用SQLite数据库，无需额外服务依赖</li>
+<li><strong>启动脚本</strong>：提供可视化启动器和批处理脚本，简化部署流程</li>
+<li><strong>日志管理</strong>：完善的日志记录机制，便于问题排查</li>
+<li><strong>数据备份</strong>：定期备份数据库和图片文件，确保数据安全</li>
+<li><strong>性能监控</strong>：通过日志分析系统性能，及时发现并解决问题</li>
+</ul>
+<h2>22 功能验证要点</h2>
+<h3>22.1 用户信息显示验证</h3>
+<ul>
+<li>登录后右上角显示真实姓名（如「张三」）而不是账号（如「1001」）</li>
+<li>当用户没有设置真实姓名时，显示账号</li>
+</ul>
+<h3>22.2 数据统计验证</h3>
+<ul>
+<li>数据统计页面默认显示近365天的数据</li>
+<li>老板端显示「平均发货时长」统计卡片</li>
+<li>老板端显示「销售提成统计表格」，默认显示当前月份数据</li>
+<li>提成比例正确显示为百分比格式（如5%，而非500%）</li>
+<li>可通过日期选择器筛选提成统计时间范围</li>
+<li>可按用户筛选提成统计数据</li>
+<li>汇总数据正确计算</li>
+</ul>
+<h3>22.3 订单管理验证</h3>
+<ul>
+<li>订单列表显示发货时间列</li>
+<li>订单列表显示创建人列</li>
+<li>可通过关键词搜索订单（支持平台订单号、商品名称、销售金额）</li>
+<li>选择框内容完整显示，无截断</li>
+<li>订单创建、编辑、删除功能正常</li>
+<li>订单创建表单中显示"下单时间"日期选择器</li>
+<li>默认选择当前日期</li>
+<li>无法选择未来日期</li>
+<li>用户选择的下单时间会保存到数据库</li>
+<li>订单列表和详情页正确显示用户选择的下单时间</li>
+<li>订单列表和详情页正确显示订单创建人的真实姓名</li>
+<li>订单详情弹窗右上角展示「打印」按钮，点击可打开A4打印预览窗口</li>
+<li>打印预览中正确显示订单信息、二维码、商品图片</li>
+</ul>
+<h3>22.4 基础信息模块验证</h3>
+<ul>
+<li>点击「基础信息」菜单进入合并后的页面</li>
+<li>页面包含「网店管理」和「物流公司管理」两个标签页</li>
+<li>可正常切换标签页</li>
+<li>网店和物流公司的增删改查功能正常</li>
+</ul>
+<h3>22.5 汇率计算器验证</h3>
+<ul>
+<li>汇率计算器融入侧边栏底部区域，作为侧边栏的一部分显示</li>
+<li>不使用悬浮卡片显示，与侧边栏深色主题融合</li>
+<li>默认显示 CNY 到 USD 的汇率信息</li>
+<li>点击卡片区域展开完整的汇率计算器</li>
+<li>点击"刷新"按钮可更新汇率数据</li>
+<li>支持多种货币选择（CNY、USD、EUR、GBP、JPY、HKD、AUD、CAD）</li>
+<li>点击交换按钮可以一键切换源货币和目标货币</li>
+<li>输入金额后自动计算转换结果</li>
+<li>显示汇率更新时间</li>
+<li>网络请求失败时显示友好的错误提示</li>
+<li>加载时显示加载状态指示器</li>
+<li>控件使用small尺寸，适配侧边栏宽度</li>
+</ul>
+<h3>22.6 数据清理管理验证</h3>
+<ul>
+<li>进入「系统设置」页面可以看到「数据清理管理」标签页面板（日志清理 / 站内信清理）</li>
+<li>日志清理：可查看和设置保留天数（30-3650天），预览、二次确认执行，查看历史记录</li>
+<li>站内信清理：默认保留 360 天、最小 360 天（输入框无法低于 360），可预览待删除数量并执行</li>
+<li>切换分页互不干扰，清理记录表正确区分 cleanup_type（含「站内信」标签）</li>
+<li>订单详情弹窗：可看到「生产进度」卡片，展示当前状态/更新时间/更新人，下拉修改后即时生效</li>
+<li>智慧大屏：网店销售 TOP10 为卡片式（无表头），超期订单点击订单ID可弹出订单详情</li>
+</ul>
+<h3>22.7 商品管理验证</h3>
+<ul>
+<li>商品列表正常显示，支持搜索、筛选、分页</li>
+<li>商品添加功能正常，表单验证生效</li>
+<li>商品编辑功能正常，修改后数据正确保存</li>
+<li>商品删除功能正常（boss角色）</li>
+<li>商品详情页显示完整信息</li>
+<li>订单创建时商品下拉框仅显示已存在的商品</li>
+<li>权限控制正确（boss/sales可编辑，factory/shipping仅查看）</li>
+<li>已被订单引用的商品无法删除</li>
+</ul>
+<h2>23 财务模块</h2>
+<h3>23.1 模块概述</h3>
+<p>财务模块包含三个子模块：
+- <strong>工资结算</strong>：按发货时间统计每月每个销售的提成金额，并支持标记已发放
+- <strong>账户提现</strong>：网店提现记录管理功能
+- <strong>费用统计</strong>（2026-08-10 起新增，由原"数据统计"模块迁入）：运费统计 <code>/freight-statistics</code>，按订单时间段统计运费，仅老板端可见</p>
+<blockquote>
+<p>菜单结构：财务模块下分「财务结算（工资结算/账户提现）」与「费用统计（运费统计）」两个分组。</p>
+</blockquote>
+<h3>23.2 工资结算</h3>
+<h4>功能说明</h4>
+<ul>
+<li>按发货时间统计每个销售的提成金额</li>
+<li>支持按月筛选统计数据</li>
+<li>标记提成已发放后，订单中添加提成已发放标记，不再统计该订单</li>
+</ul>
+<h4>API接口</h4>
+<table>
+<thead>
+<tr>
+<th>接口路径</th>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/api/commission-settlement/unpaid</td>
+<td>GET</td>
+<td>获取未发放提成列表</td>
+</tr>
+<tr>
+<td>/api/commission-settlement/unpaid/orders</td>
+<td>GET</td>
+<td>获取未发放提成订单详情</td>
+</tr>
+<tr>
+<td>/api/commission-settlement/pay</td>
+<td>POST</td>
+<td>标记提成已发放</td>
+</tr>
+</tbody>
+</table>
+<h3>23.3 账户提现</h3>
+<h4>功能说明</h4>
+<ul>
+<li>网店提现记录管理</li>
+<li>左侧网店列表按创建者分组显示</li>
+<li>右侧显示对应网店的提现记录</li>
+<li>支持新增、编辑、查询、导出功能</li>
+<li>区分销售端/老板端权限</li>
+</ul>
+<h4>数据模型</h4>
+<h5>网店提现记录表（shop_withdraw_record）</h5>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>是否主键</th>
+<th>是否必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>INTEGER</td>
+<td>是</td>
+<td>是</td>
+<td>自增主键</td>
+</tr>
+<tr>
+<td>shop_id</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>网店ID</td>
+</tr>
+<tr>
+<td>withdraw_date</td>
+<td>DATE</td>
+<td>否</td>
+<td>是</td>
+<td>提现日期</td>
+</tr>
+<tr>
+<td>withdraw_amount</td>
+<td>NUMERIC(12,2)</td>
+<td>否</td>
+<td>是</td>
+<td>提现金额</td>
+</tr>
+<tr>
+<td>remark</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>备注</td>
+</tr>
+<tr>
+<td>create_operator_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>是</td>
+<td>创建人姓名</td>
+</tr>
+<tr>
+<td>create_operator_id</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>是</td>
+<td>创建人ID</td>
+</tr>
+<tr>
+<td>update_operator_name</td>
+<td>TEXT</td>
+<td>否</td>
+<td>否</td>
+<td>更新人姓名</td>
+</tr>
+<tr>
+<td>update_operator_id</td>
+<td>INTEGER</td>
+<td>否</td>
+<td>否</td>
+<td>更新人ID</td>
+</tr>
+<tr>
+<td>create_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>创建时间</td>
+</tr>
+<tr>
+<td>update_time</td>
+<td>TIMESTAMP</td>
+<td>否</td>
+<td>是</td>
+<td>更新时间</td>
+</tr>
+</tbody>
+</table>
+<h4>API接口</h4>
+<table>
+<thead>
+<tr>
+<th>接口路径</th>
+<th>方法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>/api/withdraw/shops</td>
+<td>GET</td>
+<td>获取网店列表（按创建者分组）</td>
+</tr>
+<tr>
+<td>/api/withdraw/records</td>
+<td>GET</td>
+<td>获取提现记录列表</td>
+</tr>
+<tr>
+<td>/api/withdraw/records</td>
+<td>POST</td>
+<td>新增提现记录</td>
+</tr>
+<tr>
+<td>/api/withdraw/records/{id}</td>
+<td>PUT</td>
+<td>更新提现记录</td>
+</tr>
+<tr>
+<td>/api/withdraw/records/{id}</td>
+<td>DELETE</td>
+<td>删除提现记录</td>
+</tr>
+<tr>
+<td>/api/withdraw/export</td>
+<td>GET</td>
+<td>导出提现记录</td>
+</tr>
+</tbody>
+</table>
+<h4>网店列表分组显示</h4>
+<p>网店列表按创建者（用户管理中的真实姓名）进行分组显示：</p>
+<pre><code>👤 张三 (3个网店)
+  ├── SHOP001 - 淘宝旗舰店
+  ├── SHOP002 - 京东自营店
+  └── SHOP003 - 拼多多店
+
+👤 李四 (2个网店)
+  ├── SHOP004 - 抖音店
+  └── SHOP005 - 快手店
+</code></pre>
+<p>点击网店ID后，右侧展示对应网店的提现记录管理功能。</p>
+<h2>24 启动器优化</h2>
+<h3>24.1 功能改进</h3>
+<h4>服务状态检测</h4>
+<ul>
+<li>启动器打开后自动检测后端（8000端口）和前端（5173端口）服务是否已启动</li>
+<li>根据检测结果更新状态显示：运行中/未启动</li>
+<li>已启动的服务显示绿色指示灯，未启动显示灰色</li>
+</ul>
+<h4>强制重启功能</h4>
+<ul>
+<li>即使服务已运行，点击「启动系统」仍可执行重启</li>
+<li>自动检测并关闭占用端口的进程</li>
+<li>等待2秒后启动新服务</li>
+</ul>
+<h4>进度条优化</h4>
+<ul>
+<li>后端和前端进度条独立更新</li>
+<li>启动过程中进度条平滑增长，使用圆角矩形绘制填充区域</li>
+<li>运行中显示完整进度（100%），颜色变为绿色</li>
+<li>使用标签（tags）管理进度条元素，避免引用失效</li>
+</ul>
+<h4>日志标签页切换</h4>
+<ul>
+<li>四个标签页：综合、前端、后端、备份（备份日志由 <code>add_log(channel='backup')</code> 单独分流）</li>
+<li>点击标签可切换显示对应日志内容</li>
+<li>滚动条与当前日志文本同步</li>
+<li>标签页切换使用pack/pack_forget方式控制显示</li>
+</ul>
+<h4>按钮悬停效果</h4>
+<ul>
+<li>鼠标悬停时按钮颜色变亮</li>
+<li>文字始终保持显示，不会被背景覆盖（使用btn_text标签管理文字）</li>
+<li>停止按钮点击正常响应，事件绑定不会被覆盖</li>
+</ul>
+<h4>修复内容</h4>
+<ul>
+<li>修复进度条显示异常：使用标签管理替代item_id引用，避免进度条元素被删除后无法更新</li>
+<li>修复按钮文字消失：使用btn_text标签删除文字而非delete('all')，保留事件绑定</li>
+<li>修复停止按钮无反应：移除delete('all')调用，确保事件绑定不被清除</li>
+</ul>
+<h3>24.2 界面样式</h3>
+<h4>磨砂深色设计（Frosted Dark）</h4>
+<ul>
+<li>深灰蓝主背景（#2c3138），卡片底色（#374151），磨砂玻璃质感圆角卡片（12px 圆角）</li>
+<li>左侧 72px 磨砂深色侧边栏（#1e2227），蓝色 ✓ logo + 🏠 首页 / ⚙ 设置 两个有效入口</li>
+<li>服务磁贴采用六边形图标 + 竖条均衡器波形 + 带白色圆形滑块的进度条 + 开关 toggle</li>
+<li>底部功能按钮为左右两块式：左侧图标+文字、右侧纯色色块，高 120px</li>
+</ul>
+<h4>颜色系统</h4>
+<ul>
+<li>成功绿（#4ade80 / #22c55e）：运行中、启动按钮、激活态</li>
+<li>品牌蓝（#3b82f6 / #2584e8）：前端服务、停止/打开/刷新按钮色块</li>
+<li>警示橙（#f59e0b）：异常状态</li>
+<li>紫色（#a78bfa）：辅助强调</li>
+<li>深灰终端背景（#1e2228）：日志区域</li>
+</ul>
+<blockquote>
+<p>注：早于本版本的启动器曾采用浅色「苹果风格」UI，已在磨砂深色风格重设计中整体替换，旧配色（#f5f5f7 / #007aff / #34c759 / #ff3b30）不再使用。</p>
+</blockquote>
+<h2>25 近期修复与变更记录</h2>
+<blockquote>
+<p>以下记录本会话期间完成的主要修复与功能变更，便于后续维护回溯。</p>
+</blockquote>
+<h3>25.1 启动器与运行稳定性</h3>
+<ul>
+<li><strong>健康检查增强</strong>：<code>启动器.py</code> 新增 <code>is_service_healthy()</code>，对后端 <code>/health</code> 发送 HTTP 请求，端口占用但服务不可用不再误报「运行中」。</li>
+<li><strong>SQLite 写锁修复</strong>：<code>get_orders</code> 原先在每次读取时写 <code>order_days</code> 字段，结合过大的连接池（pool_size=20）在 SQLite 单写者模型下造成全部连接阻塞、网页无响应；已移除读取时的写库操作，并将 <code>database.py</code> 连接池调整为 <code>pool_size=5 / max_overflow=10 / timeout=30</code>。</li>
+</ul>
+<h3>25.2 智慧大屏重构</h3>
+<ul>
+<li>由「理想化设计稿」落地为可运行的三栏布局：顶部标题栏+时间+刷新、左侧指标卡×5+月度折线图+畅销TOP10、中央 ECharts 世界地图（15 城涟漪散点 + 枢纽飞线）、右侧网店TOP10 + 超期订单表格。</li>
+<li>新增后端接口 <code>/api/dashboard/monthly-sales</code>、<code>/api/dashboard/shop-ranking</code>、<code>/api/dashboard/overdue-orders</code>；<code>/api/dashboard/overview</code> 新增 <code>sales_total</code>、<code>producing_orders</code> 字段。</li>
+<li>世界地图 GeoJSON 改为 <code>frontend/public/map/world.json</code> 静态资源 + <code>echarts.registerMap</code> 注册，不再逐单做地址解析；旧 <code>/api/statistics/dashboard/*</code> 路径已下线，统一为 <code>/api/dashboard/*</code>。</li>
+</ul>
+<h3>25.3 老板端工作台</h3>
+<ul>
+<li>新增「生产/发货概览」分区（已发货/未生产/生产中/生产完成），复用 <code>/api/statistics/factory-dashboard</code> 聚合接口。</li>
+<li>全部 8 张卡片支持点击联动：携带 <code>shipping_status</code> / <code>produce_status</code> 查询参数跳转订单管理页，<code>UniversalOrderList.vue</code> 读取路由参数自动筛选。</li>
+<li>修复「总销售额」「总提成」卡片恒为 ¥0 的问题（改取 overview 与 commission/by-user 汇总）。</li>
+</ul>
+<h3>25.4 订单管理</h3>
+<ul>
+<li>修复点击搜索后弹出「获取订单列表失败」但订单仍正常加载的问题：图片加载分支引用了未定义变量 <code>orderIds</code>，已改为 <code>orders.value</code>。</li>
+<li>图片加载由循环串行请求改为 <code>Promise.all</code> 并行，消除 N+1 查询。</li>
+</ul>
+<h3>25.5 前序批量修复（共 28 项）</h3>
+<p>涵盖安全（密码改 Body 传参、CORS 白名单、路径遍历防护、注册角色校验）、逻辑（订单号生成器 RLock/deque、提成百分比整数比较、事务内 <code>flush</code> 替代 <code>commit</code>、状态日志取值、日志起止日期生效、SQLite 删除 <code>LIMIT</code> 改用子查询、CN 时区事件监听、删除校验双字段匹配、禁止修改 shop_id、<code>.model_dump()</code> 替代 <code>.dict()</code>）、前端（<code>validate</code> 异步回调模式、分页总数跟随筛选、跳转改用 <code>router.push</code>、移除多余 <code>console.log</code> 等）。</p>
+<h3>25.6 本批功能文档化（2026-07-16）</h3>
+<p>将以下已上线功能同步补充至本文档：</p>
+<ul>
+<li><strong>生产进度功能</strong>：订单详情弹窗（<code>OrderDetailDialog.vue</code> 及 <code>Notifications.vue</code> 内联弹窗）右侧栏新增生产进度卡片，展示 <code>produce_status</code> 状态标签、更新时间/更新人，支持下拉修改（复用 <code>PUT /api/orders/{order_id}</code>）。详见第 4.5.8 节。</li>
+<li><strong>智慧大屏相关</strong>：</li>
+<li>网店销售 TOP10 改为卡片式排行（无表头，排名色条+店主名+青色金额+网店ID副标题）</li>
+<li>超期订单列表订单ID可点击，弹出订单详情弹窗（含生产进度）</li>
+<li>右上角「退出」按钮返回订单管理页（<code>/orders</code>）</li>
+<li>详见第 17.2.4、17.6、17.8 节</li>
+<li><strong>站内信清理 + 日志清理重设计</strong>：「日志清理管理」升级为「数据清理管理」标签页面板，新增站内信清理分区（默认保留 360 天、最小 360 天、每日 2:10 定时清理），新增 4 个站内信清理接口。详见第 12 章、第 6.2 节。</li>
+</ul>
+<blockquote>
+<p>说明：智慧大屏呼吸点已按订单金额高低做<strong>蓝→青→黄→红热力渐变</strong>上色——金额越高的国家颜色越偏暖（红），越低越偏冷（蓝）；呼吸涟漪与光晕同步取该点颜色。金额归一化以各国最大订单金额为基准，颜色由 <code>heatColor(t)</code> 函数插值计算，tooltip 金额文字也按同一热力色显示。点的大小仍按金额缩放（14~42px）。</p>
+</blockquote>
+<h3>25.7 手机端作业页与启动器备份还原（2026-07-23）</h3>
+<ul>
+<li><strong>手机端轻量作业页（<code>/m/</code>）</strong>：新增独立于 PC 端的手机端作业页 <code>backend/mobile/index.html</code>（同源托管于 <code>/m/</code>，无需跨域），面向工厂 / 发货一线人员。功能：登录（复用 JWT）→ 扫码定位订单（jsQR 解析订单号，支持摄像头实时扫码与「从相册选二维码」兜底；HTTP 局域网下摄像头受限，相册选图可正常工作）→ 按角色查看 / 修改订单（工厂改生产状态 + 备注，发货改发货信息 + 备注）→ 上传图片（拍照或从相册选择，按角色写入 production / shipping 图层）。兼容现有订单二维码（编码订单号），无需重印。</li>
+<li><strong>启动器数据库备份 / 还原设置（主窗口内视图）</strong>：启动器左侧「⚙ 设置」图标，点击后<strong>在主窗口内切换到「数据库备份与还原」设置视图</strong>（非独立窗口；点击 🏠 返回首页）。含备份目录选择、立即备份（<code>VACUUM INTO</code> 在线热备）、自动备份计划（每日 / 每周 / 每月，持久化 <code>backend/data/launcher_config.json</code>）、还原选中备份（先停服务 → emergency 备份 → 覆盖 → 重启）、操作日志。对应 <code>启动器.py</code>。</li>
+<li><strong>后台系统设置调整</strong>：Web 端「系统设置」移除「数据备份路径」表单项（真实备份配置入口已移至启动器设置视图）。</li>
+<li><strong>配置位置调整</strong>：<code>launcher_config.json</code> 由项目根目录迁移至 <code>backend/data/launcher_config.json</code>，并在 <code>.gitignore</code> 中忽略（含本机路径、会被自动备份调度改写）。</li>
+<li><strong>启动器 UI 整体重设计（磨砂深色风格）</strong>：<code>启动器.py</code> 按设计稿重设计为磨砂深色 UI——左侧 72px 磨砂侧边栏（✓ logo + 🏠 首页 + ⚙ 设置）、主区「服务概览」+「实时日志」双卡片、服务磁贴（六边形图标 + 竖条均衡器波形 + 带白色圆形滑块的进度条 + 状态文字 + 开关 toggle）、实时日志扩展为综合 / 前端 / 后端 / 备份 4 个标签页并新增检索框与搜索按钮、底部 4 个左右两块式功能按钮（启动系统 / 停止系统 / 打开页面 / 刷新状态，高 120px）。所有基本功能逻辑（启动 / 停止 / 打开页面 / 刷新状态、备份还原、看门狗、自动备份调度）保持不变；侧边栏仅保留首页与设置两个有效入口，其余占位图标已移除；服务概览内后端 / 前端磁贴为上下堆叠结构。</li>
+</ul>
+<h3>25.8 2026-08-08 ~ 2026-08-10 变更记录</h3>
+<ul>
+<li><strong>启动器 PySide6 重写</strong>：<code>启动器.py</code> 由 Tkinter 彻底重写为 PySide6（880×620 无边框浅色），最大化走 Qt 原生 <code>showMaximized</code>，根除 Tkinter 合成器双窗口堆叠 bug；侧边栏三导航「状态 / 备份 / 初始」（初始=恢复出厂，需特殊操作密码）；服务磁贴简化为「图标+SRV标签+服务名+状态」，磁贴下方新增<strong>服务状态卡片</strong>（WaveBar 波浪进度条三态：已停止白色无动画 / 运行中渐变绿缓慢波浪 / 异常告警橙红高频闪烁）。详见第 19 章。</li>
+<li><strong>自动备份配置增强</strong>：备份模式由「每日/每周/每月」扩展为 4 种，新增<strong>「每隔几小时」</strong>（1–24 整数，非法输入保存弹窗拦截）；表单联动：每日→时间选择器、每周→星期+时间、每月→日期(1-31)+时间（超当月最大天数自动取月末）、每隔几小时→间隔数字输入框。详见第 19.4 节。</li>
+<li><strong>订单状态简化</strong>：移除 <code>virtual_shipped</code>（已虚拟发货）状态，全端统一为 <strong>pending/virtual/shipped/refunded</strong> 四态（后端 orders/statistics/dashboard、前端各组件、移动端均已清理）。</li>
+<li><strong>追溯码语义确认</strong>：追溯码 = 订单号 order_id = 二维码内容；新建/编辑订单表单「订单号」标签统一为「追溯码」（22 位订单号输入框字号 14→12px 保证完整显示）；订单详情弹窗二维码下方显示追溯码（标签与数字分行、数字单行不换行）。</li>
+<li><strong>智慧大屏升级</strong>：各模块固定高度 + 内容超出内部滚动（畅销品排行/网店排行/超期订单/统计卡/月度趋势）；超期订单卡片显示发货状态 + 生产进度上下结构标签、天数红色加粗、标题带「X单」计数；右侧面板超期订单与网店排行位置对调（超期在上）；超期订单接口返回 <code>produce_status</code>/<code>produce_status_text</code>。</li>
+<li><strong>生产统计口径</strong>：已退货/退款（refunded）订单不计入「未生产/生产中/生产完成」统计——process-flow（老板工作台）、factory-dashboard（工厂看板）、overview（智慧大屏）、orders 列表 <code>produce_status</code> 筛选四口径统一排除，保证卡片数字 = 跳转列表数量。</li>
+<li><strong>菜单调整</strong>：「费用统计（运费统计）」由「数据统计」模块迁入「财务模块」。</li>
+<li><strong>退款订单详情</strong>：右侧抽屉新增三端图片分类展示（销售端/工厂端/发货端，按 images.layer 分组）；images 表 layer 全局规范化为 sales/factory/shipping（旧 base/detail/extra 已映射）。</li>
+<li><strong>订单列表增强</strong>：二维码列前新增「序号」列；关键词搜索支持追溯码（=order_id）；组件监听 <code>route.query</code> 变化自动刷新（修复 keep-alive 缓存下工作台卡片跳转不刷新的问题）。</li>
+<li><strong>异常数据修复</strong>：12 单「已发货但生产状态未完成」强制锁定为生产完成（operator=system-auto，写操作日志）；数据库已填充 100 条/表的业务测试数据（角色仅 boss/sales/factory/shipping，员工密码 123456）。</li>
+</ul>
+<h3>25.9 2026-08-11 ~ 2026-08-12 变更记录</h3>
+<ul>
+<li><strong>小工具菜单重构</strong>：侧边栏底部汇率计算器卡片移除，新增「小工具」固定入口（侧栏最左下角），点击在按钮右侧展开二级菜单（汇率计算器 / 科学计算器），点击页面其他区域自动收起；选择后在屏幕右下角弹出可拖动、仅手动关闭的浮动窗口（<code>CalcFloatWindow.vue</code>，<code>z-index:4000</code>）。</li>
+<li><strong>新增科学计算器</strong>：<code>ScientificCalculator.vue</code> 支持基础四则运算、百分比、正负号、清空、删除，屏幕点击与键盘输入双操作（已屏蔽 Ctrl/Alt/Win 组合键）；原汇率计算器的顶部红色下拉切换器已移除，汇率计算器自包含。</li>
+<li><strong>订单流程全景移植到所有角色工作台</strong>：三段式流程图（销售→生产→发货）由老板端独占改为四类角色工作台均展示；后端 <code>/api/statistics/process-flow</code> 放开角色限制，<code>sales</code> 仅统计自己创建的订单，其余角色统计全公司。销售端以全景替换原「我的订单」卡片。</li>
+<li><strong>系统备份接口异步化</strong>：<code>system_backup.py</code> 的 <code>_proxy</code> 改为 <code>asyncio.to_thread</code> 包装，把阻塞的 HTTP 调用丢到线程池，避免冻结 uvicorn 事件循环。</li>
+<li><strong>文档同步</strong>：更新第 16.7 节（小工具 / 计算器）、新增第 16.9 节（订单流程全景全角色）、更新第 25 章变更记录。</li>
+</ul>
+<h3>25.10 2026-08-12 数据权限全模块扩展</h3>
+<ul>
+<li><strong>数据权限页面改造</strong>：编辑用户「数据权限」页签由「类别/品牌/商品 × 增删改」平铺三行，重构为<strong>全模块树形</strong>（一级模块 → 分组 → 28 个页面），每个页面按性质定制「查询/新增/修改/删除/导出」操作集；新增一键展开 / 一键收缩 / 全选（全页面）/ 清空、模块级与分组级全选；未勾「查询」时该页增删改导出禁用且自动清空；弹窗 600px 尺寸不变，树形区域滚动。</li>
+<li><strong>存储格式升级</strong>：<code>data_permissions</code> 由旧格式 <code>{"category":["add"],...}</code> 升级为路径键格式 <code>{"/orders":["query","export"],...}</code>；兼容旧格式（旧键自动映射为路径键，旧数据任一操作等价于可见该页）。</li>
+<li><strong>菜单按权限隐藏</strong>：<code>Layout.vue</code> 全部二级菜单项可见性 = 角色权限 ∩ 查询权限（<code>canQuery</code>）；订单管理入口同样受控；工作台 / 智慧大屏 / 小工具始终可见。</li>
+<li><strong>后端权限模块扩展</strong>：<code>security.py</code> 的 <code>DATA_PERMISSION_MODULES</code> 扩展为 28 个路径键、操作码增加 query/export、新增 <code>LEGACY_DATA_PERM_KEYS</code> 旧键映射；既有类别/品牌/商品接口鉴权不变。</li>
+<li><strong>生效范围</strong>：本轮为「设置页 + 菜单隐藏」；各页面内部按钮显隐与后端接口级拦截按模块接入（后续批次）。详见第 5.3 节。</li>
+</ul>
+<h3>25.11 2026-08-12 数据权限全模块落地（按钮隐藏 + 接口拦截）</h3>
+<ul>
+<li><strong>背景</strong>：用户反馈「只给了 2001 网店查询权限，但 2001 仍能新增/编辑网店」。排查确认：上一轮仅做了「设置页 + 菜单隐藏」，网店等模块的按钮与接口均未接数据权限（后端只有登录/角色判断），导致看得见页面即可操作。经询问确认全部模块补齐。</li>
+<li><strong>后端接口拦截（12 个文件）</strong>：给所有有增删改权限项的模块写接口加 <code>ensure_data_permission</code>：</li>
+<li><code>/shops</code>（shops.py 增/改/删）、<code>/logistics</code>（logistics.py 增/改/删）</li>
+<li><code>/accounting-codes</code> 与 <code>/non-trade-transactions</code>（non_trade.py 各增/改/删）</li>
+<li><code>/order-imports</code>（order_imports.py 上传=增、审核合并/编辑=改、删除/批量删除=删）</li>
+<li><code>/users</code>（users.py 改/删 + auth.py 注册=增）</li>
+<li><code>/notifications</code> 删除、<code>/salary-settlement</code> 发放提成=改、<code>/account-withdrawal</code> 增/改/删</li>
+<li><code>/settings</code> 保存=改、<code>/data-cleanup</code>（logs.py 配置与执行=改）、<code>/system-backup</code> 立即备份/保存配置=改</li>
+<li>订单管理按规格只有「查询/导出」，增删改保持角色制不拦。</li>
+<li><strong>前端按钮隐藏（13 个页面）</strong>：网店/物流/账务代码/收支录入/数据导入/用户/站内信/工资结算/提现/系统参数/日志清理/系统备份页面按 <code>checkDataPerm</code> 隐藏或禁用增删改按钮；订单列表「导出Excel」按钮按 <code>/orders</code> 的 export 权限控制（老板恒可导出）。</li>
+<li><strong>验证</strong>：13 个 SFC 编译 OK；后端 py_compile + 全模块 import OK；真实起服务后：2001（仅查询）POST/PUT/DELETE 网店均 403、GET 200、页面上新建/编辑/删除按钮全部隐藏；老板端按钮正常。测试产生的脏数据已清理。旧进程未清干净导致首轮验证被旧代码放行，已修正验证流程（先查端口占用再验）。</li>
+<li>详见第 5.3 节。</li>
+</ul>
+<h2>26 运维限制与已知约束（2026-08-13）</h2>
+<blockquote>
+<p>以下为启动器（启动器.py）在生产部署与日常使用中的硬性限制，部署前务必知悉。</p>
+</blockquote>
+<h3>26.1 自动数据库备份依赖启动器保持打开</h3>
+<ul>
+<li>定时自动备份由启动器内的调度线程驱动。<strong>只有启动器程序保持打开（含最小化到系统托盘）时，定时备份才会执行</strong>。</li>
+<li>关闭 / 退出启动器后，备份调度线程随进程销毁，定时备份<strong>完全停止且不会补跑</strong>，用户无提示。</li>
+<li>备份设置页已增加醒目红色警告标签提醒此限制。</li>
+<li><strong>无人值守部署</strong>：若需 7×24 定时备份，不要依赖启动器，应改用 <strong>Windows 任务计划程序</strong> 或 <strong>Linux cron</strong> 调用备份脚本。</li>
+</ul>
+<h3>26.2 看门狗仅自愈后端 API，前端不自愈</h3>
+<ul>
+<li>启动器的健康检查看门狗只监控后端（端口 8000 / /health）。后端崩溃、端口消失、疑似死锁时，看门狗会自动重启后端。</li>
+<li>前端 vite 服务（端口 5173）<strong>不在看门狗监控范围内</strong>：前端进程崩溃或卡死时，界面仍显示「运行中」，浏览器实际白屏，看门狗不会自动重启前端，需人工重启启动器或前端。</li>
+<li>防雪崩保护：后端连续自愈重启达到 5 次上限后，看门狗停止自动重启并打印严重告警，等待人工排查；服务恢复正常后自动恢复自愈能力。</li>
+</ul>
+<h3>26.3 单实例锁</h3>
+<ul>
+<li>启动器以 <code>launcher.pid</code> 文件做单实例锁（原子创建），专用端口 25999 仅作补充校验。</li>
+<li>进程被强制结束（任务管理器 / 强杀）后，下次启动会检测并清理陈旧 pid 文件，<strong>通常可立即重新打开，无需等待端口释放</strong>。</li>
+<li>若旧进程仍未真正退出（例如挂起未终止），则提示「启动器已在运行」，需先在任务管理器结束对应进程。</li>
+</ul>
+<h3>26.4 外部启动的前后端服务，启动器无法停止</h3>
+<ul>
+<li>若 8000 / 5173 端口已被「启动器之外」的进程占用且健康，启动器会识别为「外部进程」并复用，状态标记为运行中。</li>
+<li>此时点击【停止系统】只能终止「本启动器管理的子进程」；<strong>外部进程不会被停止</strong>，界面仍显示运行中，需用户到任务管理器手动结束。</li>
+</ul>
+<h2>27 时序图</h2>
+<blockquote>
+<p>以下时序图描述关键交互流程。Mermaid 源码可被 Typora / 语雀 / GitHub 直接渲染。</p>
+</blockquote>
+<h3>27.1 登录鉴权时序</h3>
+<p><div class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant F as 前端（Vue3）
+    participant B as 后端（FastAPI）
+    participant DB as SQLite
+    U-&gt;&gt;F: 输入账号密码，点击登录
+    F-&gt;&gt;B: POST /api/auth/login（OAuth2 表单）
+    B-&gt;&gt;DB: 查询 users 表
+    DB--&gt;&gt;B: 用户记录（含 password_hash）
+    B-&gt;&gt;B: verify_password 校验密码
+    alt 校验失败
+        B--&gt;&gt;F: 401 用户名或密码错误
+    else 校验成功
+        B-&gt;&gt;B: create_access_token(sub=username)
+        B--&gt;&gt;F: {access_token, token_type: bearer}
+        F-&gt;&gt;F: 本地存储 token
+        F-&gt;&gt;B: 业务请求（携带 Bearer Token）
+        B-&gt;&gt;B: get_current_active_user 解析鉴权
+        B--&gt;&gt;F: 业务数据
+    end</div></p>
+<blockquote>
+<p>注：登录接口为 OAuth2 密码模式表单（x-www-form-urlencoded），提交 JSON 会返回 422；token 的 <code>sub</code> 即用户名。</p>
+</blockquote>
+<h3>27.2 订单创建与生产/发货状态联动时序</h3>
+<p><div class="mermaid">sequenceDiagram
+    autonumber
+    participant S as 销售/老板
+    participant F as 前端订单模块
+    participant B as 后端 orders.py
+    participant DB as SQLite
+    participant N as 站内信中心
+    S-&gt;&gt;F: 填写表单，提交新建订单
+    F-&gt;&gt;B: POST /api/orders
+    B-&gt;&gt;DB: 生成追溯码，插入 orders（unproduce）
+    B-&gt;&gt;N: 推送 order_created（通知工厂端）
+    B--&gt;&gt;F: 200 创建成功
+    Note over F,N: 工厂端上传生产图片
+    F-&gt;&gt;B: POST 订单图片上传（layer=factory）
+    B-&gt;&gt;DB: 写 images；produce_status → producing
+    B-&gt;&gt;N: 推送生产进度更新（销售/工厂/老板）
+    Note over F,N: 发货端填写物流并发货
+    F-&gt;&gt;B: PUT /api/orders/{id}（shipping_status → shipped）
+    B-&gt;&gt;DB: 写物流字段；produce_status → produced 锁定
+    B-&gt;&gt;N: 推送 order_shipped + 生产完成通知
+    B--&gt;&gt;F: 200 更新成功</div></p>
+<h3>27.3 平台订单同步时序</h3>
+<p><div class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant F as 前端
+    participant B as 后端 shops.py
+    participant P as 电商平台 API
+    participant DB as SQLite
+    U-&gt;&gt;F: 点击「立即同步」
+    F-&gt;&gt;B: POST /api/shops/{id}/sync
+    B-&gt;&gt;B: 读取店铺凭证（Fernet 解密）
+    B-&gt;&gt;P: 拉取平台订单（增量时间窗口）
+    P--&gt;&gt;B: 订单数据
+    B-&gt;&gt;DB: 写入 order_imports 临时表（待审核）
+    B--&gt;&gt;F: 返回 N 条待审核
+    Note over F,U: 用户进入「数据导入」页审核
+    U-&gt;&gt;F: 勾选并确认合并
+    F-&gt;&gt;B: POST /api/order-imports/merge
+    B-&gt;&gt;DB: 合并进 orders（生成追溯码），删除临时记录
+    B--&gt;&gt;F: 合并结果</div></p>
+<blockquote>
+<p>注：<code>_fetch_platform_orders</code> 当前为占位实现，真实拉单需平台 API 凭证 + 对接代码；店铺 API 配置密钥类字段以 Fernet 加密存储。</p>
+</blockquote>
+<h2>28 状态机图</h2>
+<h3>28.1 订单状态机（shipping_status）</h3>
+<p><div class="mermaid">stateDiagram-v2
+    [*] --&gt; pending: 新建订单
+    pending --&gt; shipped: 发货
+    pending --&gt; virtual: 虚拟发货（占位催单）
+    pending --&gt; refunded: 退货/退款
+    virtual --&gt; shipped: 补发实体
+    virtual --&gt; refunded: 退货/退款
+    shipped --&gt; refunded: 退货/退款
+    refunded --&gt; [*]: 终态（只读）
+    note right of shipped
+        已发货订单其余字段锁定，
+        仅可修改状态或退款备注
+    end note
+    note right of virtual
+        虚拟发货地位等同未发货，
+        未按时生产时占位催单
+    end note</div></p>
+<blockquote>
+<p>流转约束：新建订单仅可选「未发货」；已发货订单仅允许改为「已退货/退款」；虚拟发货允许改为「已发货/已退货/退款」；已退货/退款为终态。</p>
+</blockquote>
+<h3>28.2 生产状态机（produce_status）</h3>
+<p><div class="mermaid">stateDiagram-v2
+    [*] --&gt; unproduce: 新建订单默认
+    unproduce --&gt; producing: 工厂上传生产图片（自动）/ 手动修改
+    unproduce --&gt; produced: 手动修改 / 直接发货（自动）
+    producing --&gt; produced: 手动修改 / 订单发货（自动）
+    produced --&gt; [*]: 永久锁定
+    note right of produced
+        发货后强制锁定为 produced；
+        撤销发货不回退；无返工流程
+    end note</div></p>
+<blockquote>
+<p>触发规则：① 工厂上传 factory 层级生产图自动置为「生产中」（防抖：已是生产中不重复更新/通知）；② 订单变为已发货/虚拟发货时强制锁定「生产完成」；③ 手动修改所有角色均可，但发货后永久锁定不可下调。</p>
+</blockquote>
+<h2>29 部署拓扑图</h2>
+<p><div class="mermaid">flowchart LR
+    subgraph USER[&quot;用户侧&quot;]
+        B1[&quot;浏览器&quot;]
+        L1[&quot;启动器窗口 / 托盘&quot;]
+    end
+    subgraph HOST[&quot;本机部署&quot;]
+        LA[&quot;启动器.py（PySide6）&quot;]
+        FE[&quot;前端 vite dev server\n127.0.0.1:5173&quot;]
+        BE[&quot;后端 uvicorn\n127.0.0.1:8000&quot;]
+        WD[&quot;看门狗线程\n15s 探测 /health&quot;]
+        LOCK[&quot;单实例锁\nlauncher.pid + 端口25999&quot;]
+        BK[&quot;自动备份调度线程&quot;]
+        DB[(&quot;SQLite\norder_system.db&quot;)]
+        IMG[(&quot;图片目录\ndata/images&quot;)]
+        LOG[(&quot;日志文件\n*.log&quot;)]
+    end
+    subgraph EXT[&quot;外部&quot;]
+        PLAT[&quot;电商平台 API&quot;]
+    end
+    B1 --&gt;|&quot;HTTP :5173&quot;| FE
+    L1 --&gt;|&quot;控制 / 监控&quot;| LA
+    LA --&gt;|&quot;启动 / 停止&quot;| FE
+    LA --&gt;|&quot;启动 / 停止&quot;| BE
+    LA --&gt; WD
+    LA --&gt; LOCK
+    LA --&gt; BK
+    BK --&gt;|&quot;定时备份&quot;| DB
+    BE --&gt; DB
+    BE --&gt; IMG
+    BE --&gt; LOG
+    BE --&gt;|&quot;HTTPS 拉单&quot;| PLAT
+    FE --&gt;|&quot;REST + JWT :8000&quot;| BE</div></p>
+<blockquote>
+<p>说明：启动器是桌面管理端，管理前后端子进程生命周期；看门狗只监控后端（端口 8000 + /health），前端崩溃需人工重启；自动备份仅启动器保持打开时执行；8000/5173 被外部进程占用时启动器识别为外部进程、无法停止。</p>
+</blockquote>
+<h2>30 数据流图</h2>
+<h3>30.1 订单数据流（导入 / 同步 → 正式表 → 消费）</h3>
+<p><div class="mermaid">flowchart LR
+    S1[&quot;Excel 模板下载&quot;] --&gt; U1[&quot;上传 Excel&quot;]
+    S2[&quot;平台「立即同步」&quot;] --&gt; U2[&quot;拉单 API（占位待对接）&quot;]
+    U1 --&gt; T[(&quot;order_imports 临时表&quot;)]
+    U2 --&gt; T
+    T --&gt; V[&quot;10 条业务规则校验&quot;]
+    V --&gt;|&quot;异常&quot;| E[&quot;异常原因列表&quot;]
+    E --&gt; F[&quot;编辑修正&quot;]
+    F --&gt; T
+    V --&gt;|&quot;无异常&quot;| M[&quot;勾选审核（支持全选）&quot;]
+    M --&gt; MG[&quot;合并进 orders&quot;]
+    MG --&gt; O[(&quot;orders 正式表&quot;)]
+    O --&gt; ST[&quot;统计模块\n智慧大屏 / 退款率 / 提成&quot;]
+    O --&gt; WA[&quot;预警中心\n超期未生产 / 未发货&quot;]
+    O --&gt; NO[&quot;站内通知&quot;]
+    O --&gt; EX[&quot;导出 Excel&quot;]</div></p>
+<h3>30.2 图片与通知数据流</h3>
+<p><div class="mermaid">flowchart LR
+    SALE[&quot;销售上传商品图&quot;] --&gt; I1[&quot;images 表 layer=sales&quot;]
+    FACT[&quot;工厂上传生产图&quot;] --&gt; I2[&quot;images 表 layer=factory&quot;]
+    SHIP[&quot;发货端上传凭证&quot;] --&gt; I3[&quot;images 表 layer=shipping&quot;]
+    I1 --&gt; ST[(&quot;data/images 存储&quot;)]
+    I2 --&gt; ST
+    I3 --&gt; ST
+    I2 --&gt; AUTO[&quot;自动：produce_status → producing&quot;]
+    AUTO --&gt; NOTI[(&quot;notifications&quot;)]
+    EV[&quot;订单创建 / 发货 / 退款 / 删除事件&quot;] --&gt; NOTI
+    NOTI --&gt; FE[&quot;前端站内信中心&quot;]
+    NOTI --&gt; READ[&quot;已读 / 全部已读&quot;]</div></p>
+<blockquote>
+<p>说明：图片访问走鉴权路由；图片层级 layer 与上传者角色共同决定生产状态联动（factory 层级生产图触发 producing）；站内信 6 类事件由订单/图片/生产状态变更自动产生，同订单同事件去重。</p>
+</blockquote>
+<footer>由开发文档说明.md 自动生成 · Mermaid 图使用本地渲染脚本，断网可用 · 最后生成 2026-08-18</footer>
+</article>
+</div>
+<button id="topBtn" title="返回顶部">↑</button>
+<script src="mermaid-render.min.js"></script>
+<script>
+(function(){
+  try { mermaid.initialize({ startOnLoad:false, theme:'default', securityLevel:'loose', flowchart:{useMaxWidth:true}, er:{useMaxWidth:true} }); }
+  catch(e) { console.error('mermaid 初始化失败', e); }
+  function renderAll(){
+    var nodes = document.querySelectorAll('.mermaid');
+    var i = 0;
+    nodes.forEach(function(n){
+      var id = 'mmd-' + (++i);
+      try {
+        mermaid.render(id, n.textContent).then(function(res){
+          n.innerHTML = res.svg;
+        }).catch(function(err){
+          n.innerHTML = '<div style="color:#c0392b;border:1px solid #e8a2a2;background:#fdf0f0;padding:10px 14px;border-radius:8px;text-align:left;">该图渲染失败：' + (err && err.message ? err.message : err) + '<br><small style="color:#888;">原始源码见下方</small></div><pre style="margin-top:6px;">' + n.textContent.replace(/</g,'&lt;') + '</pre>';
+        });
+      } catch(err) {
+        n.innerHTML = '<div style="color:#c0392b;">渲染失败：' + (err && err.message ? err.message : err) + '</div>';
+      }
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderAll);
+  else renderAll();
+  var btn = document.getElementById('topBtn');
+  window.addEventListener('scroll', function(){ btn.style.display = window.scrollY > 400 ? 'block' : 'none'; });
+  btn.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+})();
+</script>
+</body>
+</html>
